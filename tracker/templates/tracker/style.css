@@ -1,0 +1,22 @@
+body {
+  background: #f0f0f1;
+  color: #313335;
+}
+
+.card {
+  /* background: rgba(15, 20, 25, .65); */
+  /* background: #020024; */
+  background: radial-gradient(
+    circle,
+    rgb(195, 237, 247) 0%,
+    rgb(186, 204, 227) 39%,
+    rgb(119, 147, 181) 100%
+  );
+  /* background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); */
+  color: #e8ebf1;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+label {
+  font-weight: 600;
+}

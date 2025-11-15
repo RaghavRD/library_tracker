@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI – Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+
+  <!-- 🔹 Toast Container (Top-right corner) -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+    {% if messages %}
+    {% for m in messages %}
+    <div
+      class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+      role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+      <div class="d-flex">
+        <div class="toast-body">
+          {{ m }}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+          aria-label="Close"></button>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- 🔹 Header Section -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="fw-semibold mb-1">Dashboard</h1>
+      <p class="text-muted mb-0">
+        View all project registrations synced with Google Sheets.
+      </p>
+    </div>
+    <a href="{% url 'register_project' %}" class="btn btn-primary shadow-sm">
+      <i class="bi bi-plus-lg"></i> New Registration
+    </a>
+  </div>
+
+  <!-- 🔹 Google Sheets Registrations -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Registrations</h5>
+      <span class="badge bg-light text-dark">
+        {{ registrations|length }} Project{{ registrations|pluralize }}
+      </span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if registrations %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light text-center">
+            <tr>
+              <th>#</th>
+              <th>Project</th>
+              <th>Developers</th>
+              <th>Emails</th>
+              <th>Language / Ver</th>
+              <th>Libraries</th>
+              <th>Lib Versions</th>
+              <th>Notify</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in registrations %}
+            <tr class="text-center">
+              <td class="text-center fw-medium">{{ forloop.counter }}</td>
+              <td>{{ r.project_name }}</td>
+              <td>{{ r.developer_names }}</td>
+              <td><small>{{ r.developer_emails }}</small></td>
+              <td>
+                {{ r.language_used }}
+                <span class="text-muted">({{ r.language_version }})</span>
+              </td>
+              <td><code>{{ r.libraries }}</code></td>
+              <td><code>{{ r.library_versions }}</code></td>
+              <td class="text-center text-capitalize">{{ r.notification_type }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">No registrations yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toastElList = [].slice.call(document.querySelectorAll(".toast"));
+    toastElList.forEach(function (toastEl) {
+      const t = new bootstrap.Toast(toastEl);
+      t.show();
+    });
+  });
+</script>
+{% endblock %}

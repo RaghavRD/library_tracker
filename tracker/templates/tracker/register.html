@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Register Project – LibTrack AI{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+  <!-- 🔹 Header -->
+  <div class="mb-4">
+    <h1 class="fw-semibold mb-1">Register Your Project</h1>
+    <p class="text-muted mb-0">
+      Add your project details & libraries. LibTrack AI will automatically monitor updates and email you.
+    </p>
+  </div>
+
+  <!-- 🔹 Django Messages -->
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert">
+        {{ m }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- 🔹 Registration Form -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Project Registration Form</h5>
+    </div>
+    <div class="card-body">
+      <form method="post" action="{% url 'register_project' %}">
+        {% csrf_token %}
+
+        <div class="row g-3">
+          <!-- Project Name -->
+          <div class="col-md-6">
+            <label for="project_name" class="form-label fw-semibold">Project Name</label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="project_name"
+              name="project_name"
+              placeholder="e.g., LibTrack AI"
+            />
+          </div>
+
+          <!-- Developer Names -->
+          <div class="col-md-6">
+            <label for="developer_names" class="form-label fw-semibold">Developer Name(s)</label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="developer_names"
+              name="developer_names"
+              placeholder="Comma-separated if multiple"
+            />
+          </div>
+
+          <!-- Developer Emails -->
+          <div class="col-md-12">
+            <label for="developer_emails" class="form-label fw-semibold">Developer Email(s)</label>
+            <input
+              type="email"
+              required
+              class="form-control"
+              id="developer_emails"
+              name="developer_emails"
+              placeholder="Comma-separated emails"
+            />
+            <div class="form-text text-secondary">
+              Use valid emails; multiple addresses separated by commas.
+            </div>
+          </div>
+
+          <!-- Language -->
+          <div class="col-md-6">
+            <label for="language_used" class="form-label fw-semibold">Language Used</label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="language_used"
+              name="language_used"
+              placeholder="e.g., Python (Django Full Stack)"
+            />
+          </div>
+
+          <!-- Language Version -->
+          <div class="col-md-6">
+            <label for="language_version" class="form-label fw-semibold">Language Version</label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="language_version"
+              name="language_version"
+              placeholder="e.g., 3.11"
+            />
+          </div>
+
+          <!-- Libraries -->
+          <div class="col-md-12">
+            <label for="libraries" class="form-label fw-semibold">Libraries (comma-separated)</label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="libraries"
+              name="libraries"
+              placeholder="numpy, django, requests"
+            />
+          </div>
+
+          <!-- Library Versions -->
+          <div class="col-md-12">
+            <label for="library_versions" class="form-label fw-semibold">
+              Library Versions (comma-separated, same order)
+            </label>
+            <input
+              type="text"
+              required
+              class="form-control"
+              id="library_versions"
+              name="library_versions"
+              placeholder="2.1.0, 5.1, 2.32.3"
+            />
+          </div>
+
+          <!-- Notification Type -->
+          <div class="col-md-6">
+            <label for="notification_type" class="form-label fw-semibold">Notification Type</label>
+            <select class="form-select" id="notification_type" name="notification_type">
+              <option value="both">Both (Major & Minor)</option>
+              <option value="major">Major only</option>
+              <option value="minor">Minor only</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+          <a href="{% url 'dashboard' %}" class="btn btn-outline-dark">
+            <i class="bi bi-arrow-left-circle"></i> Back to Dashboard
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> Save Project
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

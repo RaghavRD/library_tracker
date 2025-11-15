@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI – Last Updates{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+
+    <!-- 🔹 Toast Container (Top-right corner) -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+        {% if messages %}
+        {% for m in messages %}
+        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+            <div class="d-flex">
+                <div class="toast-body">
+                    {{ m }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Close"></button>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- 🔹 Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="fw-semibold mb-1">Last Updates</h1>
+            <p class="text-muted mb-0">
+                View all project registrations synced with Google Sheets.
+            </p>
+        </div>
+        <a href="{% url 'register_project' %}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-lg"></i> New Registration
+        </a>
+    </div>
+
+    <!-- 🔹 Update Cache Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white d-flex flex-column flex-md-row justify-content-between gap-2">
+            <div>
+                <h5 class="mb-1">Update Cache</h5>
+                <!-- <p class="mb-0 small text-white-50">Filter by project to spotlight the relevant releases.</p> -->
+            </div>
+            <div class="text-md-end">
+                <span class="badge bg-light text-dark">
+                    Showing <span id="resultsCount">{{ cache|length }}</span> / {{ cache|length }} record{{ cache|pluralize }}
+                </span>
+            </div>
+        </div>
+
+        <div class="card-body border-bottom bg-light">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
+                        Project Filter
+                    </label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white">
+                            <i class="bi bi-funnel text-primary"></i>
+                        </span>
+                        <select id="projectFilter" class="form-select" {% if not project_names %}disabled{% endif %}>
+                            <option value="">All Projects</option>
+                            {% if project_names %}
+                                {% for project in project_names %}
+                                <option value="{{ project }}">{{ project }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="">Project list unavailable</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    {% if not project_names %}
+                    <small class="text-muted d-block mt-1">Project data could not be loaded at this time.</small>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0 text-muted small">
+                        <i class="bi bi-info-circle me-1 text-primary"></i>
+                        Select a project to instantly refine the update history table.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            {% if cache %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th>#</th>
+                            <th>Library</th>
+                            <th>Projects</th>
+                            <th>Version</th>
+                            <th>Category</th>
+                            <th>Release Date</th>
+                            <th>Source</th>
+                            <th>Updated At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cache %}
+                        <tr class="text-center" data-projects="{{ c.project_names|join:'||' }}">
+                            <td class="text-center fw-medium">{{ forloop.counter }}</td>
+                            <td>{{ c.library }}</td>
+                            <td>
+                                {% if c.project_names %}
+                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                    {% for project in c.project_names %}
+                                    <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-normal px-3">{{ project }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small fst-italic">Not linked</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ c.version }}</span>
+                            </td>
+                            <td>{{ c.category }}</td>
+                            <td>{{ c.release_date }}</td>
+                            <td>
+                                <a href="{{ c.source }}" class="link-primary text-decoration-none" target="_blank"
+                                    rel="noopener">View</a>
+                            </td>
+                            <td>{{ c.updated_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr id="historyEmptyState" class="text-center d-none">
+                            <td colspan="8" class="py-4 text-muted">No cache records available.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">No cache records available.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const toastElList = [].slice.call(document.querySelectorAll(".toast"));
+        toastElList.forEach(function (toastEl) {
+            const t = new bootstrap.Toast(toastEl);
+            t.show();
+        });
+
+        const filterSelect = document.getElementById("projectFilter");
+        const rows = Array.from(document.querySelectorAll("tbody tr[data-projects]"));
+        const countBadge = document.getElementById("resultsCount");
+        const emptyRow = document.getElementById("historyEmptyState");
+
+        const applyFilter = () => {
+            const selected = filterSelect ? filterSelect.value : "";
+            let visible = 0;
+
+            rows.forEach((row) => {
+                const projects = (row.dataset.projects || "").split("||").filter(Boolean);
+                const matches = !selected || projects.includes(selected);
+                row.style.display = matches ? "" : "none";
+                if (matches) {
+                    visible += 1;
+                }
+            });
+
+            if (countBadge) {
+                countBadge.textContent = visible;
+            }
+
+            if (emptyRow) {
+                emptyRow.classList.toggle("d-none", visible !== 0);
+                const messageCell = emptyRow.querySelector("td");
+                if (messageCell) {
+                    messageCell.textContent = selected
+                        ? `No updates found for “${selected}”.`
+                        : "No cache records available.";
+                }
+            }
+        };
+
+        if (filterSelect) {
+            filterSelect.addEventListener("change", applyFilter);
+        }
+
+        applyFilter();
+    });
+</script>
+{% endblock %}
