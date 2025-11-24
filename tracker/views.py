@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 
 from tracker.utils.google_sheet_manager import GoogleSheetManager
 from tracker.models import UpdateCache
@@ -297,10 +298,21 @@ def dashboard(request):
 
     cache = UpdateCache.objects.order_by("-updated_at").all()
 
+    registrations_total = len(regs)
+    registrations_page = None
+    if registrations_total:
+        paginator = Paginator(regs, 2)
+        registrations_page = paginator.get_page(request.GET.get("page"))
+
     return render(
         request,
         "tracker/dashboard.html",
-        {"registrations": regs, "cache": cache},
+        {
+            "registrations_page": registrations_page,
+            "registrations_total": registrations_total,
+            "registrations_per_page": 2,
+            "cache": cache,
+        },
     )
 
 def updateHistory(request):
@@ -338,11 +350,26 @@ def updateHistory(request):
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
 
+    selected_project = (request.GET.get("project") or "").strip()
+    if selected_project:
+        filtered_cache = [entry for entry in cache if selected_project in entry.project_names]
+    else:
+        filtered_cache = cache
+
+    history_total = len(filtered_cache)
+    history_page = None
+    if history_total:
+        paginator = Paginator(filtered_cache, 5)
+        history_page = paginator.get_page(request.GET.get("page"))
+
     return render(
         request,
         "tracker/history.html",
         {
-            "cache": cache,
+            "history_page": history_page,
+            "history_total": history_total,
+            "history_per_page": 5,
+            "selected_project": selected_project,
             "project_names": project_names,
         },
     )

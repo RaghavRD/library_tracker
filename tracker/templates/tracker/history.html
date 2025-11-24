@@ -42,7 +42,11 @@
             </div>
             <div class="text-md-end">
                 <span class="badge bg-light text-dark">
-                    Showing <span id="resultsCount">{{ cache|length }}</span> / {{ cache|length }} record{{ cache|pluralize }}
+                    {% if history_total and history_page %}
+                        Showing {{ history_page.start_index }}-{{ history_page.end_index }} of {{ history_total }} record{{ history_total|pluralize }}
+                    {% else %}
+                        No records to display
+                    {% endif %}
                 </span>
             </div>
         </div>
@@ -53,21 +57,23 @@
                     <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
                         Project Filter
                     </label>
-                    <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-white">
-                            <i class="bi bi-funnel text-primary"></i>
-                        </span>
-                        <select id="projectFilter" class="form-select" {% if not project_names %}disabled{% endif %}>
-                            <option value="">All Projects</option>
-                            {% if project_names %}
-                                {% for project in project_names %}
-                                <option value="{{ project }}">{{ project }}</option>
-                                {% endfor %}
-                            {% else %}
-                                <option value="">Project list unavailable</option>
-                            {% endif %}
-                        </select>
-                    </div>
+                    <form method="get" id="historyFilterForm" class="w-100">
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-funnel text-primary"></i>
+                            </span>
+                            <select id="projectFilter" name="project" class="form-select" {% if not project_names %}disabled{% endif %}>
+                                <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
+                                {% if project_names %}
+                                    {% for project in project_names %}
+                                    <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>{{ project }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="">Project list unavailable</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </form>
                     {% if not project_names %}
                     <small class="text-muted d-block mt-1">Project data could not be loaded at this time.</small>
                     {% endif %}
@@ -75,14 +81,14 @@
                 <div class="col-md-6 text-md-end">
                     <p class="mb-0 text-muted small">
                         <i class="bi bi-info-circle me-1 text-primary"></i>
-                        Select a project to instantly refine the update history table.
+                        Select a project to filter the update history table.
                     </p>
                 </div>
             </div>
         </div>
 
         <div class="card-body p-0">
-            {% if cache %}
+            {% if history_total and history_page %}
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light text-center">
@@ -98,9 +104,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for c in cache %}
-                        <tr class="text-center" data-projects="{{ c.project_names|join:'||' }}">
-                            <td class="text-center fw-medium">{{ forloop.counter }}</td>
+                        {% for c in history_page %}
+                        <tr class="text-center">
+                            <td class="text-center fw-medium">{{ history_page.start_index|add:forloop.counter0 }}</td>
                             <td>{{ c.library }}</td>
                             <td>
                                 {% if c.project_names %}
@@ -125,16 +131,60 @@
                             <td>{{ c.updated_at|date:"Y-m-d H:i" }}</td>
                         </tr>
                         {% endfor %}
-                        <tr id="historyEmptyState" class="text-center d-none">
-                            <td colspan="8" class="py-4 text-muted">No cache records available.</td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
             {% else %}
-            <div class="p-4 text-center text-muted">No cache records available.</div>
+            <div class="p-4 text-center text-muted">
+                {% if selected_project %}
+                No updates found for “{{ selected_project }}”.
+                {% else %}
+                No cache records available.
+                {% endif %}
+            </div>
             {% endif %}
         </div>
+        {% if history_total and history_page and history_page.paginator.num_pages > 1 %}
+        <div class="card-footer border-0 bg-light">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+                <small class="text-muted mb-0">
+                    Showing {{ history_page.start_index }}-{{ history_page.end_index }} of {{ history_total }} record{{ history_total|pluralize }}
+                </small>
+                <nav aria-label="History pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item {% if not history_page.has_previous %}disabled{% endif %}">
+                            {% if history_page.has_previous %}
+                            <a class="page-link"
+                                href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}page={{ history_page.previous_page_number }}"
+                                aria-label="Previous">Previous</a>
+                            {% else %}
+                            <span class="page-link">Previous</span>
+                            {% endif %}
+                        </li>
+                        {% for num in history_page.paginator.page_range %}
+                        <li class="page-item {% if history_page.number == num %}active{% endif %}">
+                            {% if history_page.number == num %}
+                            <span class="page-link">{{ num }}</span>
+                            {% else %}
+                            <a class="page-link"
+                                href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}page={{ num }}">{{ num }}</a>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        <li class="page-item {% if not history_page.has_next %}disabled{% endif %}">
+                            {% if history_page.has_next %}
+                            <a class="page-link"
+                                href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}page={{ history_page.next_page_number }}"
+                                aria-label="Next">Next</a>
+                            {% else %}
+                            <span class="page-link">Next</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -148,45 +198,15 @@
             const t = new bootstrap.Toast(toastEl);
             t.show();
         });
-
         const filterSelect = document.getElementById("projectFilter");
-        const rows = Array.from(document.querySelectorAll("tbody tr[data-projects]"));
-        const countBadge = document.getElementById("resultsCount");
-        const emptyRow = document.getElementById("historyEmptyState");
-
-        const applyFilter = () => {
-            const selected = filterSelect ? filterSelect.value : "";
-            let visible = 0;
-
-            rows.forEach((row) => {
-                const projects = (row.dataset.projects || "").split("||").filter(Boolean);
-                const matches = !selected || projects.includes(selected);
-                row.style.display = matches ? "" : "none";
-                if (matches) {
-                    visible += 1;
+        if (filterSelect) {
+            filterSelect.addEventListener("change", function () {
+                const form = filterSelect.closest("form");
+                if (form) {
+                    form.submit();
                 }
             });
-
-            if (countBadge) {
-                countBadge.textContent = visible;
-            }
-
-            if (emptyRow) {
-                emptyRow.classList.toggle("d-none", visible !== 0);
-                const messageCell = emptyRow.querySelector("td");
-                if (messageCell) {
-                    messageCell.textContent = selected
-                        ? `No updates found for “${selected}”.`
-                        : "No cache records available.";
-                }
-            }
-        };
-
-        if (filterSelect) {
-            filterSelect.addEventListener("change", applyFilter);
         }
-
-        applyFilter();
     });
 </script>
 {% endblock %}
