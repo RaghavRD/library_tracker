@@ -29,10 +29,25 @@ Return JSON like this:
   "version": "<latest_version_number>",
   "category": "major|minor",
   "summary": "3-4 concise bullet points or sentences about new features or changes",
-  "release_date": "YYYY-MM-DD or empty if unknown",
+  "release_date": "DD-MM-YYYY or empty if unknown",
   "source": "<official URL>"
 }
 """
+
+MAJOR_SIGNALS = {
+    "breaking",
+    "deprecated",
+    "security",
+    "cve",
+    "vulnerability",
+    "removed",
+    "migration",
+    "refactor",
+    "major",
+    "incompatible",
+    "upgrade required",
+    "critical",
+}
 
 # --- Utility Functions ---
 def _clean_version(v: str) -> str:
@@ -51,8 +66,7 @@ def _coerce_category(text: str) -> str:
     if not text:
         return "minor"
     t = text.lower()
-    major_signals = ["breaking", "deprecated", "security", "removed", "migration", "refactor", "major"]
-    if any(w in t for w in major_signals):
+    if any(w in t for w in MAJOR_SIGNALS):
         return "major"
     return "minor"
 
@@ -101,11 +115,24 @@ class GroqAnalyzer:
             return {"error": "Invalid Serper result type"}
 
         serper_text = json.dumps(serper_results.get("filtered") or serper_results, indent=2)[:12000]
+        future_updates = serper_results.get("future_updates") or []
+
+        future_snippets = ""
+        if future_updates:
+            future_lines = []
+            for entry in future_updates[:3]:
+                title = entry.get("title", "").strip()
+                snippet = entry.get("snippet", "").strip()
+                link = entry.get("link", "").strip()
+                future_lines.append(f"- {title} :: {snippet} ({link})")
+            future_snippets = "\nUpcoming / planned releases:\n" + "\n".join(future_lines)
 
         prompt = (
             f"Analyze the following search results for the library '{library}'. "
             f"Find the latest release version, update type (major/minor), date, and summary.\n\n"
             f"{_JSON_SCHEMA_HINT}\n\n"
+            f"Latest version hint from search: {serper_results.get('latest_version_candidate') or 'unknown'}\n"
+            f"{future_snippets}\n"
             f"Search Results:\n{serper_text}"
         )
 

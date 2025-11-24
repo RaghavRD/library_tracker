@@ -6,7 +6,7 @@ from pathlib import Path
 from django.db import transaction
 from dotenv import load_dotenv, find_dotenv
 from packaging import version as pkg_version
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from tracker.utils.google_sheet_manager import GoogleSheetManager
 from tracker.utils.serper_fetcher import SerperFetcher
@@ -26,6 +26,8 @@ else:
 
 load_dotenv()
 
+DEFAULT_AUTO_RUN_TIME = "09:00"
+
 class Command(BaseCommand):
     help = "Runs daily update check using Serper.dev + Groq and emails relevant updates via Mailtrap"
 
@@ -33,13 +35,26 @@ class Command(BaseCommand):
         parser.add_argument(
             "--auto",
             action="store_true",
-            help="Run in auto-schedule mode (every day at 9:00 AM)",
+            help=f"Run in auto-schedule mode (defaults to daily at {DEFAULT_AUTO_RUN_TIME}).",
+        )
+        parser.add_argument(
+            "--time",
+            dest="run_time",
+            metavar="HH:MM",
+            default=DEFAULT_AUTO_RUN_TIME,
+            help=f"Time of day (24h) to execute when --auto is used. Defaults to {DEFAULT_AUTO_RUN_TIME}.",
         )
 
     def handle(self, *args, **options):
+        run_time = options.get("run_time") or DEFAULT_AUTO_RUN_TIME
+        if run_time and not self._is_valid_time_format(run_time):
+            raise CommandError("Invalid value for --time. Use HH:MM in 24-hour format, e.g. 09:00.")
+
         if options.get("auto"):
-            self.stdout.write(self.style.MIGRATE_HEADING("⏰ Auto mode: will run every day at 9:00 AM"))
-            schedule.every().day.at("11:00").do(self.run_daily_check)
+            self.stdout.write(
+                self.style.MIGRATE_HEADING(f"⏰ Auto mode: will run every day at {run_time}")
+            )
+            schedule.every().day.at(run_time).do(self.run_daily_check)
             while True:
                 schedule.run_pending()
                 time.sleep(30)
@@ -236,7 +251,6 @@ class Command(BaseCommand):
                 should_send = True
             elif category == "major" and cache.category != "major":
                 should_send = True
-            should_send = True
 
             if should_send:
                 if notify_pref == "major" and category != "major":
@@ -272,3 +286,12 @@ class Command(BaseCommand):
 
         self.stdout.write(f"[{label}] No email (no new version or filtered by preference).")
         return None
+
+    @staticmethod
+    def _is_valid_time_format(value: str) -> bool:
+        """Return True if time is HH:MM in 24h format."""
+        try:
+            time.strptime(value, "%H:%M")
+            return True
+        except (TypeError, ValueError):
+            return False

@@ -4,15 +4,13 @@
 
 {% block content %}
 <div class="container py-4" style="max-width: 900px;">
-  <!-- 🔹 Header -->
   <div class="mb-4">
     <h1 class="fw-semibold mb-1">Register Your Project</h1>
     <p class="text-muted mb-0">
-      Add your project details & libraries. LibTrack AI will automatically monitor updates and email you.
+      Track every dependency—languages, frameworks, SDKs, internal tools—and get proactive release alerts.
     </p>
   </div>
 
-  <!-- 🔹 Django Messages -->
   {% if messages %}
     {% for m in messages %}
       <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert">
@@ -22,7 +20,6 @@
     {% endfor %}
   {% endif %}
 
-  <!-- 🔹 Registration Form -->
   <div class="card border-0 shadow-sm">
     <div class="card-header bg-primary text-white">
       <h5 class="mb-0">Project Registration Form</h5>
@@ -32,114 +29,105 @@
         {% csrf_token %}
 
         <div class="row g-3">
-          <!-- Project Name -->
           <div class="col-md-6">
             <label for="project_name" class="form-label fw-semibold">Project Name</label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="project_name"
-              name="project_name"
-              placeholder="e.g., LibTrack AI"
-            />
+            <input type="text" class="form-control" id="project_name" name="project_name" placeholder="e.g., LibTrack AI" required />
           </div>
 
-          <!-- Developer Names -->
           <div class="col-md-6">
-            <label for="developer_names" class="form-label fw-semibold">Developer Name(s)</label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="developer_names"
-              name="developer_names"
-              placeholder="Comma-separated if multiple"
-            />
+            <label for="developer_names" class="form-label fw-semibold">Project Owner / Team</label>
+            <input type="text" class="form-control" id="developer_names" name="developer_names" placeholder="Comma-separated if multiple" required />
           </div>
 
-          <!-- Developer Emails -->
           <div class="col-md-12">
-            <label for="developer_emails" class="form-label fw-semibold">Developer Email(s)</label>
-            <input
-              type="email"
-              required
-              class="form-control"
-              id="developer_emails"
-              name="developer_emails"
-              placeholder="Comma-separated emails"
-            />
-            <div class="form-text text-secondary">
-              Use valid emails; multiple addresses separated by commas.
+            <label for="developer_emails" class="form-label fw-semibold">Notification Emails</label>
+            <textarea class="form-control" id="developer_emails" name="developer_emails" rows="2" placeholder="Comma-separated emails" required></textarea>
+            <div class="form-text text-secondary">Use valid emails; separate multiple addresses with commas.</div>
+          </div>
+
+          <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <span class="form-label fw-semibold d-block">Technology Stack</span>
+                <p class="text-secondary small mb-0">
+                  Add everything that matters—programming languages, frameworks, SDKs, data pipelines, CI/CD tools, private packages, or cloud services.
+                </p>
+              </div>
+              <span class="badge bg-light text-dark border">Unlimited entries</span>
             </div>
+
+            <div
+              class="stack-builder border rounded-3 p-3 bg-light-subtle"
+              data-builder-id="register-stack"
+              data-datalist-id="stackComponentTypes"
+              data-initial-rows='[{"category":"Language"}]'
+              data-min-rows="1"
+            >
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 20%">Type</th>
+                      <th style="width: 30%">Name</th>
+                      <th style="width: 20%">Version</th>
+                      <th style="width: 20%">Scope / Notes</th>
+                      <th style="width: 10%" class="text-end">Remove</th>
+                    </tr>
+                  </thead>
+                  <tbody class="stack-builder-body"></tbody>
+                </table>
+              </div>
+              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-3">
+                <button type="button" class="btn btn-outline-primary btn-sm stack-builder-add">
+                  <i class="bi bi-plus-circle me-1"></i> Add Component
+                </button>
+                <small class="text-muted">Versions are required so LibTrack AI can monitor releases accurately.</small>
+              </div>
+            </div>
+            <datalist id="stackComponentTypes">
+              <option value="Language"></option>
+              <option value="Programming Language"></option>
+              <option value="Framework"></option>
+              <option value="Library"></option>
+              <option value="SDK"></option>
+              <option value="Package"></option>
+              <option value="Module"></option>
+              <option value="Tool"></option>
+              <option value="Service"></option>
+              <option value="Dependency"></option>
+            </datalist>
           </div>
 
-          <!-- Language -->
           <div class="col-md-6">
-            <label for="language_used" class="form-label fw-semibold">Language Used</label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="language_used"
-              name="language_used"
-              placeholder="e.g., Python (Django Full Stack)"
-            />
-          </div>
-
-          <!-- Language Version -->
-          <div class="col-md-6">
-            <label for="language_version" class="form-label fw-semibold">Language Version</label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="language_version"
-              name="language_version"
-              placeholder="e.g., 3.11"
-            />
-          </div>
-
-          <!-- Libraries -->
-          <div class="col-md-12">
-            <label for="libraries" class="form-label fw-semibold">Libraries (comma-separated)</label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="libraries"
-              name="libraries"
-              placeholder="numpy, django, requests"
-            />
-          </div>
-
-          <!-- Library Versions -->
-          <div class="col-md-12">
-            <label for="library_versions" class="form-label fw-semibold">
-              Library Versions (comma-separated, same order)
-            </label>
-            <input
-              type="text"
-              required
-              class="form-control"
-              id="library_versions"
-              name="library_versions"
-              placeholder="2.1.0, 5.1, 2.32.3"
-            />
-          </div>
-
-          <!-- Notification Type -->
-          <div class="col-md-6">
-            <label for="notification_type" class="form-label fw-semibold">Notification Type</label>
-            <select class="form-select" id="notification_type" name="notification_type">
-              <option value="both">Both (Major & Minor)</option>
-              <option value="major">Major only</option>
-              <option value="minor">Minor only</option>
-            </select>
+            <span class="form-label fw-semibold d-block mb-1">Notification Preferences</span>
+            <p class="text-secondary small mb-2">Select all release types you’d like to receive.</p>
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_major" value="major" checked />
+              <label class="form-check-label" for="notify_major">Major updates</label>
+            </div>
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_minor" value="minor" checked />
+              <label class="form-check-label" for="notify_minor">Minor updates</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_future" value="future" />
+              <label class="form-check-label d-flex align-items-center gap-2" for="notify_future">
+                <span>Future release announcements</span>
+                <span
+                  class="badge text-dark bg-warning-subtle border border-warning-subtle"
+                  role="button"
+                  tabindex="0"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="We’ll alert you when official maintainers announce upcoming releases."
+                >
+                  Important
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
-        <!-- Buttons -->
         <div class="d-flex justify-content-between mt-4">
           <a href="{% url 'dashboard' %}" class="btn btn-outline-dark">
             <i class="bi bi-arrow-left-circle"></i> Back to Dashboard
@@ -152,4 +140,15 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  });
+</script>
 {% endblock %}

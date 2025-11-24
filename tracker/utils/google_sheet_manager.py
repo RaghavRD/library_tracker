@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from google.oauth2.service_account import Credentials
 from gspread.exceptions import WorksheetNotFound, APIError
+from gspread.utils import rowcol_to_a1
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,9 +16,15 @@ if not load_dotenv(dotenv_path=env_path):
 
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 HEADERS = [
-    "project_name", "developer_names", "developer_emails",
-    "language_used", "language_version", "libraries",
-    "library_versions", "notification_type",
+    "project_name",
+    "developer_names",
+    "developer_emails",
+    "language_used",
+    "language_version",
+    "libraries",
+    "library_versions",
+    "notification_type",
+    "tech_stack",
 ]
 
 class GoogleSheetManager:
@@ -59,12 +66,43 @@ class GoogleSheetManager:
 
     def read_all_registrations(self) -> list[dict]:
         try:
-            values = self.ws.get_all_records()
+            values = self.ws.get_all_values()
         except APIError as e:
             raise RuntimeError(f"Google Sheets API error during read: {e}")
 
-        normalized = [{k: v.get(k, "") for k in HEADERS} for v in values]
+        if not values:
+            return []
+
+        normalized: list[dict] = []
+        # Skip header row; Google Sheets row indices start at 1 so data begins at 2
+        for idx, row in enumerate(values[1:], start=2):
+            if not any(cell.strip() for cell in row):
+                continue
+            payload = {header: (row[i].strip() if i < len(row) else "") for i, header in enumerate(HEADERS)}
+            payload["row_id"] = idx
+            normalized.append(payload)
+
         return normalized
+
+    def update_registration(self, row_id: int, data: dict) -> None:
+        if row_id < 2:
+            raise ValueError("Invalid row ID for update operation.")
+
+        row_values = [data.get(h, "") for h in HEADERS]
+        start = rowcol_to_a1(row_id, 1)
+        end = rowcol_to_a1(row_id, len(HEADERS))
+        try:
+            self.ws.update(f"{start}:{end}", [row_values], value_input_option="RAW")
+        except APIError as e:
+            raise RuntimeError(f"Google Sheets API error during update: {e}")
+
+    def delete_registration(self, row_id: int) -> None:
+        if row_id < 2:
+            raise ValueError("Invalid row ID for delete operation.")
+        try:
+            self.ws.delete_rows(row_id)
+        except APIError as e:
+            raise RuntimeError(f"Google Sheets API error during delete: {e}")
 
 
 
@@ -136,5 +174,3 @@ class GoogleSheetManager:
 #             item = {k: v.get(k, "") for k in HEADERS}
 #             normalized.append(item)
 #         return normalized
-
-
