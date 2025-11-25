@@ -336,7 +336,7 @@ def dashboard(request):
     registrations_total = len(regs)
     registrations_page = None
     if registrations_total:
-        paginator = Paginator(regs, 2)
+        paginator = Paginator(regs, 5)
         registrations_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -345,7 +345,7 @@ def dashboard(request):
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,
-            "registrations_per_page": 2,
+            "registrations_per_page": 5,
             "cache": cache,
         },
     )
@@ -395,7 +395,7 @@ def updateHistory(request):
     history_total = len(filtered_cache)
     history_page = None
     if history_total:
-        paginator = Paginator(filtered_cache, 5)
+        paginator = Paginator(filtered_cache, 10)
         history_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -404,7 +404,7 @@ def updateHistory(request):
         {
             "history_page": history_page,
             "history_total": history_total,
-            "history_per_page": 5,
+            "history_per_page": 10,
             "selected_project": selected_project,
             "project_names": project_names,
         },

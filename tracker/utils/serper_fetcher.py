@@ -186,7 +186,7 @@ class SerperFetcher:
         ]
 
         future_queries = [
-            f"{library} roadmap next release OR upcoming changes",
+            f"{library} roadmap next {library} release OR upcoming changes",
             f"{library} release candidate OR beta announcement",
         ]
 

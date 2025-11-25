@@ -347,22 +347,27 @@
               </div>
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-12 mb-3">
             <span class="form-label fw-semibold d-block mb-2">Notification Preferences</span>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="edit_notify_major"
-                value="major" />
-              <label class="form-check-label" for="edit_notify_major">Major updates</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="edit_notify_minor"
-                value="minor" />
-              <label class="form-check-label" for="edit_notify_minor">Minor updates</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="edit_notify_future"
-                value="future" />
-              <label class="form-check-label" for="edit_notify_future">Future updates</label>
+            <div class="row">
+              <div class="col-sm-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_major" value="major" checked />
+                  <label class="form-check-label" for="add_notify_major">Major updates</label>
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_minor" value="minor" />
+                  <label class="form-check-label" for="add_notify_minor">Minor updates</label>
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_future" value="future" />
+                  <label class="form-check-label" for="add_notify_future">Future updates</label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
