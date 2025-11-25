@@ -15,7 +15,6 @@ from tracker.utils.send_mail import send_update_email
 from tracker.models import UpdateCache
 
 # ✅ Locate .env manually (robust)
-# Go three levels up (utils → tracker → LibTrack_AI)
 BASE_DIR = Path(__file__).resolve().parents[3]
 env_path = BASE_DIR / ".env"
 if env_path.exists():

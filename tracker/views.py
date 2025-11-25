@@ -1,6 +1,7 @@
 import json
 import traceback
 from collections import defaultdict
+from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.core.validators import validate_email
@@ -12,6 +13,7 @@ from tracker.models import UpdateCache
 
 VALID_NOTIFICATION_TYPES = {"both", "major", "minor", "future"}
 NOTIFICATION_ORDER = ("major", "minor", "future")
+STANDARD_DATE_OUTPUT = "%Y-%m-%d"
 
 def _normalize_notification_types(selected: list[str]) -> set[str]:
     normalized: set[str] = set()
@@ -116,6 +118,39 @@ def _split_csv_preserve(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",")]
+
+
+def _format_release_date(raw: str | None) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+
+    known_formats = (
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d/%m/%Y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+        "%d %b %Y",
+        "%d %B %Y",
+    )
+
+    for fmt in known_formats:
+        try:
+            parsed = datetime.strptime(value, fmt)
+            return parsed.strftime(STANDARD_DATE_OUTPUT)
+        except ValueError:
+            continue
+
+    try:
+        normalized = value.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        return parsed.strftime(STANDARD_DATE_OUTPUT)
+    except ValueError:
+        pass
+
+    return value
 
 
 def _stack_from_registration(reg: dict) -> list[dict]:
@@ -349,6 +384,7 @@ def updateHistory(request):
     for entry in cache:
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
+        entry.release_date_formatted = _format_release_date(entry.release_date)
 
     selected_project = (request.GET.get("project") or "").strip()
     if selected_project:
