@@ -1,5 +1,18 @@
 from django.contrib import admin
-from .models import UpdateCache
+from .models import UpdateCache, Project, StackComponent
+
+class StackComponentInline(admin.TabularInline):
+    model = StackComponent
+    extra = 0
+    fields = ("category", "name", "version", "scope")
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ("project_name", "developer_names", "notification_type", "updated_at")
+    search_fields = ("project_name", "developer_names", "developer_emails")
+    inlines = [StackComponentInline]
+
 
 @admin.register(UpdateCache)
 class UpdateCacheAdmin(admin.ModelAdmin):
@@ -23,4 +36,3 @@ class UpdateCacheAdmin(admin.ModelAdmin):
     # def save_model(self, request, obj, form, change):
     #     super().save_model(request, obj, form, change)
     #     UpdateCache.objects.all().update(updated_at=None)
-

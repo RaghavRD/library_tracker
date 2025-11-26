@@ -29,6 +29,72 @@
     });
   }
 
+  function normalizeCategory(value) {
+    return (value || "").trim().toLowerCase();
+  }
+
+  function enforceUniqueType(input, tbody) {
+    if (!input) return;
+    const normalized = normalizeCategory(input.value);
+    if (!normalized) {
+      input.dataset.lastValidValue = "";
+      input.classList.remove("is-invalid");
+      input.setCustomValidity("");
+      return;
+    }
+
+    const duplicate = Array.from(tbody.querySelectorAll(".stack-type-input"))
+      .filter((other) => other !== input)
+      .find((other) => normalizeCategory(other.value) === normalized);
+
+    if (duplicate) {
+      const lastValue = input.dataset.lastValidValue || "";
+      input.value = lastValue;
+      input.classList.add("is-invalid");
+      input.setCustomValidity("Type must be unique");
+      input.reportValidity();
+      setTimeout(() => {
+        input.classList.remove("is-invalid");
+        input.setCustomValidity("");
+      }, 1800);
+      return;
+    }
+
+    input.dataset.lastValidValue = input.value || "";
+    input.classList.remove("is-invalid");
+    input.setCustomValidity("");
+  }
+
+  function refreshTypeState(tbody) {
+    const seen = new Set();
+    tbody.querySelectorAll(".stack-type-input").forEach((input) => {
+      const normalized = normalizeCategory(input.value);
+      if (normalized && seen.has(normalized)) {
+        input.value = "";
+        input.dataset.lastValidValue = "";
+      } else {
+        if (normalized) {
+          seen.add(normalized);
+        }
+        input.dataset.lastValidValue = input.value || "";
+      }
+      input.classList.remove("is-invalid");
+      input.setCustomValidity("");
+    });
+  }
+
+  function attachTypeInputHandlers(row, tbody) {
+    const typeInput = row.querySelector(".stack-type-input");
+    if (!typeInput) return;
+    typeInput.dataset.lastValidValue = typeInput.value || "";
+    typeInput.addEventListener("focus", function () {
+      typeInput.dataset.lastValidValue = typeInput.value || "";
+    });
+    typeInput.addEventListener("change", function () {
+      enforceUniqueType(typeInput, tbody);
+    });
+  }
+
   function setupBuilder(element) {
     const builderId = assignBuilderId(element);
     const tbody = element.querySelector(".stack-builder-body");
@@ -45,8 +111,8 @@
       row.classList.add("stack-builder-row");
       row.innerHTML = `
         <td>
-          <input type="text" class="form-control form-control-sm" name="component_type[]" list="${datalistId}"
-            placeholder="Language / Framework" value="${sanitize(data.category)}" required />
+          <input type="text" class="form-control form-control-sm stack-type-input" name="component_type[]" list="${datalistId}"
+            placeholder="Select type" value="${sanitize(data.category)}" required />
         </td>
         <td>
           <input type="text" class="form-control form-control-sm" name="component_name[]" placeholder="Component name"
@@ -75,6 +141,7 @@
           }
           row.remove();
           updateRemoveState(tbody, minRows);
+          refreshTypeState(tbody);
         });
       }
 
@@ -82,7 +149,10 @@
     }
 
     function addRow(data = {}) {
-      tbody.appendChild(createRow(data));
+      const newRow = createRow(data);
+      tbody.appendChild(newRow);
+      attachTypeInputHandlers(newRow, tbody);
+      refreshTypeState(tbody);
       updateRemoveState(tbody, minRows);
     }
 
@@ -92,7 +162,12 @@
       if (!payload.length) {
         addRow({});
       } else {
-        payload.forEach((row) => addRow(row));
+        payload.forEach((rowData) => {
+          const newRow = createRow(rowData);
+          tbody.appendChild(newRow);
+          attachTypeInputHandlers(newRow, tbody);
+        });
+        refreshTypeState(tbody);
       }
       updateRemoveState(tbody, minRows);
     }

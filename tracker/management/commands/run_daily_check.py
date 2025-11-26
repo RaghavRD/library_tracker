@@ -8,11 +8,10 @@ from dotenv import load_dotenv, find_dotenv
 from packaging import version as pkg_version
 from django.core.management.base import BaseCommand, CommandError
 
-from tracker.utils.google_sheet_manager import GoogleSheetManager
 from tracker.utils.serper_fetcher import SerperFetcher
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.send_mail import send_update_email
-from tracker.models import UpdateCache
+from tracker.models import UpdateCache, Project
 
 # ✅ Locate .env manually (robust)
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -75,48 +74,45 @@ class Command(BaseCommand):
             )
             return
 
-        # 1️⃣ Load registrations from Google Sheet
-        try:
-            gsm = GoogleSheetManager()
-            regs = gsm.read_all_registrations()
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"⚠️ GoogleSheetManager error: {e}"))
-            return
-
-        if not regs:
+        projects = Project.objects.prefetch_related("components").all()
+        if not projects:
             self.stdout.write("No registrations found.")
             return
 
         groq = GroqAnalyzer()
         serper = SerperFetcher()
 
-        for reg in regs:
-            # Defensive coercion
-            project = str(reg.get("project_name", "")).strip()
-            emails_raw = reg.get("developer_emails", "")
-            notify_pref = str(reg.get("notification_type", "both") or "both").lower()
+        for project in projects:
+            project_name = (project.project_name or "").strip() or "Unnamed Project"
+            emails = [e.strip() for e in (project.developer_emails or "").split(",") if e.strip()]
+            notify_pref = str(project.notification_type or "both").lower()
 
-            libs_raw = str(reg.get("libraries", "") or "")
-            vers_raw = str(reg.get("library_versions", "") or "")
-            languages_raw = str(reg.get("language_used", "") or "")
-            language_versions_raw = str(reg.get("language_version", "") or "")
+            components = list(project.components.all())
+            library_components = [comp for comp in components if comp.key != "language"]
+            language_components = [comp for comp in components if comp.key == "language"]
 
-            emails = [e.strip() for e in str(emails_raw).split(",") if e.strip()]
-            libs = [x.strip() for x in libs_raw.split(",") if x.strip()]
-            vers = [x.strip() for x in vers_raw.split(",") if x.strip()]
-            languages = [x.strip() for x in languages_raw.split(",") if x.strip()]
-            language_versions = [x.strip() for x in language_versions_raw.split(",") if x.strip()]
+            lib_pairs = [
+                (comp.name.strip(), comp.version.strip())
+                for comp in library_components
+                if comp.name and comp.version
+            ]
+            language_pairs = [
+                (comp.name.strip(), comp.version.strip())
+                for comp in language_components
+                if comp.name and comp.version
+            ]
 
-            if not libs or not vers or len(libs) != len(vers):
-                self.stdout.write(self.style.WARNING(f"⚠️ Skipping {project}: libs/versions mismatch"))
-                continue
+            lib_names = [name for name, _ in lib_pairs]
+            lib_versions = [version for _, version in lib_pairs]
+            language_names = [name for name, _ in language_pairs]
+            language_versions = [version for _, version in language_pairs]
 
             project_updates = []
             project_updates.extend(
                 self._process_components(
-                    project=project,
-                    names=libs,
-                    versions=vers,
+                    project=project_name,
+                    names=lib_names,
+                    versions=lib_versions,
                     component_type="library",
                     groq=groq,
                     serper=serper,
@@ -125,8 +121,8 @@ class Command(BaseCommand):
             )
             project_updates.extend(
                 self._process_components(
-                    project=project,
-                    names=languages,
+                    project=project_name,
+                    names=language_names,
                     versions=language_versions,
                     component_type="language",
                     groq=groq,
@@ -153,7 +149,7 @@ class Command(BaseCommand):
 
                 ok, info = send_update_email(
                     mailtrap_api_key=mailtrap_key,
-                    project_name=project,
+                    project_name=project_name,
                     recipients=emails,
                     library=subject_library,
                     version=subject_version,
@@ -164,9 +160,9 @@ class Command(BaseCommand):
                     updates=project_updates,
                     from_email=str(sender_email),
                 )
-                self.stdout.write(f"Project digest for {project}: {ok} -> {info}")
+                self.stdout.write(f"Project digest for {project_name}: {ok} -> {info}")
             else:
-                self.stdout.write(f"No qualifying updates for {project}.")
+                self.stdout.write(f"No qualifying updates for {project_name}.")
 
         self.stdout.write(self.style.SUCCESS("✅ Daily check completed successfully."))
 

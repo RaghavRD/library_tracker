@@ -100,9 +100,10 @@ def send_update_email(
 
     summary_sections: list[str] = []
     for entry in updates_payload:
+        entry_source = entry.get("source") or ""
         link_html = (
-            f"<a href='{source}' target='_blank' rel='noopener'>Read release notes</a>"
-            if entry.get("source")
+            f"<a href='{entry_source}' target='_blank' rel='noopener'>Read release notes</a>"
+            if entry_source
             else "<span style='color:#999'>Source link not provided.</span>"
         )
         summary_sections.append(

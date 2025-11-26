@@ -7,9 +7,9 @@ from django.contrib import messages
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 
-from tracker.utils.google_sheet_manager import GoogleSheetManager
-from tracker.models import UpdateCache
+from tracker.models import UpdateCache, Project, StackComponent
 
 VALID_NOTIFICATION_TYPES = {"both", "major", "minor", "future"}
 NOTIFICATION_ORDER = ("major", "minor", "future")
@@ -111,13 +111,8 @@ def _build_registration_payload(request):
         "notification_type": notification_type,
         "tech_stack": json.dumps(components),
     }
+    payload["stack_components"] = components
     return payload, None
-
-
-def _split_csv_preserve(value: str | None) -> list[str]:
-    if not value:
-        return []
-    return [item.strip() for item in value.split(",")]
 
 
 def _format_release_date(raw: str | None) -> str:
@@ -153,73 +148,112 @@ def _format_release_date(raw: str | None) -> str:
     return value
 
 
-def _stack_from_registration(reg: dict) -> list[dict]:
-    """
-    Returns normalized stack components from the stored tech_stack JSON.
-    Falls back to legacy language/library CSVs for older rows.
-    """
-    stack_raw = reg.get("tech_stack", "")
-    stack: list[dict] = []
+def _normalize_component_key(category: str, key: str | None) -> str:
+    candidate = (key or category or "dependency").strip().lower() or "dependency"
+    if "language" in candidate:
+        return "language"
+    return candidate
 
-    if stack_raw:
+
+def _parse_stack_payload(payload: dict) -> list[dict]:
+    stack = payload.get("stack_components")
+    if stack is None:
         try:
-            parsed = json.loads(stack_raw)
+            stack = json.loads(payload.get("tech_stack", "[]") or "[]")
         except json.JSONDecodeError:
-            parsed = []
-        for component in parsed or []:
-            category = (
-                str(component.get("category") or component.get("type") or component.get("key") or "Component").strip()
-                or "Component"
-            )
-            key = (component.get("key") or category).strip().lower() or "component"
-            if "language" in key:
-                key = "language"
-            stack.append(
-                {
-                    "category": category,
-                    "key": key,
-                    "name": str(component.get("name", "")).strip(),
-                    "version": str(component.get("version", "")).strip(),
-                    "scope": str(component.get("scope", "")).strip(),
-                }
-            )
+            stack = []
 
-    if stack:
-        return stack
-
-    languages = _split_csv_preserve(reg.get("language_used"))
-    language_versions = _split_csv_preserve(reg.get("language_version"))
-    for idx, lang in enumerate(languages):
-        if not lang:
+    normalized: list[dict] = []
+    for component in stack or []:
+        name = str(component.get("name", "")).strip()
+        version = str(component.get("version", "")).strip()
+        if not name or not version:
             continue
-        version = language_versions[idx] if idx < len(language_versions) else ""
-        stack.append(
+        category = str(component.get("category") or component.get("type") or "Dependency").strip() or "Dependency"
+        key = _normalize_component_key(category, component.get("key"))
+        scope = str(component.get("scope", "")).strip()
+        normalized.append(
             {
-                "category": "Language",
-                "key": "language",
-                "name": lang,
+                "category": category,
+                "key": key,
+                "name": name,
                 "version": version,
-                "scope": "",
+                "scope": scope,
             }
         )
+    return normalized
 
-    libs = _split_csv_preserve(reg.get("libraries"))
-    lib_versions = _split_csv_preserve(reg.get("library_versions"))
-    for idx, lib in enumerate(libs):
-        if not lib:
-            continue
-        version = lib_versions[idx] if idx < len(lib_versions) else ""
-        stack.append(
-            {
-                "category": "Dependency",
-                "key": "dependency",
-                "name": lib,
-                "version": version,
-                "scope": "",
-            }
+
+def _save_project_from_payload(payload: dict, *, instance: Project | None = None) -> Project:
+    stack = _parse_stack_payload(payload)
+    if not stack:
+        raise ValueError("Add at least one technology component to the stack.")
+
+    notification_value = payload.get("notification_type") or "major, minor"
+
+    with transaction.atomic():
+        if instance is None:
+            instance = Project.objects.create(
+                project_name=payload["project_name"],
+                developer_names=payload["developer_names"],
+                developer_emails=payload["developer_emails"],
+                notification_type=notification_value,
+            )
+        else:
+            instance.project_name = payload["project_name"]
+            instance.developer_names = payload["developer_names"]
+            instance.developer_emails = payload["developer_emails"]
+            instance.notification_type = notification_value
+            instance.save()
+            instance.components.all().delete()
+
+        StackComponent.objects.bulk_create(
+            [
+                StackComponent(
+                    project=instance,
+                    category=item["category"],
+                    key=item["key"],
+                    name=item["name"],
+                    version=item["version"],
+                    scope=item["scope"],
+                )
+                for item in stack
+            ]
         )
 
-    return stack
+    return instance
+
+
+def _serialize_project(project: Project) -> dict:
+    components = [
+        {
+            "id": component.id,
+            "category": component.category,
+            "key": component.key,
+            "name": component.name,
+            "version": component.version,
+            "scope": component.scope,
+        }
+        for component in project.components.all()
+    ]
+
+    languages = [comp for comp in components if comp["key"] == "language"]
+    notification_list = [item.strip() for item in (project.notification_type or "").split(",") if item.strip()]
+    if not notification_list:
+        notification_list = ["major", "minor"]
+
+    return {
+        "project_id": project.id,
+        "project_name": project.project_name,
+        "developer_names": project.developer_names,
+        "developer_emails": project.developer_emails,
+        "language_used": ", ".join([comp["name"] for comp in languages]),
+        "language_version": ", ".join([comp["version"] for comp in languages]),
+        "stack_components": components,
+        "stack_json": json.dumps(components),
+        "notification_type": project.notification_type,
+        "notification_list": notification_list,
+    }
 
 
 def register_project(request):
@@ -235,12 +269,14 @@ def register_project(request):
             return render(request, "tracker/register.html")
 
         try:
-            gsm = GoogleSheetManager()
-            gsm.append_registration(payload)
+            _save_project_from_payload(payload)
             messages.success(request, f"Project '{payload['project_name']}' saved successfully!")
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return render(request, "tracker/register.html")
         except Exception:
             print("Error while saving registration:", traceback.format_exc())
-            messages.error(request, "Failed to save to Google Sheets. Please try again later.")
+            messages.error(request, "Failed to save project. Please try again later.")
             return render(request, "tracker/register.html")
 
         return redirect("dashboard")
@@ -254,12 +290,6 @@ def dashboard(request):
     """
     if request.method == "POST":
         action = request.POST.get("action")
-        try:
-            gsm = GoogleSheetManager()
-        except Exception:
-            print("Error while instantiating GoogleSheetManager:", traceback.format_exc())
-            messages.error(request, "Could not connect to Google Sheets.")
-            return redirect("dashboard")
 
         if action == "create":
             payload, error = _build_registration_payload(request)
@@ -267,18 +297,20 @@ def dashboard(request):
                 messages.error(request, error)
             else:
                 try:
-                    gsm.append_registration(payload)
+                    _save_project_from_payload(payload)
                     messages.success(request, f"Project '{payload['project_name']}' added successfully.")
+                except ValueError as exc:
+                    messages.error(request, str(exc))
                 except Exception:
-                    print("Error while creating registration:", traceback.format_exc())
+                    print("Error while creating project:", traceback.format_exc())
                     messages.error(request, "Failed to add project. Please try again.")
             return redirect("dashboard")
 
         if action == "update":
-            row_id = request.POST.get("row_id")
+            project_id = request.POST.get("project_id")
             try:
-                row_int = int(row_id)
-            except (TypeError, ValueError):
+                project = Project.objects.prefetch_related("components").get(pk=int(project_id))
+            except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for update.")
                 return redirect("dashboard")
 
@@ -288,55 +320,40 @@ def dashboard(request):
                 return redirect("dashboard")
 
             try:
-                gsm.update_registration(row_int, payload)
+                _save_project_from_payload(payload, instance=project)
                 messages.success(request, f"Project '{payload['project_name']}' updated.")
+            except ValueError as exc:
+                messages.error(request, str(exc))
             except Exception:
-                print("Error while updating registration:", traceback.format_exc())
+                print("Error while updating project:", traceback.format_exc())
                 messages.error(request, "Failed to update project. Please try again.")
             return redirect("dashboard")
 
         if action == "delete":
-            row_id = request.POST.get("row_id")
+            project_id = request.POST.get("project_id")
             try:
-                row_int = int(row_id)
-            except (TypeError, ValueError):
+                project = Project.objects.get(pk=int(project_id))
+            except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for deletion.")
                 return redirect("dashboard")
 
-            project_name = request.POST.get("project_name") or "Project"
-            try:
-                gsm.delete_registration(row_int)
-                messages.success(request, f"{project_name} deleted.")
-            except Exception:
-                print("Error while deleting registration:", traceback.format_exc())
-                messages.error(request, "Failed to delete project. Please try again.")
+            project_name = request.POST.get("project_name") or project.project_name or "Project"
+            project.delete()
+            messages.success(request, f"{project_name} deleted.")
             return redirect("dashboard")
 
         messages.error(request, "Unknown action.")
         return redirect("dashboard")
 
-    try:
-        gsm = GoogleSheetManager()
-        regs = gsm.read_all_registrations()
-    except Exception as e:
-        print("Error while reading registrations:", traceback.format_exc())
-        regs = []
-        messages.error(request, "Could not fetch Google Sheet data.")
-    else:
-        for reg in regs:
-            stack_components = _stack_from_registration(reg)
-            reg["stack_components"] = stack_components
-            reg["stack_json"] = json.dumps(stack_components)
-            reg["notification_list"] = [
-                x.strip() for x in str(reg.get("notification_type", "") or "").split(",") if x.strip()
-            ]
+    project_qs = Project.objects.prefetch_related("components").order_by("-updated_at")
+    regs = [_serialize_project(project) for project in project_qs]
 
     cache = UpdateCache.objects.order_by("-updated_at").all()
 
     registrations_total = len(regs)
     registrations_page = None
     if registrations_total:
-        paginator = Paginator(regs, 5)
+        paginator = Paginator(regs, 2)
         registrations_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -345,7 +362,7 @@ def dashboard(request):
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,
-            "registrations_per_page": 5,
+            "registrations_per_page": 2,
             "cache": cache,
         },
     )
@@ -357,25 +374,22 @@ def updateHistory(request):
     project_lookup: dict[str, list[str]] = {}
     project_names: list[str] = []
 
-    try:
-        gsm = GoogleSheetManager()
-        regs = gsm.read_all_registrations()
-    except Exception:
-        regs = []
-        messages.error(request, "Could not fetch Google Sheet data for project filters.")
-
-    if regs:
+    projects = Project.objects.prefetch_related("components").all()
+    if projects:
         map_temp: dict[str, set[str]] = defaultdict(set)
         projects_set: set[str] = set()
-        for reg in regs:
-            project = str(reg.get("project_name", "")).strip()
-            libs_raw = str(reg.get("libraries", "") or "")
-            libraries = [lib.strip().lower() for lib in libs_raw.split(",") if lib.strip()]
-            if not project or not libraries:
+        for project in projects:
+            project_name = (project.project_name or "").strip()
+            if not project_name:
                 continue
-            projects_set.add(project)
-            for lib in libraries:
-                map_temp[lib].add(project)
+            projects_set.add(project_name)
+            for component in project.components.all():
+                if component.key == "language":
+                    continue
+                lib_key = (component.name or "").strip().lower()
+                if not lib_key:
+                    continue
+                map_temp[lib_key].add(project_name)
         project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
         project_names = sorted(projects_set, key=str.casefold)
 
@@ -395,7 +409,7 @@ def updateHistory(request):
     history_total = len(filtered_cache)
     history_page = None
     if history_total:
-        paginator = Paginator(filtered_cache, 10)
+        paginator = Paginator(filtered_cache, 5)
         history_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -404,7 +418,7 @@ def updateHistory(request):
         {
             "history_page": history_page,
             "history_total": history_total,
-            "history_per_page": 10,
+            "history_per_page": 5,
             "selected_project": selected_project,
             "project_names": project_names,
         },

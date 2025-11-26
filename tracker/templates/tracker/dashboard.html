@@ -29,7 +29,7 @@
     <div>
       <h1 class="fw-semibold mb-1">Dashboard</h1>
       <p class="text-muted mb-0">
-        View all project registrations synced with Google Sheets.
+        View all project registrations stored in LibTrack AI.
       </p>
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -112,7 +112,7 @@
               <td class="text-end">
                 <div class="btn-group btn-group-sm" role="group">
                   <button type="button" class="btn btn-outline-primary edit-project-btn" data-bs-toggle="modal"
-                    data-bs-target="#editProjectModal" data-row="{{ r.row_id }}"
+                    data-bs-target="#editProjectModal" data-project-id="{{ r.project_id }}"
                     data-project="{{ r.project_name|default:''|escape }}"
                     data-developers="{{ r.developer_names|default:''|escape }}"
                     data-emails="{{ r.developer_emails|default:''|escape }}"
@@ -125,7 +125,7 @@
                     </svg>
                   </button>
                   <button type="button" class="btn btn-outline-danger delete-project-btn" data-bs-toggle="modal"
-                    data-bs-target="#deleteProjectModal" data-row="{{ r.row_id }}"
+                    data-bs-target="#deleteProjectModal" data-project-id="{{ r.project_id }}"
                     data-project="{{ r.project_name|default:''|escape }}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                       class="bi bi-trash3-fill" viewBox="0 0 16 16">
@@ -185,8 +185,8 @@
 </div>
 
 <datalist id="dashboardStackTypes">
+  <option value="" disabled>Select type</option>
   <option value="Language"></option>
-  <option value="Programming Language"></option>
   <option value="Framework"></option>
   <option value="Library"></option>
   <option value="SDK"></option>
@@ -230,7 +230,7 @@
               class="stack-builder border rounded-3 p-3 bg-light-subtle"
               data-builder-id="add-stack"
               data-datalist-id="dashboardStackTypes"
-              data-initial-rows='[{"category":"Language"}]'
+              data-initial-rows='[]'
               data-min-rows="1"
             >
               <div class="table-responsive">
@@ -260,20 +260,20 @@
             <div class="row">
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_major" value="major" checked />
-                  <label class="form-check-label" for="add_notify_major">Major updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_major1" value="major" checked />
+                  <label class="form-check-label" for="add_notify_major1">Major updates</label>
                 </div>
               </div>
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_minor" value="minor" />
-                  <label class="form-check-label" for="add_notify_minor">Minor updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_minor1" value="minor" />
+                  <label class="form-check-label" for="add_notify_minor1">Minor updates</label>
                 </div>
               </div>
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_future" value="future" />
-                  <label class="form-check-label" for="add_notify_future">Future updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_future1" value="future" />
+                  <label class="form-check-label" for="add_notify_future1">Future updates</label>
                 </div>
               </div>
             </div>
@@ -295,7 +295,7 @@
     <form method="post" class="modal-content border-0 shadow">
       {% csrf_token %}
       <input type="hidden" name="action" value="update" />
-      <input type="hidden" name="row_id" id="edit_row_id" />
+      <input type="hidden" name="project_id" id="edit_project_id" />
       <div class="modal-header bg-primary-subtle border-0">
         <div>
           <h5 class="modal-title fw-semibold" id="editProjectModalLabel">Edit Project</h5>
@@ -352,20 +352,20 @@
             <div class="row">
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_major" value="major" checked />
-                  <label class="form-check-label" for="add_notify_major">Major updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_major2" value="major" checked />
+                  <label class="form-check-label" for="add_notify_major2">Major updates</label>
                 </div>
               </div>
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_minor" value="minor" />
-                  <label class="form-check-label" for="add_notify_minor">Minor updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_minor2" value="minor" />
+                  <label class="form-check-label" for="add_notify_minor2">Minor updates</label>
                 </div>
               </div>
               <div class="col-sm-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_future" value="future" />
-                  <label class="form-check-label" for="add_notify_future">Future updates</label>
+                  <input class="form-check-input" type="checkbox" name="notification_types" id="add_notify_future2" value="future" />
+                  <label class="form-check-label" for="add_notify_future2">Future updates</label>
                 </div>
               </div>
             </div>
@@ -387,16 +387,16 @@
     <form method="post" class="modal-content border-0 shadow">
       {% csrf_token %}
       <input type="hidden" name="action" value="delete" />
-      <input type="hidden" name="row_id" id="delete_row_id" />
+      <input type="hidden" name="project_id" id="delete_project_id" />
       <input type="hidden" name="project_name" id="delete_hidden_project_name" />
-      <div class="modal-header border-0">
+      <div class="modal-header bg-danger-subtle border-0">
         <h5 class="modal-title fw-semibold" id="deleteProjectModalLabel">Delete Project</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <p class="mb-0">
           Are you sure you want to delete <strong id="deleteProjectName">this project</strong>? This action removes the
-          entry from the Google Sheet.
+          entry from the Database.
         </p>
       </div>
       <div class="modal-footer border-0">
@@ -418,7 +418,7 @@
       t.show();
     });
 
-    const defaultStackTemplate = [{ category: "Language" }];
+    const defaultStackTemplate = [{}];
 
     const resetCheckboxes = (container, ids) => {
       ids.forEach((id) => {
@@ -444,7 +444,7 @@
           window.LibTrackStack.setRows(builder, defaultStackTemplate);
         }
 
-        resetCheckboxes(addModal, ["add_notify_major", "add_notify_minor", "add_notify_future"]);
+        resetCheckboxes(addModal, ["add_notify_major1", "add_notify_minor1", "add_notify_future1"]);
       });
     }
 
@@ -454,7 +454,7 @@
         const button = event.relatedTarget;
         if (!button) return;
         const dataset = button.dataset;
-        editModal.querySelector("#edit_row_id").value = dataset.row || "";
+        editModal.querySelector("#edit_project_id").value = dataset.projectId || "";
         editModal.querySelector("#edit_project_name").value = dataset.project || "";
         editModal.querySelector("#edit_developer_names").value = dataset.developers || "";
         const emailField = editModal.querySelector("#edit_developer_emails");
@@ -494,7 +494,7 @@
         const projectName = button.dataset.project || "this project";
         deleteModal.querySelector("#deleteProjectName").textContent = projectName;
         deleteModal.querySelector("#delete_hidden_project_name").value = projectName;
-        deleteModal.querySelector("#delete_row_id").value = button.dataset.row || "";
+        deleteModal.querySelector("#delete_project_id").value = button.dataset.projectId || "";
       });
     }
   });
