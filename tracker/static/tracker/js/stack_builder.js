@@ -34,50 +34,17 @@
   }
 
   function enforceUniqueType(input, tbody) {
+    // Removed unique type validation - allow duplicate types
     if (!input) return;
-    const normalized = normalizeCategory(input.value);
-    if (!normalized) {
-      input.dataset.lastValidValue = "";
-      input.classList.remove("is-invalid");
-      input.setCustomValidity("");
-      return;
-    }
-
-    const duplicate = Array.from(tbody.querySelectorAll(".stack-type-input"))
-      .filter((other) => other !== input)
-      .find((other) => normalizeCategory(other.value) === normalized);
-
-    if (duplicate) {
-      const lastValue = input.dataset.lastValidValue || "";
-      input.value = lastValue;
-      input.classList.add("is-invalid");
-      input.setCustomValidity("Type must be unique");
-      input.reportValidity();
-      setTimeout(() => {
-        input.classList.remove("is-invalid");
-        input.setCustomValidity("");
-      }, 1800);
-      return;
-    }
-
     input.dataset.lastValidValue = input.value || "";
     input.classList.remove("is-invalid");
     input.setCustomValidity("");
   }
 
   function refreshTypeState(tbody) {
-    const seen = new Set();
+    // Removed duplicate clearing logic - preserve all values
     tbody.querySelectorAll(".stack-type-input").forEach((input) => {
-      const normalized = normalizeCategory(input.value);
-      if (normalized && seen.has(normalized)) {
-        input.value = "";
-        input.dataset.lastValidValue = "";
-      } else {
-        if (normalized) {
-          seen.add(normalized);
-        }
-        input.dataset.lastValidValue = input.value || "";
-      }
+      input.dataset.lastValidValue = input.value || "";
       input.classList.remove("is-invalid");
       input.setCustomValidity("");
     });
