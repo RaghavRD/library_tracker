@@ -478,7 +478,7 @@
         const notifyRaw = (dataset.notify || "").toLowerCase();
         const selections = notifyRaw.split(",").map(item => item.trim()).filter(Boolean);
         ["major", "minor", "future"].forEach(type => {
-          const checkbox = editModal.querySelector(`#edit_notify_${type}`);
+          const checkbox = editModal.querySelector(`#add_notify_${type}2`);
           if (checkbox) {
             checkbox.checked = selections.length ? selections.includes(type) : type !== "future";
           }
