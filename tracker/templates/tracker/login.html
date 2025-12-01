@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI – Login{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 500px;">
+
+    <!-- 🔹 Toast Container (Top-right corner) -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+        {% if messages %}
+        {% for m in messages %}
+        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+            <div class="d-flex">
+                <div class="toast-body">
+                    {{ m }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Close"></button>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- 🔹 Login Card -->
+    <div class="card border-0 shadow-lg">
+        <div class="card-body p-5">
+            <div class="text-center mb-4">
+                <h2 class="fw-bold text-dark mb-2">Welcome Back</h2>
+                <p class="text-muted">Log in to access your LibTrack AI dashboard</p>
+            </div>
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="{{ form.username.id_for_label }}"
+                        class="form-label text-dark fw-semibold">Username</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.username.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <label for="{{ form.password.id_for_label }}"
+                        class="form-label text-dark fw-semibold">Password</label>
+                    <div class="input-group">
+                        {{ form.password }}
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                    {% if form.password.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.password.errors.0 }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {{ form.non_field_errors.0 }}
+                </div>
+                {% endif %}
+
+                <div class="d-grid mb-3">
+                    <button type="submit" class="btn btn-primary btn-lg">Log In</button>
+                </div>
+
+                <div class="text-center">
+                    <p class="text-muted mb-0">
+                        Don't have an account?
+                        <a href="{% url 'register' %}" class="text-primary fw-semibold text-decoration-none">Create
+                            one</a>
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <small class="text-muted">
+            © {{ now|date:"Y" }} LibTrack AI — Track your project dependencies
+        </small>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const toastElList = [].slice.call(document.querySelectorAll(".toast"));
+        toastElList.forEach(function (toastEl) {
+            const t = new bootstrap.Toast(toastEl);
+            t.show();
+        });
+
+        // Toggle password visibility
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordField = document.getElementById('{{ form.password.id_for_label }}');
+        const toggleIcon = document.getElementById('togglePasswordIcon');
+
+        if (togglePassword && passwordField) {
+            togglePassword.addEventListener('click', function () {
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                toggleIcon.classList.toggle('bi-eye');
+                toggleIcon.classList.toggle('bi-eye-slash');
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -4,12 +4,15 @@ from collections import defaultdict
 from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 
 from tracker.models import UpdateCache, Project, StackComponent
+from tracker.forms import LoginForm, RegistrationForm
 
 VALID_NOTIFICATION_TYPES = {"both", "major", "minor", "future"}
 NOTIFICATION_ORDER = ("major", "minor", "future")
@@ -256,6 +259,67 @@ def _serialize_project(project: Project) -> dict:
     }
 
 
+def login_view(request):
+    """
+    Handles user login.
+    """
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = LoginForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f'Welcome back, {username}!')
+                next_url = request.GET.get('next', 'dashboard')
+                return redirect(next_url)
+            else:
+                messages.error(request, 'Invalid username or password.')
+        else:
+            messages.error(request, 'Invalid username or password.')
+    else:
+        form = LoginForm()
+    
+    return render(request, 'tracker/login.html', {'form': form})
+
+
+def logout_view(request):
+    """
+    Handles user logout.
+    """
+    logout(request)
+    messages.success(request, 'You have been logged out successfully.')
+    return redirect('login')
+
+
+def register_view(request):
+    """
+    Handles user registration.
+    """
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            username = form.cleaned_data.get('username')
+            messages.success(request, f'Account created successfully for {username}! Please log in.')
+            return redirect('login')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field.capitalize()}: {error}')
+    else:
+        form = RegistrationForm()
+    
+    return render(request, 'tracker/register.html', {'form': form})
+
+
 def register_project(request):
     """
     Handles project registration via HTML form.
@@ -284,6 +348,7 @@ def register_project(request):
     return render(request, "tracker/register.html")
 
 
+@login_required
 def dashboard(request):
     """
     Displays project registrations and update cache.
@@ -367,6 +432,7 @@ def dashboard(request):
         },
     )
 
+@login_required
 def updateHistory(request):
     """
     Displays project update cache.

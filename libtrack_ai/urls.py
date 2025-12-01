@@ -5,7 +5,7 @@ from django.conf import settings
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", RedirectView.as_view(url="/tracker/dashboard/", permanent=False)),
+    path("", RedirectView.as_view(url="/tracker/login/", permanent=False)),
     path("tracker/", include("tracker.urls")),
 ]
 

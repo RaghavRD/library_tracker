@@ -1,143 +1,127 @@
 {% extends "base.html" %}
 
-{% block title %}Register Project – LibTrack AI{% endblock %}
+{% block title %}LibTrack AI – Register{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 900px;">
-  <div class="mb-4">
-    <h1 class="fw-semibold mb-1">Register Your Project</h1>
-    <p class="text-muted mb-0">
-      Track every dependency—languages, frameworks, SDKs, internal tools—and get proactive release alerts.
-    </p>
+<div class="container py-5" style="max-width: 550px;">
+
+  <!-- 🔹 Toast Container (Top-right corner) -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+    {% if messages %}
+    {% for m in messages %}
+    <div
+      class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+      role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+      <div class="d-flex">
+        <div class="toast-body">
+          {{ m }}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+          aria-label="Close"></button>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
   </div>
 
-  {% if messages %}
-    {% for m in messages %}
-      <div class="alert alert-{{ m.tags }} alert-dismissible fade show" role="alert">
-        {{ m }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  <!-- 🔹 Registration Card -->
+  <div class="card border-0 shadow-lg">
+    <div class="card-body p-5">
+      <div class="text-center mb-4">
+        <h2 class="fw-bold text-dark mb-2">Create Account</h2>
+        <p class="text-muted">Join LibTrack AI and start tracking your projects</p>
       </div>
-    {% endfor %}
-  {% endif %}
 
-  <div class="card border-0 shadow-sm">
-    <div class="card-header bg-primary text-white">
-      <h5 class="mb-0">Project Registration Form</h5>
-    </div>
-    <div class="card-body">
-      <form method="post" action="{% url 'register_project' %}">
+      <form method="post" novalidate>
         {% csrf_token %}
 
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label for="project_name" class="form-label fw-semibold">Project Name</label>
-            <input type="text" class="form-control" id="project_name" name="project_name" placeholder="e.g., LibTrack AI" required />
+        <div class="mb-3">
+          <label for="{{ form.username.id_for_label }}" class="form-label text-dark fw-semibold">Username</label>
+          {{ form.username }}
+          {% if form.username.errors %}
+          <div class="text-danger small mt-1">
+            {% for error in form.username.errors %}
+            {{ error }}
+            {% endfor %}
           </div>
-
-          <div class="col-md-6">
-            <label for="developer_names" class="form-label fw-semibold">Project Owner / Team</label>
-            <input type="text" class="form-control" id="developer_names" name="developer_names" placeholder="Comma-separated if multiple" required />
-          </div>
-
-          <div class="col-md-12">
-            <label for="developer_emails" class="form-label fw-semibold">Notification Emails</label>
-            <textarea class="form-control" id="developer_emails" name="developer_emails" rows="2" placeholder="Comma-separated emails" required></textarea>
-            <div class="form-text text-secondary">Use valid emails; separate multiple addresses with commas.</div>
-          </div>
-
-          <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <span class="form-label fw-semibold d-block">Technology Stack</span>
-                <p class="text-secondary small mb-0">
-                  Add everything that matters—programming languages, frameworks, SDKs, data pipelines, CI/CD tools, private packages, or cloud services.
-                </p>
-              </div>
-              <span class="badge bg-light text-dark border">Unlimited entries</span>
-            </div>
-
-            <div
-              class="stack-builder border rounded-3 p-3 bg-light-subtle"
-              data-builder-id="register-stack"
-              data-datalist-id="stackComponentTypes"
-              data-initial-rows='[{"category":"Language"}]'
-              data-min-rows="1"
-            >
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th style="width: 20%">Type</th>
-                      <th style="width: 30%">Name</th>
-                      <th style="width: 20%">Version</th>
-                      <th style="width: 20%">Scope / Notes</th>
-                      <th style="width: 10%" class="text-end">Remove</th>
-                    </tr>
-                  </thead>
-                  <tbody class="stack-builder-body"></tbody>
-                </table>
-              </div>
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-3">
-                <button type="button" class="btn btn-outline-primary btn-sm stack-builder-add">
-                  <i class="bi bi-plus-circle me-1"></i> Add Component
-                </button>
-                <small class="text-muted">Versions are required so LibTrack AI can monitor releases accurately.</small>
-              </div>
-            </div>
-            <datalist id="stackComponentTypes">
-              <option value="Language"></option>
-              <option value="Programming Language"></option>
-              <option value="Framework"></option>
-              <option value="Library"></option>
-              <option value="SDK"></option>
-              <option value="Package"></option>
-              <option value="Module"></option>
-              <option value="Tool"></option>
-              <option value="Service"></option>
-              <option value="Dependency"></option>
-            </datalist>
-          </div>
-
-          <div class="col-md-6">
-            <span class="form-label fw-semibold d-block mb-1">Notification Preferences</span>
-            <p class="text-secondary small mb-2">Select all release types you’d like to receive.</p>
-            <div class="form-check mb-1">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_major" value="major" checked />
-              <label class="form-check-label" for="notify_major">Major updates</label>
-            </div>
-            <div class="form-check mb-1">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_minor" value="minor" checked />
-              <label class="form-check-label" for="notify_minor">Minor updates</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="notification_types" id="notify_future" value="future" />
-              <label class="form-check-label d-flex align-items-center gap-2" for="notify_future">
-                <span>Future release announcements</span>
-                <span
-                  class="badge text-dark bg-warning-subtle border border-warning-subtle"
-                  role="button"
-                  tabindex="0"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="We’ll alert you when official maintainers announce upcoming releases."
-                >
-                  Important
-                </span>
-              </label>
-            </div>
-          </div>
+          {% else %}
+          <div class="form-text small">{{ form.username.help_text }}</div>
+          {% endif %}
         </div>
 
-        <div class="d-flex justify-content-between mt-4">
-          <a href="{% url 'dashboard' %}" class="btn btn-outline-dark">
-            <i class="bi bi-arrow-left-circle"></i> Back to Dashboard
-          </a>
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-save"></i> Save Project
-          </button>
+        <div class="mb-3">
+          <label for="{{ form.email.id_for_label }}" class="form-label text-dark fw-semibold">Email</label>
+          {{ form.email }}
+          {% if form.email.errors %}
+          <div class="text-danger small mt-1">
+            {% for error in form.email.errors %}
+            {{ error }}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="{{ form.password1.id_for_label }}" class="form-label text-dark fw-semibold">Password</label>
+          <div class="input-group">
+            {{ form.password1 }}
+            <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
+              <i class="bi bi-eye" id="togglePassword1Icon"></i>
+            </button>
+          </div>
+          {% if form.password1.errors %}
+          <div class="text-danger small mt-1">
+            {% for error in form.password1.errors %}
+            {{ error }}
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="form-text small">{{ form.password1.help_text }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-4">
+          <label for="{{ form.password2.id_for_label }}" class="form-label text-dark fw-semibold">Confirm
+            Password</label>
+          <div class="input-group">
+            {{ form.password2 }}
+            <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
+              <i class="bi bi-eye" id="togglePassword2Icon"></i>
+            </button>
+          </div>
+          {% if form.password2.errors %}
+          <div class="text-danger small mt-1">
+            {% for error in form.password2.errors %}
+            {{ error }}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+          {{ form.non_field_errors.0 }}
+        </div>
+        {% endif %}
+
+        <div class="d-grid mb-3">
+          <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
+        </div>
+
+        <div class="text-center">
+          <p class="text-muted mb-0">
+            Already have an account?
+            <a href="{% url 'login' %}" class="text-primary fw-semibold text-decoration-none">Log in</a>
+          </p>
         </div>
       </form>
     </div>
+  </div>
+
+  <div class="text-center mt-4">
+    <small class="text-muted">
+      © {{ now|date:"Y" }} LibTrack AI — Track your project dependencies
+    </small>
   </div>
 </div>
 {% endblock %}
@@ -145,10 +129,39 @@
 {% block extra_scripts %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-      new bootstrap.Tooltip(tooltipTriggerEl);
+    const toastElList = [].slice.call(document.querySelectorAll(".toast"));
+    toastElList.forEach(function (toastEl) {
+      const t = new bootstrap.Toast(toastEl);
+      t.show();
     });
+
+    // Toggle password visibility for password1
+    const togglePassword1 = document.getElementById('togglePassword1');
+    const password1Field = document.getElementById('{{ form.password1.id_for_label }}');
+    const toggleIcon1 = document.getElementById('togglePassword1Icon');
+
+    if (togglePassword1 && password1Field) {
+      togglePassword1.addEventListener('click', function () {
+        const type = password1Field.getAttribute('type') === 'password' ? 'text' : 'password';
+        password1Field.setAttribute('type', type);
+        toggleIcon1.classList.toggle('bi-eye');
+        toggleIcon1.classList.toggle('bi-eye-slash');
+      });
+    }
+
+    // Toggle password visibility for password2
+    const togglePassword2 = document.getElementById('togglePassword2');
+    const password2Field = document.getElementById('{{ form.password2.id_for_label }}');
+    const toggleIcon2 = document.getElementById('togglePassword2Icon');
+
+    if (togglePassword2 && password2Field) {
+      togglePassword2.addEventListener('click', function () {
+        const type = password2Field.getAttribute('type') === 'password' ? 'text' : 'password';
+        password2Field.setAttribute('type', type);
+        toggleIcon2.classList.toggle('bi-eye');
+        toggleIcon2.classList.toggle('bi-eye-slash');
+      });
+    }
   });
 </script>
 {% endblock %}
