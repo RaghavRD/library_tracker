@@ -414,6 +414,12 @@ def dashboard(request):
     regs = [_serialize_project(project) for project in project_qs]
 
     cache = UpdateCache.objects.order_by("-updated_at").all()
+    
+    # ===== NEW: Fetch future updates =====
+    from tracker.models import FutureUpdateCache
+    future_updates = FutureUpdateCache.objects.filter(
+        status__in=['detected', 'confirmed']
+    ).order_by('-confidence', '-updated_at')[:10]
 
     registrations_total = len(regs)
     registrations_page = None
@@ -429,6 +435,7 @@ def dashboard(request):
             "registrations_total": registrations_total,
             "registrations_per_page": 2,
             "cache": cache,
+            "future_updates": future_updates,  # ===== NEW =====
         },
     )
 

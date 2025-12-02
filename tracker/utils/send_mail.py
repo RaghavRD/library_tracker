@@ -70,7 +70,12 @@ def send_update_email(
     #     if category.lower() == "minor"
     #     else "[Update]"
     # )
-    subject = f"{library} {version} Released"
+    
+    # ===== NEW: Different subject for future updates =====
+    if category == "future" or future_opt_in:
+        subject = f"🔮 Future Update Alert: {library} {version} Planned"
+    else:
+        subject = f"{library} {version} Released"
 
     updates_payload = updates or [
         {
@@ -85,6 +90,9 @@ def send_update_email(
         }
     ]
 
+    # ===== NEW: Check if we have any future updates with confidence =====
+    has_confidence = any("confidence" in u for u in updates_payload)
+    
     table_rows_html = "".join(
         f"""
                 <tr>
@@ -93,10 +101,12 @@ def send_update_email(
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('version', 'n/a')}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a')}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('release_date', 'Unknown')}</td>
+                    {f'<td style="padding:8px;border:1px solid #dfe3e7;"><strong>{entry.get("confidence", "N/A")}%</strong></td>' if has_confidence else ''}
                 </tr>
         """
         for entry in updates_payload
     )
+
 
     summary_sections: list[str] = []
     for entry in updates_payload:
@@ -117,20 +127,36 @@ def send_update_email(
         )
 
     summary_blocks = "".join(summary_sections) or "<p>No summary details were provided for these releases.</p>"
+    
+    # ===== ENHANCED: Better future update disclaimer =====
     future_notice_html = ""
-    if future_opt_in:
-        future_notice_html = """
-        <div style="margin:16px 0;padding:12px 16px;border-left:4px solid #f0ad4e;background:#fff8e5;">
-            <strong>Future update notice:</strong>
-            Future update notifications will only be sent when the respective language or library's new release is officially announced on its official website.
+    if future_opt_in or category == "future":
+        # Calculate average confidence if available
+        confidences = [u.get("confidence", 0) for u in updates_payload if "confidence" in u]
+        avg_confidence = sum(confidences) // len(confidences) if confidences else 0
+        
+        confidence_text = ""
+        if avg_confidence > 0:
+            confidence_text = f" (confidence: {avg_confidence}%)"
+        
+        future_notice_html = f"""
+        <div style="margin:16px 0;padding:16px;border:2px solid #f0ad4e;background:#fff8e5;border-radius:4px;">
+            <strong style="color:#856404;">⚠️ Future Update Notice{confidence_text}</strong><br/>
+            <p style="margin:8px 0 0 0;color:#856404;">
+                This is a <strong>planned/upcoming</strong> release that has <strong>NOT been officially released yet</strong>. 
+                We detected this based on official announcements or roadmaps. 
+                You'll receive another notification when this version is officially released.
+            </p>
         </div>
         """
 
     html_content = f"""
     <div style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;color:#111;line-height:1.5">
         <p style="margin:0 0 16px;">Hello Team,</p>
+        {future_notice_html}
         <p style="margin:0 0 16px;">
-            LibTrack AI detected recent update activity impacting the <strong>{project_name}</strong> project.
+            LibTrack AI detected {'upcoming planned' if future_opt_in or category == 'future' else 'recent'} update activity 
+            impacting the <strong>{project_name}</strong> project.
             Please review the details below and plan follow-up actions as needed.
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 16px;">
@@ -141,6 +167,7 @@ def send_update_email(
                     <th style="padding:8px;border:1px solid #dfe3e7;">Version</th>
                     <th style="padding:8px;border:1px solid #dfe3e7;">Category</th>
                     <th style="padding:8px;border:1px solid #dfe3e7;">Release Date</th>
+                    {f'<th style="padding:8px;border:1px solid #dfe3e7;">Confidence</th>' if has_confidence else ''}
                 </tr>
             </thead>
             <tbody>

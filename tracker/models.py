@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 UPDATE_CATEGORY_CHOICES = [
     ("major", "major"),
@@ -54,3 +55,50 @@ class UpdateCache(models.Model):
 
     def __str__(self):
         return f"{self.library} -> {self.version} ({self.category})"
+
+
+class FutureUpdateCache(TimeStampedModel):
+    """Stores detected future/planned updates separately from released versions."""
+    
+    library = models.CharField(max_length=200, db_index=True)
+    version = models.CharField(max_length=100)
+    expected_date = models.DateField(null=True, blank=True, help_text="Expected release date if known")
+    confidence = models.IntegerField(
+        default=50,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Confidence score 0-100% based on source reliability"
+    )
+    features = models.TextField(blank=True, help_text="Summary of planned features/changes")
+    source = models.URLField(blank=True, help_text="URL to announcement/roadmap")
+    
+    # Status tracking
+    STATUS_CHOICES = [
+        ('detected', 'Detected'),
+        ('confirmed', 'Confirmed'),
+        ('released', 'Released'),
+        ('cancelled', 'Cancelled'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='detected')
+    
+    # Link to the actual release when it happens
+    promoted_to_release = models.ForeignKey(
+        'UpdateCache',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='future_predictions',
+        help_text="Links to UpdateCache entry when this future update is released"
+    )
+    
+    # Notification tracking
+    notification_sent = models.BooleanField(default=False)
+    notification_sent_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-confidence', '-updated_at']
+        unique_together = [['library', 'version']]
+        verbose_name = 'Future Update'
+        verbose_name_plural = 'Future Updates'
+    
+    def __str__(self):
+        return f"{self.library} {self.version} (future, {self.confidence}% confidence)"

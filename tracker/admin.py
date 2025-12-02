@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UpdateCache, Project, StackComponent
+from .models import UpdateCache, Project, StackComponent, FutureUpdateCache
 
 class StackComponentInline(admin.TabularInline):
     model = StackComponent
@@ -36,3 +36,26 @@ class UpdateCacheAdmin(admin.ModelAdmin):
     # def save_model(self, request, obj, form, change):
     #     super().save_model(request, obj, form, change)
     #     UpdateCache.objects.all().update(updated_at=None)
+
+
+@admin.register(FutureUpdateCache)
+class FutureUpdateCacheAdmin(admin.ModelAdmin):
+    list_display = ("library", "version", "confidence", "status", "expected_date", "notification_sent", "updated_at")
+    search_fields = ("library", "version", "features")
+    list_filter = ("status", "notification_sent", "confidence")
+    readonly_fields = ("created_at", "updated_at", "notification_sent_at")
+    fieldsets = (
+        ("Update Information", {
+            "fields": ("library", "version", "confidence", "status")
+        }),
+        ("Details", {
+            "fields": ("expected_date", "features", "source")
+        }),
+        ("Tracking", {
+            "fields": ("promoted_to_release", "notification_sent", "notification_sent_at")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )

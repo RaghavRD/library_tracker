@@ -27,11 +27,27 @@ Return JSON like this:
 {
   "library": "<name>",
   "version": "<latest_version_number>",
-  "category": "major|minor",
+  "category": "major|minor|future",
+  "is_released": true|false,
+  "confidence": 0-100,
+  "expected_date": "YYYY-MM-DD or empty",
   "summary": "3-4 concise bullet points or sentences about new features or changes",
-  "release_date": "DD-MM-YYYY or empty if unknown",
+  "release_date": "YYYY-MM-DD or empty if unknown",
   "source": "<official URL>"
 }
+
+CRITICAL RULES:
+1. Use "future" category ONLY if the version is NOT yet officially released (beta, RC, planned, announced, roadmap).
+2. Use "major" or "minor" ONLY for officially released stable versions.
+3. Set "is_released" to false for future/planned versions, true for released versions.
+4. Set "expected_date" (YYYY-MM-DD format) for future versions if mentioned in sources.
+5. Set "release_date" (YYYY-MM-DD format) for released versions only.
+6. Provide "confidence" score (0-100) based on source reliability:
+   - 90-100: Official documentation/blog from maintainers (github.com/org/repo/releases, official .org sites)
+   - 70-89: Reputable tech news sites (techcrunch, ars technica, the verge)
+   - 50-69: Community forums, Reddit, dev.to, medium blogs
+   - 0-49: Speculation, rumors, unverified sources
+7. If you find BOTH a released version AND a future version in results, return the RELEASED version and mention the future version in the summary.
 """
 
 MAJOR_SIGNALS = {
@@ -161,9 +177,35 @@ class GroqAnalyzer:
         data["release_date"] = str(data.get("release_date", "")).strip()
         data["source"] = str(data.get("source", "")).strip()
 
+        # ===== NEW: Handle future update fields =====
+        is_released = data.get("is_released", True)
+        if isinstance(is_released, str):
+            is_released = is_released.lower() in ("true", "yes", "1")
+        data["is_released"] = bool(is_released)
+        
+        # Extract confidence score
+        confidence = data.get("confidence", 50)
+        try:
+            confidence = int(confidence)
+            if confidence < 0 or confidence > 100:
+                confidence = 50
+        except (ValueError, TypeError):
+            confidence = 50
+        data["confidence"] = confidence
+        
+        # Extract expected date for future updates
+        expected_date = str(data.get("expected_date", "")).strip()
+        data["expected_date"] = expected_date
+
+        # Category logic
         cat = str(data.get("category", "")).lower().strip()
-        if cat not in {"major", "minor"}:
+        
+        # ===== CRITICAL: Force "future" category if not released =====
+        if not data["is_released"]:
+            cat = "future"
+        elif cat not in {"major", "minor", "future"}:
             cat = _coerce_category(data.get("summary", ""))
+        
         data["category"] = cat
 
         # --- Fallback if version missing but Serper provided candidate ---

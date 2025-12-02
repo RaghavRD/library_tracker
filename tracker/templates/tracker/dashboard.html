@@ -181,7 +181,108 @@
         </nav>
       </div>
     </div>
-    {% endif %}
+    {% endif %}\n
+  </div>
+
+  <!-- 🔮 Future Updates Section -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-0">🔮 Upcoming Future Updates</h5>
+        <small class="text-muted">Planned releases detected with high confidence (≥70%)</small>
+      </div>
+      <span class="badge bg-dark">{{ future_updates|length }} Detected</span>
+    </div>
+    <div class="card-body p-0">
+      {% if future_updates %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th width="20%">Library</th>
+              <th width="15%">Planned Version</th>
+              <th width="15%">Expected Date</th>
+              <th width="20%">Confidence</th>
+              <th width="15%">Status</th>
+              <th width="15%" class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for future in future_updates %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ future.library }}</div>
+                {% if future.features %}
+                <div class="text-muted small text-truncate" style="max-width: 200px;" title="{{ future.features }}">
+                  {{ future.features|truncatewords:10 }}
+                </div>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-warning-subtle text-warning-emphasis">v{{ future.version }}</span>
+              </td>
+              <td>
+                {% if future.expected_date %}
+                <span class="text-dark">{{ future.expected_date|date:"Y-m-d" }}</span>
+                {% else %}
+                <span class="text-muted">TBD</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height: 24px; min-width: 100px;">
+                    <div
+                      class="progress-bar {% if future.confidence >= 90 %}bg-success{% elif future.confidence >= 75 %}bg-info{% elif future.confidence >= 70 %}bg-warning{% else %}bg-danger{% endif %}"
+                      role="progressbar" style="width: {{ future.confidence }}%" aria-valuenow="{{ future.confidence }}"
+                      aria-valuemin="0" aria-valuemax="100">
+                      {{ future.confidence }}%
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge 
+                  {% if future.status == 'confirmed' %}bg-success
+                  {% elif future.status == 'detected' %}bg-warning
+                  {% elif future.status == 'released' %}bg-primary
+                  {% else %}bg-secondary{% endif %}">
+                  {{ future.status|title }}
+                </span>
+              </td>
+              <td class="text-center">
+                {% if future.source %}
+                <a href="{{ future.source }}" target="_blank" rel="noopener noreferrer"
+                  class="btn btn-sm btn-outline-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
+                    class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd"
+                      d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5" />
+                    <path fill-rule="evenodd"
+                      d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z" />
+                  </svg>
+                  Source
+                </a>
+                {% else %}
+                <span class="text-muted small">No source</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor"
+          class="bi bi-search mb-2 opacity-25" viewBox="0 0 16 16">
+          <path
+            d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
+        </svg>
+        <p class="mb-0">No future updates detected yet.</p>
+        <small>Future updates will appear here when detected with ≥70% confidence.</small>
+      </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 

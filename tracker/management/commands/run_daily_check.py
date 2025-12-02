@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand, CommandError
 from tracker.utils.serper_fetcher import SerperFetcher
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.send_mail import send_update_email
-from tracker.models import UpdateCache, Project
+from tracker.models import UpdateCache, Project, FutureUpdateCache
 
 # ✅ Locate .env manually (robust)
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -224,10 +224,30 @@ class Command(BaseCommand):
         library = analysis.get("library", name)
         version = analysis.get("version", "")
         category = analysis.get("category", "major")
+        
+        # ===== NEW: Extract future update fields =====
+        is_released = analysis.get("is_released", True)
+        confidence = analysis.get("confidence", 50)
+        expected_date = analysis.get("expected_date", "")
+        
         release_date = analysis.get("release_date", "")
         source = analysis.get("source", "")
         summary = analysis.get("summary", "")
         label = f"{component_type}:{library}"
+        
+        # ===== NEW: Route to future update handler if not released =====
+        if category == "future" or not is_released:
+            return self._handle_future_update(
+                library=library,
+                version=version,
+                confidence=confidence,
+                expected_date=expected_date,
+                summary=summary,
+                source=source,
+                notify_pref=notify_pref,
+                label=label,
+                component_type=component_type,
+            )
 
         with transaction.atomic():
             cache, _ = UpdateCache.objects.select_for_update().get_or_create(
@@ -281,6 +301,110 @@ class Command(BaseCommand):
 
         self.stdout.write(f"[{label}] No email (no new version or filtered by preference).")
         return None
+
+    def _handle_future_update(
+        self,
+        library: str,
+        version: str,
+        confidence: int,
+        expected_date: str,
+        summary: str,
+        source: str,
+        notify_pref: str,
+        label: str,
+        component_type: str,
+    ) -> dict | None:
+        """Handle detection of future/planned updates."""
+        
+        # ===== Check if user wants future updates =====
+        if "future" not in notify_pref:
+            self.stdout.write(f"[{label}] Future update detected but user opted out (notify_pref={notify_pref}).")
+            return None
+        
+        # ===== Confidence threshold - only send high confidence future updates =====
+        MIN_CONFIDENCE = 70  # Configurable threshold
+        if confidence < MIN_CONFIDENCE:
+            self.stdout.write(
+                f"[{label}] Future update confidence too low ({confidence}% < {MIN_CONFIDENCE}%). "
+                f"Version {version}, source: {source[:50] if source else 'N/A'}"
+            )
+            return None
+        
+        # ===== Store in FutureUpdateCache =====
+        from datetime import datetime
+        
+        with transaction.atomic():
+            # Parse expected_date if provided
+            parsed_date = None
+            if expected_date:
+                try:
+                    parsed_date = datetime.strptime(expected_date, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    self.stdout.write(f"[{label}] Could not parse expected_date: {expected_date}")
+            
+            future_cache, created = FutureUpdateCache.objects.get_or_create(
+                library=library,
+                version=version,
+                defaults={
+                    "confidence": confidence,
+                    "expected_date": parsed_date,
+                    "features": summary,
+                    "source": source,
+                    "status": "detected",
+                    "notification_sent": False,
+                }
+            )
+            
+            # If already notified, don't send again
+            if not created and future_cache.notification_sent:
+                self.stdout.write(
+                    f"[{label}] Future update already notified on "
+                    f"{future_cache.notification_sent_at.strftime('%Y-%m-%d') if future_cache.notification_sent_at else 'unknown date'}."
+                )
+                return None
+            
+            # Update if confidence increased or info changed
+            if not created:
+                update_needed = False
+                if confidence > future_cache.confidence:
+                    future_cache.confidence = confidence
+                    update_needed = True
+                if summary and summary != future_cache.features:
+                    future_cache.features = summary
+                    update_needed = True
+                if source and source != future_cache.source:
+                    future_cache.source = source
+                    update_needed = True
+                if parsed_date and parsed_date != future_cache.expected_date:
+                    future_cache.expected_date = parsed_date
+                    update_needed = True
+                
+                if update_needed:
+                    future_cache.save()
+                    self.stdout.write(f"[{label}] Updated existing future update entry with new info.")
+            
+            # Mark as notified
+            future_cache.notification_sent = True
+            future_cache.notification_sent_at = datetime.now()
+            future_cache.save()
+            
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"[{label}] ✅ Future update notification prepared: v{version} "
+                    f"(confidence: {confidence}%, expected: {expected_date or 'TBD'})"
+                )
+            )
+            
+            return {
+                "library": library,
+                "version": version,
+                "category": "future",
+                "release_date": expected_date or "TBD",
+                "summary": summary or "Upcoming release detected.",
+                "source": source or "",
+                "component_type": component_type,
+                "confidence": confidence,
+            }
 
     @staticmethod
     def _is_valid_time_format(value: str) -> bool:
