@@ -424,7 +424,7 @@ def dashboard(request):
     registrations_total = len(regs)
     registrations_page = None
     if registrations_total:
-        paginator = Paginator(regs, 2)
+        paginator = Paginator(regs, 5)
         registrations_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -433,7 +433,7 @@ def dashboard(request):
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,
-            "registrations_per_page": 2,
+            "registrations_per_page": 5,
             "cache": cache,
             "future_updates": future_updates,  # ===== NEW =====
         },
@@ -482,7 +482,7 @@ def updateHistory(request):
     history_total = len(filtered_cache)
     history_page = None
     if history_total:
-        paginator = Paginator(filtered_cache, 5)
+        paginator = Paginator(filtered_cache, 10)
         history_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -491,8 +491,83 @@ def updateHistory(request):
         {
             "history_page": history_page,
             "history_total": history_total,
-            "history_per_page": 5,
+            "history_per_page": 10,
             "selected_project": selected_project,
             "project_names": project_names,
+        },
+    )
+
+
+@login_required
+def future_updates(request):
+    """
+    Displays future/planned updates with filtering and pagination.
+    """
+    from tracker.models import FutureUpdateCache
+    
+    # Build project lookup for filtering
+    project_names = []
+    project_lookup = {}  # {library_key: [project_names]}
+    
+    if True:  # Always build lookup for filtering
+        from collections import defaultdict
+        map_temp = defaultdict(set)
+        projects_set = set()
+        
+        project_qs = Project.objects.prefetch_related("components").all()
+        for project in project_qs:
+            project_name = (project.project_name or "").strip()
+            if not project_name:
+                continue
+            projects_set.add(project_name)
+            for component in project.components.all():
+                lib_key = (component.name or "").strip().lower()
+                if not lib_key:
+                    continue
+                map_temp[lib_key].add(project_name)
+        
+        project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
+        project_names = sorted(projects_set, key=str.casefold)
+    
+    # Get all future updates
+    future_qs = FutureUpdateCache.objects.order_by('-confidence', '-updated_at').all()
+    future_list = list(future_qs)
+    
+    # Attach project names to each future update
+    for entry in future_list:
+        lib_key = (entry.library or "").strip().lower()
+        entry.project_names = project_lookup.get(lib_key, [])
+    
+    # Filter by project if selected
+    selected_project = (request.GET.get("project") or "").strip()
+    if selected_project:
+        future_list = [entry for entry in future_list if selected_project in entry.project_names]
+    
+    # Filter by status if selected
+    selected_status = (request.GET.get("status") or "").strip()
+    if selected_status:
+        future_list = [entry for entry in future_list if entry.status == selected_status]
+    
+    # Pagination
+    future_total = len(future_list)
+    future_page = None
+    if future_total:
+        paginator = Paginator(future_list, 10)
+        future_page = paginator.get_page(request.GET.get("page"))
+    
+    # Status choices for filter dropdown
+    status_choices = ['detected', 'confirmed', 'released', 'cancelled']
+    
+    return render(
+        request,
+        "tracker/future_updates.html",
+        {
+            "future_page": future_page,
+            "future_total": future_total,
+            "future_per_page": 10,
+            "selected_project": selected_project,
+            "selected_status": selected_status,
+            "project_names": project_names,
+            "status_choices": status_choices,
         },
     )

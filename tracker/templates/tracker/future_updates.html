@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI – Future Updates{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1100px;">
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+        {% if messages %}
+        {% for m in messages %}
+        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+            <div class="d-flex">
+                <div class="toast-body">
+                    {{ m }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Close"></button>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="fw-semibold mb-1">Future Updates</h1>
+            <p class="text-muted mb-0">
+                View planned and upcoming releases detected for your projects.
+            </p>
+        </div>
+    </div>
+
+    <!-- Future Updates Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-warning text-dark d-flex flex-column flex-md-row justify-content-between gap-2">
+            <div>
+                <h5 class="mb-1">Upcoming Releases</h5>
+            </div>
+            <div class="text-md-end">
+                <span class="badge bg-dark">
+                    {% if future_total and future_page %}
+                    Showing {{ future_page.start_index }}-{{ future_page.end_index }} of {{ future_total }} update{{ future_total|pluralize }}
+                    {% else %}
+                    No updates to display
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="card-body border-bottom bg-light">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
+                        Project Filter
+                    </label>
+                    <form method="get" id="futureFilterForm" class="w-100">
+                        {% if selected_status %}
+                        <input type="hidden" name="status" value="{{ selected_status }}">
+                        {% endif %}
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-funnel-fill text-warning"></i>
+                            </span>
+                            <select id="projectFilter" name="project" class="form-select" {% if not project_names%}
+                                disabled{% endif %}>
+                                <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
+                                {% if project_names %}
+                                {% for project in project_names %}
+                                <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>
+                                    {{ project }}</option>
+                                {% endfor %}
+                                {% else %}
+                                <option value="">Project list unavailable</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-5">
+                    <label for="statusFilter" class="form-label text-muted fw-semibold small text-uppercase">
+                        Status Filter
+                    </label>
+                    <form method="get" id="statusFilterForm" class="w-100">
+                        {% if selected_project %}
+                        <input type="hidden" name="project" value="{{ selected_project }}">
+                        {% endif %}
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-filter-circle-fill text-warning"></i>
+                            </span>
+                            <select id="statusFilter" name="status" class="form-select">
+                                <option value="" {% if not selected_status %}selected{% endif %}>All Statuses</option>
+                                {% for status in status_choices %}
+                                <option value="{{ status }}" {% if status == selected_status %}selected{% endif %}>
+                                    {{ status|title }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-2 text-md-end">
+                    <p class="mb-0 text-muted small">
+                        <i class="bi bi-info-circle me-1 text-warning"></i>
+                        {{ future_total|default:0 }} total
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-0">
+            {% if future_total and future_page %}
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th>#</th>
+                            <th>Library</th>
+                            <th>Projects</th>
+                            <th>Version</th>
+                            <th>Expected Date</th>
+                            <th>Confidence</th>
+                            <th>Status</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in future_page %}
+                        <tr class="text-center">
+                            <td class="text-center fw-medium">{{ future_page.start_index|add:forloop.counter0 }}</td>
+                            <td class="fw-semibold">{{ entry.library }}</td>
+                            <td>
+                                {% if entry.project_names %}
+                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                    {% for proj in entry.project_names %}
+                                    <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-normal px-3">{{ proj }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small fst-italic">Not linked</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-warning-subtle text-warning-emphasis">v{{ entry.version }}</span>
+                            </td>
+                            <td>
+                                {% if entry.expected_date %}
+                                <span class="text-dark">{{ entry.expected_date|date:"Y-m-d" }}</span>
+                                {% else %}
+                                <span class="text-muted">TBD</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                    <div class="progress" style="height: 18px; min-width: 80px;">
+                                        {% if entry.confidence %}
+                                        {% with conf=entry.confidence %}
+                                        <div class="progress-bar {% if conf > 89 %}bg-success{% elif conf > 74 %}bg-info{% elif conf > 69 %}bg-warning{% else %}bg-danger{% endif %}"
+                                            role="progressbar" style="width: {{ entry.confidence }}%"
+                                            aria-valuenow="{{ entry.confidence }}" aria-valuemin="0"
+                                            aria-valuemax="100">
+                                            <small>{{ entry.confidence }}%</small>
+                                        </div>
+                                        {% endwith %}
+                                        {% else %}
+                                        <div class="progress-bar bg-secondary" role="progressbar" style="width: 50%"
+                                            aria-valuenow="50" aria-valuemin="0" aria-valuemax="100">
+                                            <small>N/A</small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% with status=entry.status %}
+                                <span class="badge 
+                                    {% if status == 'confirmed' %}bg-success
+                                    {% elif status == 'detected' %}bg-warning
+                                    {% elif status == 'released' %}bg-primary
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ entry.status|title }}
+                                </span>
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% if entry.source %}
+                                <a href="{{ entry.source }}" class="link-primary text-decoration-none" target="_blank"
+                                    rel="noopener">View</a>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                {% if selected_project or selected_status %}
+                No future updates found with current filters.
+                {% else %}
+                No future updates detected yet.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if future_total and future_page and future_page.paginator.num_pages > 1 %}
+        <div class="card-footer border-0 bg-light">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+                <small class="text-muted mb-0">
+                    Showing {{ future_page.start_index }}-{{ future_page.end_index }} of {{ future_total }} update{{ future_total|pluralize }}
+                </small>
+                <nav aria-label="Future updates pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item {% if not future_page.has_previous %}disabled{% endif %}">
+                            {% if future_page.has_previous %}
+                            <a class="page-link"
+                                href="?{% if selected_project %}project={{ selected_project|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}page={{ future_page.previous_page_number }}"
+                                aria-label="Previous">Previous</a>
+                            {% else %}
+                            <span class="page-link">Previous</span>
+                            {% endif %}
+                        </li>
+                        {% for num in future_page.paginator.page_range %}
+                        <li class="page-item {% if future_page.number == num %}active{% endif %}">
+                            {% if future_page.number == num %}
+                            <span class="page-link">{{ num }}</span>
+                            {% else %}
+                            <a class="page-link" href="?{% if selected_project %}project={{ selected_project|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}page={{ num }}">{{ num }}</a>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        <li class="page-item {% if not future_page.has_next %}disabled{% endif %}">
+                            {% if future_page.has_next %}
+                            <a class="page-link"
+                                href="?{% if selected_project %}project={{ selected_project|urlencode }}&{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&{% endif %}page={{ future_page.next_page_number }}"
+                                aria-label="Next">Next</a>
+                            {% else %}
+                            <span class="page-link">Next</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const toastElList = [].slice.call(document.querySelectorAll(".toast"));
+        toastElList.forEach(function (toastEl) {
+            const t = new bootstrap.Toast(toastEl);
+            t.show();
+        });
+
+        // Project filter auto-submit
+        const projectFilter = document.getElementById("projectFilter");
+        if (projectFilter) {
+            projectFilter.addEventListener("change", function () {
+                const form = projectFilter.closest("form");
+                if (form) {
+                    form.submit();
+                }
+            });
+        }
+
+        // Status filter auto-submit
+        const statusFilter = document.getElementById("statusFilter");
+        if (statusFilter) {
+            statusFilter.addEventListener("change", function () {
+                const form = statusFilter.closest("form");
+                if (form) {
+                    form.submit();
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

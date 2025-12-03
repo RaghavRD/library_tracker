@@ -50,6 +50,10 @@
               aria-current="page" href="{% url 'dashboard' %}">Dashboard</a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'future_updates' %}active{% endif %}"
+              href="{% url 'future_updates' %}">Future Updates</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'updateHistory' %}active{% endif %}"
               href="{% url 'updateHistory' %}">Last Updates</a>
           </li>
