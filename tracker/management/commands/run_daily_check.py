@@ -1,17 +1,22 @@
 import os
 import time
+import logging
 import schedule
 from time import sleep
 from pathlib import Path
 from django.db import transaction
 from dotenv import load_dotenv, find_dotenv
 from packaging import version as pkg_version
+from packaging.version import InvalidVersion
 from django.core.management.base import BaseCommand, CommandError
 
 from tracker.utils.serper_fetcher import SerperFetcher
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.send_mail import send_update_email
 from tracker.models import UpdateCache, Project, FutureUpdateCache
+
+# Get logger
+logger = logging.getLogger('libtrack')
 
 # ✅ Locate .env manually (robust)
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -110,7 +115,8 @@ class Command(BaseCommand):
             project_updates = []
             project_updates.extend(
                 self._process_components(
-                    project=project_name,
+                    project=project,
+                    project_name=project_name,
                     names=lib_names,
                     versions=lib_versions,
                     component_type="library",
@@ -121,7 +127,8 @@ class Command(BaseCommand):
             )
             project_updates.extend(
                 self._process_components(
-                    project=project_name,
+                    project=project,
+                    project_name=project_name,
                     names=language_names,
                     versions=language_versions,
                     component_type="language",
@@ -168,7 +175,8 @@ class Command(BaseCommand):
 
     def _process_components(
         self,
-        project: str,
+        project: Project,
+        project_name: str,
         names: list[str],
         versions: list[str],
         *,
@@ -184,7 +192,7 @@ class Command(BaseCommand):
         if not versions or len(names) != len(versions):
             self.stdout.write(
                 self.style.WARNING(
-                    f"⚠️ Skipping {project}: {component_type} name/version mismatch",
+                    f"⚠️ Skipping {project_name}: {component_type} name/version mismatch",
                 )
             )
             return []
@@ -192,6 +200,7 @@ class Command(BaseCommand):
         updates: list[dict] = []
         for name, current_version in zip(names, versions):
             update = self._evaluate_component(
+                project=project,
                 name=name,
                 current_version=current_version,
                 groq=groq,
@@ -207,6 +216,7 @@ class Command(BaseCommand):
     def _evaluate_component(
         self,
         *,
+        project: Project,
         name: str,
         current_version: str,
         groq: GroqAnalyzer,
@@ -251,6 +261,7 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             cache, _ = UpdateCache.objects.select_for_update().get_or_create(
+                project=project,
                 library=library,
                 defaults={
                     "version": version or "",
@@ -275,11 +286,26 @@ class Command(BaseCommand):
 
             if version and current_version:
                 try:
-                    if pkg_version.parse(version) <= pkg_version.parse(current_version):
-                        self.stdout.write(f"[{label}] Skipped — version {version} not newer than {current_version}")
+                    parsed_new = pkg_version.parse(version)
+                    parsed_current = pkg_version.parse(current_version)
+                    
+                    if parsed_new <= parsed_current:
+                        logger.info(
+                            f"[{label}] Skipped - version {version} not newer than {current_version}"
+                        )
                         should_send = False
-                except Exception:
-                    pass
+                except InvalidVersion as e:
+                    logger.warning(
+                        f"[{label}] Invalid version format - new: '{version}', current: '{current_version}'. "
+                        f"Error: {e}. Skipping version comparison."
+                    )
+                    # Continue processing - let other checks determine if we should send
+                except Exception as e:
+                    logger.error(
+                        f"[{label}] Unexpected error during version comparison: {e}",
+                        exc_info=True
+                    )
+                    # Continue processing despite error
 
             if should_send:
                 cache.version = version or cache.version

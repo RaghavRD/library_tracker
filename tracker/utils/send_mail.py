@@ -62,14 +62,6 @@ def send_update_email(
     recipients = list(recipients or [])
     if not recipients:
         return False, "❌ No valid recipients provided"
-
-    # subject_prefix = (
-    #     "[Major Update]"
-    #     if category.lower() == "major"
-    #     else "[Minor Update]"
-    #     if category.lower() == "minor"
-    #     else "[Update]"
-    # )
     
     # ===== NEW: Different subject for future updates =====
     if category == "future" or future_opt_in:
@@ -141,7 +133,7 @@ def send_update_email(
         
         future_notice_html = f"""
         <div style="margin:16px 0;padding:16px;border:2px solid #f0ad4e;background:#fff8e5;border-radius:4px;">
-            <strong style="color:#856404;">⚠️ Future Update Notice{confidence_text}</strong><br/>
+            <strong style="color:#856404;">Future Update Notice{confidence_text}</strong><br/>
             <p style="margin:8px 0 0 0;color:#856404;">
                 This is a <strong>planned/upcoming</strong> release that has <strong>NOT been officially released yet</strong>. 
                 We detected this based on official announcements or roadmaps. 
@@ -153,7 +145,6 @@ def send_update_email(
     html_content = f"""
     <div style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;color:#111;line-height:1.5">
         <p style="margin:0 0 16px;">Hello Team,</p>
-        {future_notice_html}
         <p style="margin:0 0 16px;">
             LibTrack AI detected {'upcoming planned' if future_opt_in or category == 'future' else 'recent'} update activity 
             impacting the <strong>{project_name}</strong> project.

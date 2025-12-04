@@ -44,17 +44,31 @@ class StackComponent(TimeStampedModel):
         return f"{self.project.project_name} :: {self.name} ({self.version})"
 
 
-class UpdateCache(models.Model):
-    library = models.CharField(max_length=200, unique=True)
+class UpdateCache(TimeStampedModel):
+    """Stores detected updates for libraries/languages per project."""
+    
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='update_caches',
+        help_text="Project this update cache belongs to"
+    )
+    library = models.CharField(max_length=200, db_index=True)
     version = models.CharField(max_length=100)
     release_date = models.CharField(max_length=50, blank=True)
     category = models.CharField(max_length=10, choices=UPDATE_CATEGORY_CHOICES)
     summary = models.TextField(blank=True)
     source = models.URLField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = [['project', 'library']]
+        ordering = ['-updated_at']
+        verbose_name = 'Update Cache'
+        verbose_name_plural = 'Update Caches'
 
     def __str__(self):
-        return f"{self.library} -> {self.version} ({self.category})"
+        return f"{self.project.project_name} :: {self.library} -> {self.version} ({self.category})"
+
 
 
 class FutureUpdateCache(TimeStampedModel):
