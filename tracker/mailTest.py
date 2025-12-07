@@ -15,7 +15,7 @@ from tracker.utils.send_mail import send_update_email
 
 # Test mail works
 ok, info = send_update_email(
-    mailtrap_api_key="519bb909edb9865ca04dc85fa8247aea",
+    mailtrap_api_key=None,
     project_name="LibTrack AI Test Project",
     recipients="raghavdesai549@gmail.com",
     library="pandas",
@@ -23,7 +23,7 @@ ok, info = send_update_email(
     category="major",
     summary="Big performance & bug fixes release.",
     source="https://pandas.pydata.org/docs/whatsnew/index.html",
-    from_email="hello@demomailtrap.com",  # will use MAILTRAP_FROM_EMAIL from .env
+    from_email=None,
 )
 
 print("status:", ok)

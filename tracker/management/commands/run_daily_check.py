@@ -67,7 +67,7 @@ class Command(BaseCommand):
     def run_daily_check(self):
         self.stdout.write(self.style.NOTICE("LibTrack AI: Daily check starting..."))
 
-        mailtrap_key = os.getenv("MAILTRAP_MAIN_KEY")
+        mailtrap_key = os.getenv("MAILTRAP_API_KEY")
         sender_email = os.getenv("MAILTRAP_FROM_EMAIL")
 
         if not mailtrap_key or not sender_email:

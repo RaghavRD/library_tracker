@@ -46,7 +46,7 @@ def send_update_email(
         (success: bool, status_text: str)
     """
 
-    api_key = mailtrap_api_key or os.getenv("MAILTRAP_MAIN_KEY")
+    api_key = mailtrap_api_key or os.getenv("MAILTRAP_API_KEY")
     from_addr = from_email or os.getenv("MAILTRAP_FROM_EMAIL")
 
     if not api_key or not from_addr:
@@ -181,28 +181,21 @@ def send_update_email(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    # print(f"Headers:-------- {headers}")
 
     # Mailtrap Bulk API payload
     payload_category = "Future Updates" if future_opt_in else "Library Updates"
     payload = {
-        "from": {"email": "hello@demomailtrap.com", "name": "LibTrack AI"},
+        "from": {"email": "hello@demomailtrap.co", "name": "LibTrack AI"},
         "to": [{"email": r} for r in recipients],
         "subject": subject,
         "html": html_content,
         "category": payload_category,
     }
 
-    # is_test = os.getenv("TEST_MODE")
-    # if is_test:
-    #     print(f"Payload:-------- {html_content}")
-    #     return True, "Test email sent"
-
-    print(f"Payload:-------- {html_content}")
     try:
-        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
+        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=15)
         ok = 200 <= resp.status_code < 300
-        status_text = f"Mailtrap: {resp.status_code} - {resp.text[:250]}"
+        status_text = f"Mailtrap: {resp.status_code} - {resp.text}"
         if ok:
             print(f"✅ Email sent successfully: {status_text}")
         else:

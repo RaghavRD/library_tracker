@@ -89,3 +89,40 @@ WARNING 2025-12-07 22:15:17,625 groq_analyzer 3142 8530468992 [python] Version m
 INFO 2025-12-07 22:15:17,626 run_daily_check 3142 8530468992 [language:python] Groq detected version: 4.0
 INFO 2025-12-07 22:15:26,896 run_daily_check 3142 8530468992 [library:docker] Serper found version candidate: 30.1
 INFO 2025-12-07 22:15:27,366 run_daily_check 3142 8530468992 [library:docker] Groq detected version: 30.1
+INFO 2025-12-07 23:58:47,894 run_daily_check 9377 8530468992 [library:tensorflow] Serper found version candidate: 2025.12
+WARNING 2025-12-07 23:58:49,128 groq_analyzer 9377 8530468992 [tensorflow] Version mismatch: Groq detected 2.20, but Serper found 2025.12. Using higher version.
+INFO 2025-12-07 23:58:49,128 run_daily_check 9377 8530468992 [library:tensorflow] Groq detected version: 2025.12
+INFO 2025-12-07 23:58:58,566 run_daily_check 9377 8530468992 [library:pytorch] Serper found version candidate: 25.20.01.14
+WARNING 2025-12-07 23:58:59,367 groq_analyzer 9377 8530468992 [pytorch] Version mismatch: Groq detected 2.10.0, but Serper found 25.20.01.14. Using higher version.
+INFO 2025-12-07 23:58:59,367 run_daily_check 9377 8530468992 [library:pytorch] Groq detected version: 25.20.01.14
+INFO 2025-12-07 23:59:08,307 run_daily_check 9377 8530468992 [library:scikit-learn] Serper found version candidate: 2025.8.0
+WARNING 2025-12-07 23:59:16,942 groq_analyzer 9377 8530468992 [scikit-learn] Version mismatch: Groq detected 1.7.2, but Serper found 2025.8.0. Using higher version.
+INFO 2025-12-07 23:59:16,942 run_daily_check 9377 8530468992 [library:scikit-learn] Groq detected version: 2025.8.0
+INFO 2025-12-07 23:59:25,744 run_daily_check 9377 8530468992 [library:pandas] Serper found version candidate: 2025.1
+WARNING 2025-12-07 23:59:40,293 groq_analyzer 9377 8530468992 [pandas] Version mismatch: Groq detected 3.0.0, but Serper found 2025.1. Using higher version.
+INFO 2025-12-07 23:59:40,294 run_daily_check 9377 8530468992 [library:pandas] Groq detected version: 2025.1
+INFO 2025-12-07 23:59:48,418 run_daily_check 9377 8530468992 [library:numpy] Serper found version candidate: 22.5
+INFO 2025-12-08 00:00:08,010 run_daily_check 9377 8530468992 [library:numpy] Groq detected version: 22.5
+INFO 2025-12-08 00:00:15,703 run_daily_check 9377 8530468992 [library:fastapi] Serper found version candidate: 17.0
+WARNING 2025-12-08 00:00:29,340 groq_analyzer 9377 8530468992 [fastapi] Version mismatch: Groq detected 0.124.0, but Serper found 17.0. Using higher version.
+INFO 2025-12-08 00:00:29,340 run_daily_check 9377 8530468992 [library:fastapi] Groq detected version: 17.0
+INFO 2025-12-08 00:00:38,604 run_daily_check 9377 8530468992 [language:python] Serper found version candidate: 10.14.0
+WARNING 2025-12-08 00:01:04,327 groq_analyzer 9377 8530468992 [python] Version mismatch: Groq detected 3.14.2, but Serper found 10.14.0. Using higher version.
+INFO 2025-12-08 00:01:04,327 run_daily_check 9377 8530468992 [language:python] Groq detected version: 10.14.0
+INFO 2025-12-08 00:01:13,711 run_daily_check 9377 8530468992 [library:docker] Serper found version candidate: 28.0
+INFO 2025-12-08 00:01:44,437 run_daily_check 9377 8530468992 [library:docker] Groq detected version: 29.0
+INFO 2025-12-08 00:01:53,849 run_daily_check 9377 8530468992 [library:kubernetes] Serper found version candidate: 37.0
+WARNING 2025-12-08 00:02:00,430 groq_analyzer 9377 8530468992 [kubernetes] Version mismatch: Groq detected 1.34.2, but Serper found 37.0. Using higher version.
+INFO 2025-12-08 00:02:00,431 run_daily_check 9377 8530468992 [library:kubernetes] Groq detected version: 37.0
+INFO 2025-12-08 00:02:09,079 run_daily_check 9377 8530468992 [library:terraform] Serper found version candidate: 9.2.0
+WARNING 2025-12-08 00:02:16,628 groq_analyzer 9377 8530468992 [terraform] Version mismatch: Groq detected 1.15.0-20251203, but Serper found 9.2.0. Using higher version.
+INFO 2025-12-08 00:02:16,628 run_daily_check 9377 8530468992 [library:terraform] Groq detected version: 9.2.0
+INFO 2025-12-08 00:02:24,879 run_daily_check 9377 8530468992 [library:ansible] Serper found version candidate: 32.0.0.0
+WARNING 2025-12-08 00:02:37,556 groq_analyzer 9377 8530468992 [ansible] Version mismatch: Groq detected 13.0.0, but Serper found 32.0.0.0. Using higher version.
+INFO 2025-12-08 00:02:37,557 run_daily_check 9377 8530468992 [library:ansible] Groq detected version: 32.0.0.0
+INFO 2025-12-08 00:02:45,327 run_daily_check 9377 8530468992 [library:prometheus] Serper found version candidate: 52.0
+WARNING 2025-12-08 00:02:52,801 groq_analyzer 9377 8530468992 [prometheus] Version mismatch: Groq detected 3.8.0, but Serper found 52.0. Using higher version.
+INFO 2025-12-08 00:02:52,801 run_daily_check 9377 8530468992 [library:prometheus] Groq detected version: 52.0
+INFO 2025-12-08 00:03:00,570 run_daily_check 9377 8530468992 [library:nginx] Serper found version candidate: 8.4
+WARNING 2025-12-08 00:03:12,126 groq_analyzer 9377 8530468992 [nginx] Version mismatch: Groq detected 1.29.3, but Serper found 8.4. Using higher version.
+INFO 2025-12-08 00:03:12,126 run_daily_check 9377 8530468992 [library:nginx] Groq detected version: 8.4
