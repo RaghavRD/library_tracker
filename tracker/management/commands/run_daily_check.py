@@ -89,6 +89,14 @@ class Command(BaseCommand):
 
         for project in projects:
             project_name = (project.project_name or "").strip() or "Unnamed Project"
+            
+            # ===== Print project header with separators =====
+            self.stdout.write("\n" + "-"*8)
+            self.stdout.write(
+                self.style.MIGRATE_HEADING(f"📦 Processing Project: {project_name}")
+            )
+            self.stdout.write("-"*8 + "\n")
+            
             emails = [e.strip() for e in (project.developer_emails or "").split(",") if e.strip()]
             notify_pref = str(project.notification_type or "both").lower()
 
@@ -170,6 +178,9 @@ class Command(BaseCommand):
                 self.stdout.write(f"Project digest for {project_name}: {ok} -> {info}")
             else:
                 self.stdout.write(f"No qualifying updates for {project_name}.")
+            
+            # ===== Add spacing after project completion =====
+            self.stdout.write(self.style.SUCCESS(f"✅ Completed processing for: {project_name}"))
 
         self.stdout.write(self.style.SUCCESS("✅ Daily check completed successfully."))
 
@@ -225,8 +236,20 @@ class Command(BaseCommand):
         component_type: str,
     ) -> dict | None:
         """Run Serper+Groq for a single component and return an update dict if we should email."""
-        serper_results = serper.search_library(name, current_version)
+        serper_results = serper.search_library(name, current_version, component_type=component_type)
+        
+        # Log Serper's version candidate for debugging
+        candidate = serper_results.get("latest_version_candidate", "")
+        if candidate:
+            logger.info(f"[{component_type}:{name}] Serper found version candidate: {candidate}")
+        
         analysis = groq.analyze(name, serper_results)
+        
+        # Log Groq's detected version
+        detected_version = analysis.get("version", "")
+        if detected_version:
+            logger.info(f"[{component_type}:{name}] Groq detected version: {detected_version}")
+        
         if analysis.get("error"):
             self.stdout.write(self.style.WARNING(f"[{name}] Groq error: {analysis['error']}"))
             return None
@@ -291,7 +314,8 @@ class Command(BaseCommand):
                     
                     if parsed_new <= parsed_current:
                         logger.info(
-                            f"[{label}] Skipped - version {version} not newer than {current_version}"
+                            f"[{label}] Skipped - version {version} not newer than current {current_version} "
+                            f"(Serper candidate: {serper_results.get('latest_version_candidate', 'N/A')})"
                         )
                         should_send = False
                 except InvalidVersion as e:

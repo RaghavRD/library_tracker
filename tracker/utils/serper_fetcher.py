@@ -47,6 +47,92 @@ _FUTURE_KEYWORDS = (
     "general availability",
 )
 
+# Common programming languages (not libraries)
+_PROGRAMMING_LANGUAGES = {
+    "python", "javascript", "java", "go", "ruby", "php", "rust", 
+    "typescript", "c++", "c#", "kotlin", "swift", "scala", "r",
+    "perl", "lua", "dart", "elixir", "haskell", "clojure", "node.js",
+    "nodejs", "node", "dotnet", ".net"
+}
+
+# Official sites for programming languages
+_LANGUAGE_OFFICIAL_SITES = {
+    "python": "python.org",
+    "javascript": "developer.mozilla.org",
+    "node.js": "nodejs.org",
+    "nodejs": "nodejs.org", 
+    "node": "nodejs.org",
+    "java": "oracle.com/java OR openjdk.org",
+    "go": "go.dev",
+    "ruby": "ruby-lang.org",
+    "php": "php.net",
+    "rust": "rust-lang.org",
+    "typescript": "typescriptlang.org",
+    "kotlin": "kotlinlang.org",
+    "swift": "swift.org",
+    "dotnet": "dotnet.microsoft.com",
+    ".net": "dotnet.microsoft.com",
+}
+
+# Common tools, services, and CLIs (not libraries)
+_TOOLS_AND_SERVICES = {
+    "docker", "kubernetes", "k8s", "kubectl", "nginx", "apache", "httpd",
+    "ansible", "terraform", "jenkins", "gitlab", "github", "prometheus",
+    "grafana", "elasticsearch", "kibana", "logstash", "redis", "mongodb",
+    "postgresql", "postgres", "mysql", "mariadb", "rabbitmq", "kafka",
+    "vault", "consul", "etcd", "haproxy", "traefik", "helm", "argocd",
+    "git", "maven", "gradle", "npm", "yarn", "pnpm", "pip", "conda",
+    "vscode", "intellij", "eclipse", "vim", "emacs", "aws-cli", "azure-cli",
+    "gcloud", "circleci", "travis", "bamboo", "octopus", "spinnaker"
+}
+
+# Official sites for tools/services/CLIs
+_TOOL_OFFICIAL_SITES = {
+    "docker": "docs.docker.com OR docker.com/blog",
+    "kubernetes": "kubernetes.io",
+    "k8s": "kubernetes.io",
+    "kubectl": "kubernetes.io",
+    "nginx": "nginx.org OR nginx.com",
+    "apache": "httpd.apache.org",
+    "httpd": "httpd.apache.org",
+    "ansible": "docs.ansible.com",
+    "terraform": "developer.hashicorp.com/terraform",
+    "jenkins": "jenkins.io",
+    "gitlab": "about.gitlab.com OR docs.gitlab.com",
+    "github": "github.blog OR docs.github.com",
+    "prometheus": "prometheus.io",
+    "grafana": "grafana.com",
+    "elasticsearch": "elastic.co",
+    "kibana": "elastic.co",
+    "logstash": "elastic.co",
+    "redis": "redis.io",
+    "mongodb": "mongodb.com",
+    "postgresql": "postgresql.org",
+    "postgres": "postgresql.org",
+    "mysql": "dev.mysql.com",
+    "mariadb": "mariadb.org",
+    "rabbitmq": "rabbitmq.com",
+    "kafka": "kafka.apache.org",
+    "vault": "vaultproject.io",
+    "consul": "consul.io",
+    "etcd": "etcd.io",
+    "haproxy": "haproxy.org",
+    "traefik": "traefik.io",
+    "helm": "helm.sh",
+    "argocd": "argo-cd.readthedocs.io",
+    "git": "git-scm.com",
+    "maven": "maven.apache.org",
+    "gradle": "gradle.org",
+    "npm": "docs.npmjs.com OR npmjs.com/package/npm",
+    "yarn": "yarnpkg.com",
+    "pnpm": "pnpm.io",
+    "pip": "pip.pypa.io",
+    "conda": "docs.conda.io",
+    "aws-cli": "docs.aws.amazon.com/cli",
+    "azure-cli": "docs.microsoft.com/cli/azure",
+    "gcloud": "cloud.google.com/sdk/gcloud",
+}
+
 # --- Enhanced Fetcher Class ---
 class SerperFetcher:
     """
@@ -129,15 +215,51 @@ class SerperFetcher:
 
     # ---------------------------------------------
     @staticmethod
-    def _score_link(link: str) -> int:
-        """Assign a priority score to favor official sources."""
+    def _score_link(link: str, is_language: bool = False, result_date: str = "") -> int:
+        """Assign a priority score to favor official sources and recent results."""
         if not link:
             return 0
+        
+        score = 1
         host = link.split("/")[2] if "://" in link else link.split("/")[0]
-        for domain, score in _OFFICIAL_HOST_WEIGHTS.items():
+        
+        # Boost official package registry sites
+        for domain, base_score in _OFFICIAL_HOST_WEIGHTS.items():
             if domain in host:
-                return score
-        return 1
+                score += base_score
+        
+        # Extra boost for official language sites when searching for languages
+        if is_language:
+            for lang_site in _LANGUAGE_OFFICIAL_SITES.values():
+                # Extract just the domain (e.g., "python.org" from "python.org")
+                main_domain = lang_site.split(" OR ")[0].strip()
+                if main_domain in host:
+                    score += 10  # Heavily favor official language sites
+            
+            # Also check tool sites (in case a tool is being searched as a language)
+            for tool_site in _TOOL_OFFICIAL_SITES.values():
+                main_domain = tool_site.split(" OR ")[0].strip()
+                if main_domain in host:
+                    score += 10  # Heavily favor official tool sites too
+        
+        # Boost recent results (if date is available)
+        if result_date:
+            try:
+                from datetime import datetime
+                # Try to parse the date
+                result_datetime = datetime.strptime(result_date[:10], "%Y-%m-%d")
+                days_old = (datetime.now() - result_datetime).days
+                
+                if days_old < 30:  # Less than a month old
+                    score += 5
+                elif days_old < 90:  # Less than 3 months old
+                    score += 3
+                elif days_old < 180:  # Less than 6 months old
+                    score += 1
+            except Exception:
+                pass  # If date parsing fails, just skip the bonus
+        
+        return score
 
     # ---------------------------------------------
     @staticmethod
@@ -165,29 +287,94 @@ class SerperFetcher:
         return best_raw
 
     # ---------------------------------------------
-    def search_library(self, library: str, current_version: str | None = None) -> dict:
+    @staticmethod
+    def _is_programming_language(name: str) -> bool:
+        """Check if the component is a programming language vs a library."""
+        return name.lower().strip() in _PROGRAMMING_LANGUAGES
+
+    # ---------------------------------------------
+    @staticmethod
+    def _is_tool_or_service(name: str) -> bool:
+        """Check if the component is a tool/service/CLI."""
+        return name.lower().strip() in _TOOLS_AND_SERVICES
+
+    # ---------------------------------------------
+    @staticmethod
+    def _get_time_filter() -> str:
+        """Get date filter for recent results (last 3 months)."""
+        from datetime import datetime, timedelta
+        three_months_ago = datetime.now() - timedelta(days=90)
+        return three_months_ago.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------
+    def search_library(self, library: str, current_version: str | None = None, component_type: str = "library") -> dict:
         """
-        Searches the web for the most recent info about a given library.
-        If `current_version` is provided, filters results that mention a higher version.
+        Searches the web for the most recent info about a given library or language.
+        
+        Args:
+            library: Name of the library or language
+            current_version: Current version to compare against
+            component_type: "library" or "language" (auto-detected if not specified)
+        
+        Returns:
+            dict with search results, filtered results, and version candidates
         """
 
         if not library or not isinstance(library, str):
             return {"error": "Invalid library name", "results": []}
 
+        # Auto-detect component type
+        is_language = component_type == "language" or self._is_programming_language(library)
+        is_tool = component_type == "tool" or self._is_tool_or_service(library)
+        
+        # Determine final category
+        if is_language:
+            category = "language"
+        elif is_tool:
+            category = "tool"
+        else:
+            category = "library"
+        
+        time_filter = self._get_time_filter()
+
         if self.debug:
-            print(f"🔍 Fetching library data for '{library}' (current={current_version})...")
+            print(f"🔍 Fetching {category} data for '{library}' (current={current_version})...")
 
-        base_queries = [
-            f"{library} latest release version site:pypi.org OR site:npmjs.com OR site:rubygems.org",
-            f"{library} changelog OR release notes site:github.com OR site:gitlab.com",
-            f"{library} new features OR breaking changes site:dev.to OR site:medium.com",
-            f"{library} stable release date OR updated site:python.org OR site:angular.io OR site:reactjs.org",
-            f"{library} documentation site:readthedocs.io OR site:{library}.org",
-        ]
+        # Different query strategies based on category
+        if is_language:
+            # For programming languages, search official sites
+            official_site = _LANGUAGE_OFFICIAL_SITES.get(library.lower(), f"{library}.org")
+            base_queries = [
+                f"{library} latest version site:{official_site}",
+                f"{library} download latest release site:{official_site}",
+                f"{library} release notes after:{time_filter}",
+                f"{library} changelog what's new {datetime.now().year}",
+                f"{library} current version official",
+            ]
+        elif is_tool:
+            # For tools/services/CLIs, search official documentation sites
+            official_site = _TOOL_OFFICIAL_SITES.get(library.lower(), f"{library}.io OR {library}.org")
+            base_queries = [
+                f"{library} latest version site:{official_site}",
+                f"{library} release notes site:{official_site}",
+                f"{library} download latest after:{time_filter}",
+                f"{library} changelog {datetime.now().year} site:{official_site}",
+                f"{library} stable version official documentation",
+            ]
+        else:
+            # For libraries, search package registries and GitHub
+            base_queries = [
+                f"{library} latest release after:{time_filter} site:pypi.org OR site:npmjs.com OR site:rubygems.org",
+                f"{library} changelog OR release notes site:github.com OR site:gitlab.com",
+                f"{library} new features after:{time_filter}",
+                f"{library} stable release what's new {datetime.now().year}",
+                f"{library} documentation latest version site:readthedocs.io",
+            ]
 
+        # Common future update queries for both languages and libraries
         future_queries = [
-            f"{library} roadmap next {library} release OR upcoming changes",
-            f"{library} release candidate OR beta announcement",
+            f"{library} roadmap next release OR upcoming changes",
+            f"{library} release candidate OR beta announcement after:{time_filter}",
         ]
 
         responses = [self._call_serper(q) for q in base_queries]
@@ -196,7 +383,7 @@ class SerperFetcher:
 
         filtered = []
         future_updates = []
-        keywords = ("release", "version", "changelog", "notes", "update")
+        keywords = ("release", "version", "changelog", "notes", "update", "download")
         version_candidates = []
 
         all_results = self._dedupe_results(merged.get("results", []))
@@ -214,7 +401,11 @@ class SerperFetcher:
             )
             versions_found = self._extract_versions(text_blob)
             result["versions_found"] = versions_found
-            result["relevance_score"] = self._score_link(result.get("link", "")) + len(versions_found)
+            result["relevance_score"] = self._score_link(
+                result.get("link", ""), 
+                is_language=(is_language or is_tool),  # Both languages and tools get official site boost
+                result_date=result.get("date", "")
+            ) + len(versions_found)
 
             if versions_found:
                 version_candidates.extend(versions_found)

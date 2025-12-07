@@ -1,1 +1,91 @@
 INFO 2025-12-04 23:30:26,370 run_daily_check 72658 8530468992 [library:docker] Skipped - version 0.30.0 not newer than 24.0.7
+INFO 2025-12-07 18:52:53,592 run_daily_check 159 8530468992 [library:tensorflow] Skipped - version 2.11.0 not newer than 2.15.0
+INFO 2025-12-07 18:53:07,500 run_daily_check 159 8530468992 [library:scikit-learn] Skipped - version 1.1.2 not newer than 1.3.2
+INFO 2025-12-07 18:53:13,889 run_daily_check 159 8530468992 [library:pandas] Skipped - version 1.5.2 not newer than 2.1.4
+INFO 2025-12-07 18:53:19,460 run_daily_check 159 8530468992 [library:numpy] Skipped - version 1.26.0 not newer than 1.26.2
+INFO 2025-12-07 18:53:31,105 run_daily_check 159 8530468992 [language:python] Skipped - version 3.11.0 not newer than 3.11.7
+INFO 2025-12-07 18:53:44,684 run_daily_check 159 8530468992 [library:terraform] Skipped - version 1.4.0 not newer than 1.6.6
+INFO 2025-12-07 18:53:58,805 run_daily_check 159 8530468992 [library:nginx] Skipped - version 1.25.0 not newer than 1.25.3
+INFO 2025-12-07 18:54:03,566 run_daily_check 159 8530468992 [library:pandas] Skipped - version 1.5.2 not newer than 2.0.0
+INFO 2025-12-07 18:54:18,330 run_daily_check 159 8530468992 [library:nextjs] Skipped - version 13.0.5 not newer than 14.0.4
+INFO 2025-12-07 18:54:23,205 run_daily_check 159 8530468992 [library:tailwindcss] Skipped - version 3.3.0 not newer than 3.4.0
+INFO 2025-12-07 18:54:26,757 run_daily_check 159 8530468992 [library:axios] Skipped - version 1.2.0 not newer than 1.6.2
+INFO 2025-12-07 18:54:40,202 run_daily_check 159 8530468992 [language:typescript] Skipped - version 4.9.4 not newer than 5.3.3
+INFO 2025-12-07 18:54:48,014 run_daily_check 159 8530468992 [library:react] Skipped - version 18.3.0 not newer than 19.0.0
+INFO 2025-12-07 18:54:55,383 run_daily_check 159 8530468992 [library:nextjs] Skipped - version 13.1.6 not newer than 14.0.0
+INFO 2025-12-07 18:55:03,237 run_daily_check 159 8530468992 [library:django] Skipped - version 4.2 not newer than 4.2.0
+INFO 2025-12-07 18:55:10,490 run_daily_check 159 8530468992 [library:Pydantic] Skipped - version 2.3.73 not newer than v2.11.0
+INFO 2025-12-07 18:55:26,254 run_daily_check 159 8530468992 [library:django] Skipped - version 4.2.7 not newer than 4.2.8
+INFO 2025-12-07 18:55:41,937 run_daily_check 159 8530468992 [library:celery] Skipped - version 5.2.7 not newer than 5.3.4
+INFO 2025-12-07 18:55:56,526 run_daily_check 159 8530468992 [library:psycopg2] Skipped - version 2.9.4 not newer than 2.9.9
+INFO 2025-12-07 18:56:11,721 run_daily_check 159 8530468992 [language:python] Skipped - version 3.11.1 not newer than 3.11.7
+INFO 2025-12-07 18:56:49,357 run_daily_check 159 8530468992 [library:react-native] Skipped - version 0.72.0 not newer than 0.73.0
+INFO 2025-12-07 18:57:12,347 run_daily_check 159 8530468992 [library:react-native-reanimated] Skipped - version 2.5.0 not newer than 3.6.1
+INFO 2025-12-07 18:57:19,924 run_daily_check 159 8530468992 [library:firebase] Skipped - version 9.11.0 not newer than 10.7.1
+INFO 2025-12-07 18:57:34,582 run_daily_check 159 8530468992 [library:scikit-learn] Skipped - version 1.1.2 not newer than 1.3.0
+INFO 2025-12-07 19:17:48,283 run_daily_check 1096 8530468992 [library:pytorch] Groq detected version: 2.3.0
+INFO 2025-12-07 19:17:54,411 run_daily_check 1096 8530468992 [library:scikit-learn] Groq detected version: 1.1.2
+INFO 2025-12-07 19:17:54,413 run_daily_check 1096 8530468992 [library:scikit-learn] Skipped - version 1.1.2 not newer than current 1.3.2 (Serper candidate: )
+INFO 2025-12-07 19:18:00,895 run_daily_check 1096 8530468992 [library:pandas] Groq detected version: 1.5.2
+INFO 2025-12-07 19:18:00,897 run_daily_check 1096 8530468992 [library:pandas] Skipped - version 1.5.2 not newer than current 2.1.4 (Serper candidate: )
+INFO 2025-12-07 19:18:06,456 run_daily_check 1096 8530468992 [library:numpy] Groq detected version: 1.26.0
+INFO 2025-12-07 19:18:06,458 run_daily_check 1096 8530468992 [library:numpy] Skipped - version 1.26.0 not newer than current 1.26.2 (Serper candidate: )
+INFO 2025-12-07 19:18:12,485 run_daily_check 1096 8530468992 [library:fastapi] Groq detected version: 0.92.0
+INFO 2025-12-07 19:18:12,489 run_daily_check 1096 8530468992 [library:fastapi] Skipped - version 0.92.0 not newer than current 0.108.0 (Serper candidate: )
+INFO 2025-12-07 19:18:17,319 run_daily_check 1096 8530468992 [language:python] Groq detected version: 3.11.7
+INFO 2025-12-07 19:18:17,322 run_daily_check 1096 8530468992 [language:python] Skipped - version 3.11.7 not newer than current 3.11.7 (Serper candidate: )
+INFO 2025-12-07 19:18:22,064 run_daily_check 1096 8530468992 [library:docker] Groq detected version: 2.11.2
+INFO 2025-12-07 19:18:22,067 run_daily_check 1096 8530468992 [library:docker] Skipped - version 2.11.2 not newer than current 24.0.7 (Serper candidate: )
+INFO 2025-12-07 19:18:27,335 run_daily_check 1096 8530468992 [library:kubernetes] Groq detected version: 1.28.0
+INFO 2025-12-07 19:18:27,338 run_daily_check 1096 8530468992 [library:kubernetes] Skipped - version 1.28.0 not newer than current 1.28.4 (Serper candidate: )
+INFO 2025-12-07 19:18:37,211 run_daily_check 1096 8530468992 [library:ansible] Groq detected version: 5.13.0
+INFO 2025-12-07 19:18:45,680 run_daily_check 1096 8530468992 [library:nginx] Groq detected version: 1.25.0
+INFO 2025-12-07 19:18:45,683 run_daily_check 1096 8530468992 [library:nginx] Skipped - version 1.25.0 not newer than current 1.25.3 (Serper candidate: )
+INFO 2025-12-07 19:18:51,136 run_daily_check 1096 8530468992 [library:pandas] Groq detected version: 1.5.2
+INFO 2025-12-07 19:18:51,137 run_daily_check 1096 8530468992 [library:pandas] Skipped - version 1.5.2 not newer than current 2.0.0 (Serper candidate: )
+INFO 2025-12-07 19:18:57,438 run_daily_check 1096 8530468992 [library:django] Groq detected version: 4.2.7
+INFO 2025-12-07 19:19:05,752 run_daily_check 1096 8530468992 [library:react] Groq detected version: 18.3.0
+INFO 2025-12-07 19:19:32,152 run_daily_check 1096 8530468992 [library:axios] Groq detected version: 1.2.0
+INFO 2025-12-07 19:19:32,154 run_daily_check 1096 8530468992 [library:axios] Skipped - version 1.2.0 not newer than current 1.6.2 (Serper candidate: )
+INFO 2025-12-07 19:19:58,071 run_daily_check 1096 8530468992 [library:react] Groq detected version: 18.3.0
+INFO 2025-12-07 19:19:58,077 run_daily_check 1096 8530468992 [library:react] Skipped - version 18.3.0 not newer than current 19.0.0 (Serper candidate: )
+INFO 2025-12-07 19:20:06,762 run_daily_check 1096 8530468992 [library:nextjs] Groq detected version: 13.2.0
+INFO 2025-12-07 19:20:06,764 run_daily_check 1096 8530468992 [library:nextjs] Skipped - version 13.2.0 not newer than current 14.0.0 (Serper candidate: )
+INFO 2025-12-07 19:20:15,355 run_daily_check 1096 8530468992 [library:django] Groq detected version: 4.2.7
+INFO 2025-12-07 19:20:24,385 run_daily_check 1096 8530468992 [library:Pydantic] Groq detected version: 2.3.73
+INFO 2025-12-07 19:20:24,387 run_daily_check 1096 8530468992 [library:Pydantic] Skipped - version 2.3.73 not newer than current v2.11.0 (Serper candidate: )
+INFO 2025-12-07 19:20:50,490 run_daily_check 1096 8530468992 [library:django-rest-framework] Groq detected version: 3.16.2
+INFO 2025-12-07 19:20:58,785 run_daily_check 1096 8530468992 [library:celery] Groq detected version: 6.0.0
+INFO 2025-12-07 19:21:07,244 run_daily_check 1096 8530468992 [library:redis] Groq detected version: 7.0.11
+INFO 2025-12-07 19:21:16,498 run_daily_check 1096 8530468992 [library:psycopg2] Groq detected version: 3.1.0
+INFO 2025-12-07 19:22:16,891 run_daily_check 1096 8530468992 [library:react-native] Groq detected version: 0.71.0
+INFO 2025-12-07 19:22:16,892 run_daily_check 1096 8530468992 [library:react-native] Skipped - version 0.71.0 not newer than current 0.73.0 (Serper candidate: )
+INFO 2025-12-07 19:31:04,160 run_daily_check 1096 8530468992 [library:react-navigation] Groq detected version: 6.0.0
+INFO 2025-12-07 19:31:04,165 run_daily_check 1096 8530468992 [library:react-navigation] Skipped - version 6.0.0 not newer than current 6.1.9 (Serper candidate: )
+INFO 2025-12-07 19:31:16,617 run_daily_check 1096 8530468992 [library:react-native-reanimated] Groq detected version: 2.6.0
+INFO 2025-12-07 19:31:16,618 run_daily_check 1096 8530468992 [library:react-native-reanimated] Skipped - version 2.6.0 not newer than current 3.6.1 (Serper candidate: )
+INFO 2025-12-07 19:31:34,529 run_daily_check 1096 8530468992 [library:scikit-learn] Groq detected version: 1.1.2
+INFO 2025-12-07 19:31:34,530 run_daily_check 1096 8530468992 [library:scikit-learn] Skipped - version 1.1.2 not newer than current 1.3.0 (Serper candidate: )
+INFO 2025-12-07 22:13:06,353 run_daily_check 3142 8530468992 [library:tensorflow] Serper found version candidate: 2025.12
+WARNING 2025-12-07 22:13:06,875 groq_analyzer 3142 8530468992 [tensorflow] Version mismatch: Groq detected 2.20, but Serper found 2025.12. Using higher version.
+INFO 2025-12-07 22:13:06,875 run_daily_check 3142 8530468992 [library:tensorflow] Groq detected version: 2025.12
+INFO 2025-12-07 22:13:16,433 run_daily_check 3142 8530468992 [library:pytorch] Serper found version candidate: 25.20.01.14
+WARNING 2025-12-07 22:13:17,055 groq_analyzer 3142 8530468992 [pytorch] Version mismatch: Groq detected 2.10.0, but Serper found 25.20.01.14. Using higher version.
+INFO 2025-12-07 22:13:17,055 run_daily_check 3142 8530468992 [library:pytorch] Groq detected version: 25.20.01.14
+INFO 2025-12-07 22:13:27,010 run_daily_check 3142 8530468992 [library:scikit-learn] Serper found version candidate: 2025.8.0
+WARNING 2025-12-07 22:13:36,762 groq_analyzer 3142 8530468992 [scikit-learn] Version mismatch: Groq detected 1.7.2, but Serper found 2025.8.0. Using higher version.
+INFO 2025-12-07 22:13:36,764 run_daily_check 3142 8530468992 [library:scikit-learn] Groq detected version: 2025.8.0
+INFO 2025-12-07 22:13:46,855 run_daily_check 3142 8530468992 [library:pandas] Serper found version candidate: 2025.1
+WARNING 2025-12-07 22:14:06,664 groq_analyzer 3142 8530468992 [pandas] Version mismatch: Groq detected 3.14, but Serper found 2025.1. Using higher version.
+INFO 2025-12-07 22:14:06,666 run_daily_check 3142 8530468992 [library:pandas] Groq detected version: 2025.1
+INFO 2025-12-07 22:14:15,850 run_daily_check 3142 8530468992 [library:numpy] Serper found version candidate: 22.5
+WARNING 2025-12-07 22:14:29,497 groq_analyzer 3142 8530468992 [numpy] Version mismatch: Groq detected 2.3.5, but Serper found 22.5. Using higher version.
+INFO 2025-12-07 22:14:29,498 run_daily_check 3142 8530468992 [library:numpy] Groq detected version: 22.5
+INFO 2025-12-07 22:14:38,204 run_daily_check 3142 8530468992 [library:fastapi] Serper found version candidate: 17.0
+WARNING 2025-12-07 22:14:48,835 groq_analyzer 3142 8530468992 [fastapi] Version mismatch: Groq detected 0.124.0, but Serper found 17.0. Using higher version.
+INFO 2025-12-07 22:14:48,837 run_daily_check 3142 8530468992 [library:fastapi] Groq detected version: 17.0
+INFO 2025-12-07 22:14:59,952 run_daily_check 3142 8530468992 [language:python] Serper found version candidate: 4.0
+WARNING 2025-12-07 22:15:17,625 groq_analyzer 3142 8530468992 [python] Version mismatch: Groq detected 3.14.2, but Serper found 4.0. Using higher version.
+INFO 2025-12-07 22:15:17,626 run_daily_check 3142 8530468992 [language:python] Groq detected version: 4.0
+INFO 2025-12-07 22:15:26,896 run_daily_check 3142 8530468992 [library:docker] Serper found version candidate: 30.1
+INFO 2025-12-07 22:15:27,366 run_daily_check 3142 8530468992 [library:docker] Groq detected version: 30.1

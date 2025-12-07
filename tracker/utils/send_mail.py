@@ -186,29 +186,34 @@ def send_update_email(
     # Mailtrap Bulk API payload
     payload_category = "Future Updates" if future_opt_in else "Library Updates"
     payload = {
-        "from": {"email": from_addr, "name": "LibTrack AI"},
+        "from": {"email": "hello@demomailtrap.com", "name": "LibTrack AI"},
         "to": [{"email": r} for r in recipients],
         "subject": subject,
         "html": html_content,
         "category": payload_category,
     }
 
-    is_test = os.getenv("TEST_MODE", default=True)
-    if is_test:
-        print(f"Payload:-------- {html_content}")
-        return True, "Test email sent"
+    # is_test = os.getenv("TEST_MODE")
+    # if is_test:
+    #     print(f"Payload:-------- {html_content}")
+    #     return True, "Test email sent"
 
+    print(f"Payload:-------- {html_content}")
     try:
         resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
         ok = 200 <= resp.status_code < 300
         status_text = f"Mailtrap: {resp.status_code} - {resp.text[:250]}"
+        if ok:
+            print(f"✅ Email sent successfully: {status_text}")
+        else:
+            print(f"❌ Email failed to send: {status_text}")
         return ok, status_text
     except Exception as e:
         return False, f"Mailtrap exception: {e}"
 
 
 # from tracker.utils.send_mail import send_update_email  # adjust import path if different
-
+# Test mail works
 # ok, info = send_update_email(
 #     mailtrap_api_key=None,  # will use MAILTRAP_API_KEY from .env
 #     project_name="LibTrack AI Test Project",

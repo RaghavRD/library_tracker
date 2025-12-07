@@ -19,7 +19,10 @@ else:
 _SYSTEM_PROMPT = (
     "You are a precise AI release analyzer. "
     "You always respond in valid JSON ONLY (no markdown, no explanations). "
-    "Your task: extract and summarize the most relevant version info from the provided search results."
+    "Your task: extract and summarize the most relevant version info from the provided search results. "
+    "CRITICAL: ALWAYS prioritize the NEWEST version from the most recent and official sources. "
+    "Ignore results older than 6 months unless no recent information exists. "
+    "If multiple versions are found, return the HIGHEST version number."
 )
 
 _JSON_SCHEMA_HINT = """
@@ -48,6 +51,8 @@ CRITICAL RULES:
    - 50-69: Community forums, Reddit, dev.to, medium blogs
    - 0-49: Speculation, rumors, unverified sources
 7. If you find BOTH a released version AND a future version in results, return the RELEASED version and mention the future version in the summary.
+8. IMPORTANT: Cross-check your detected version against the 'latest_version_candidate' hint provided. If the hint shows a higher version, use that version instead.
+9. When comparing versions, always select the HIGHEST semantic version (e.g., 3.14.2 > 3.11.7 > 3.11.1).
 """
 
 MAJOR_SIGNALS = {
@@ -110,7 +115,8 @@ class GroqAnalyzer:
 
         self.client = Groq(api_key=api_key)
         # ✅ Updated model list — choose safest available
-        self.model = os.getenv("GROQ_MODEL", "llama-3.2-11b-text")
+        # self.model = os.getenv("GROQ_MODEL", "llama-3.2-11b-text")
+        self.model = os.getenv("GROQ_MODEL")
         self._validate_model()
 
     def _validate_model(self):
@@ -211,6 +217,33 @@ class GroqAnalyzer:
         # --- Fallback if version missing but Serper provided candidate ---
         if not data["version"]:
             data["version"] = str(serper_results.get("latest_version_candidate", "")).strip()
+
+        # --- Cross-check against Serper's candidate ---
+        candidate_version = str(serper_results.get("latest_version_candidate", "")).strip()
+        if data["version"] and candidate_version:
+            try:
+                groq_ver = pkg_version.parse(data["version"])
+                candidate_ver = pkg_version.parse(candidate_version)
+                
+                if candidate_ver > groq_ver:
+                    # Serper found a higher version than Groq detected
+                    import logging
+                    logger = logging.getLogger('libtrack')
+                    logger.warning(
+                        f"[{library}] Version mismatch: Groq detected {data['version']}, "
+                        f"but Serper found {candidate_version}. Using higher version."
+                    )
+                    data["version"] = candidate_version
+                    # Lower confidence since there's a mismatch
+                    data["confidence"] = max(data.get("confidence", 50) - 10, 30)
+            except Exception as e:
+                # If version comparison fails, prefer Serper's candidate if groq version is invalid
+                if candidate_version:
+                    try:
+                        pkg_version.parse(candidate_version)
+                        data["version"] = candidate_version
+                    except Exception:
+                        pass
 
         # --- Final sanity check ---
         if data["version"]:
