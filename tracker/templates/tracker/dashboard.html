@@ -365,7 +365,8 @@
       <div class="modal-header bg-primary-subtle border-0">
         <div>
           <h5 class="modal-title fw-semibold" id="editProjectModalLabel">Edit Project</h5>
-          <p class="text-muted mb-0 small">Update project details for {{ project_name }}</p>
+          <p class="text-muted mb-0 small">Update project details for <span id="edit_modal_project_name_display"
+              class="fw-bold text-dark"></span></p>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -522,6 +523,13 @@
         const dataset = button.dataset;
         editModal.querySelector("#edit_project_id").value = dataset.projectId || "";
         editModal.querySelector("#edit_project_name").value = dataset.project || "";
+
+        // Populate the project name in the subtitle
+        const nameDisplay = editModal.querySelector("#edit_modal_project_name_display");
+        if (nameDisplay) {
+          nameDisplay.textContent = dataset.project || "";
+        }
+
         editModal.querySelector("#edit_developer_names").value = dataset.developers || "";
         const emailField = editModal.querySelector("#edit_developer_emails");
         if (emailField) {

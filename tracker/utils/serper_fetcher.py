@@ -210,6 +210,16 @@ class SerperFetcher:
         versions = []
         for match in pattern.findall(text):
             if match not in versions:
+                # Filter out likely years/dates (e.g. 2025.12)
+                # Heuristic: if major version > 200, assume it's a date/year, unless length is small (like build number)
+                # But simple year check is safest for now matching the bug report (2025.x).
+                try:
+                    parts = match.split('.')
+                    if parts and parts[0].isdigit() and int(parts[0]) > 200:
+                        continue
+                except (ValueError, IndexError):
+                    pass
+                    
                 versions.append(match)
         return versions
 
@@ -282,6 +292,9 @@ class SerperFetcher:
             except Exception:
                 continue
             if best is None or parsed > best:
+                # Double check for year-like numbers
+                if parsed.major > 200:
+                    continue
                 best = parsed
                 best_raw = raw
         return best_raw

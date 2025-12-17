@@ -192,17 +192,24 @@ def send_update_email(
         "category": payload_category,
     }
 
-    try:
-        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=15)
-        ok = 200 <= resp.status_code < 300
-        status_text = f"Mailtrap: {resp.status_code} - {resp.text}"
-        if ok:
-            print(f"✅ Email sent successfully: {status_text}")
-        else:
-            print(f"❌ Email failed to send: {status_text}")
-        return ok, status_text
-    except Exception as e:
-        return False, f"Mailtrap exception: {e}"
+    # get global TEST_MODE from settings
+    TEST_MODE = os.getenv("TEST_MODE", True)
+    if TEST_MODE:
+        print("TEST_MODE: Email subject:", subject)
+        print("TEST_MODE: Email content:", html_content)
+        return True, "🧪🧪 Email would be sent in TEST_MODE 🧪🧪"
+
+    # try:
+    #     resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=15)
+    #     ok = 200 <= resp.status_code < 300
+    #     status_text = f"Mailtrap: {resp.status_code} - {resp.text}"
+    #     if ok:
+    #         print(f"✅ Email sent successfully: {status_text}")
+    #     else:
+    #         print(f"❌ Email failed to send: {status_text}")
+    #     return ok, status_text
+    # except Exception as e:
+    #     return False, f"Mailtrap exception: {e}"
 
 
 # from tracker.utils.send_mail import send_update_email  # adjust import path if different

@@ -147,35 +147,62 @@ class Command(BaseCommand):
             )
 
             if project_updates:
-                categories = {update["category"] for update in project_updates}
-                aggregate_category = categories.pop() if len(categories) == 1 else "mix"
+                # Separate confidence updates from regular updates
+                confidence_updates = [u for u in project_updates if u.get("category") == "confidence_update"]
+                regular_updates = [u for u in project_updates if u.get("category") != "confidence_update"]
+                
+                # Send confidence update emails separately
+                if confidence_updates:
+                    from tracker.utils.confidence_email import send_confidence_update_email
+                    
+                    for conf_update in confidence_updates:
+                        ok, info = send_confidence_update_email(
+                            mailtrap_api_key=mailtrap_key,
+                            project_name=project_name,
+                            recipients=emails,
+                            library=conf_update["library"],
+                            version=conf_update["version"],
+                            old_confidence=conf_update["old_confidence"],
+                            new_confidence=conf_update["confidence"],
+                            change_reason=conf_update["change_reason"],
+                            expected_date=conf_update.get("release_date"),
+                            summary=conf_update["summary"],
+                            source=conf_update["source"],
+                            from_email=str(sender_email),
+                        )
+                        self.stdout.write(f"Confidence update email for {conf_update['library']}: {ok} -> {info}")
+                
+                # Process regular updates
+                if regular_updates:
+                    categories = {update["category"] for update in regular_updates}
+                    aggregate_category = categories.pop() if len(categories) == 1 else "mix"
 
-                if len(project_updates) == 1:
-                    first = project_updates[0]
-                    subject_library = first["library"]
-                    subject_version = first["version"]
-                    summary_text = first["summary"]
-                    source_link = first["source"]
-                else:
-                    subject_library = f"{project_updates[0]['library']} + {len(project_updates) - 1} more"
-                    subject_version = f"{project_updates[0]['version']} and additional releases"
-                    summary_text = "See release summaries below."
-                    source_link = ""
+                    if len(regular_updates) == 1:
+                        first = regular_updates[0]
+                        subject_library = first["library"]
+                        subject_version = first["version"]
+                        summary_text = first["summary"]
+                        source_link = first["source"]
+                    else:
+                        subject_library = f"{regular_updates[0]['library']} + {len(regular_updates) - 1} more"
+                        subject_version = f"{regular_updates[0]['version']} and additional releases"
+                        summary_text = "See release summaries below."
+                        source_link = ""
 
-                ok, info = send_update_email(
-                    mailtrap_api_key=mailtrap_key,
-                    project_name=project_name,
-                    recipients=emails,
-                    library=subject_library,
-                    version=subject_version,
-                    category=aggregate_category,
-                    summary=summary_text,
-                    source=source_link,
-                    release_date=project_updates[0].get("release_date"),
-                    updates=project_updates,
-                    from_email=str(sender_email),
-                )
-                self.stdout.write(f"Project digest for {project_name}: {ok} -> {info}")
+                    ok, info = send_update_email(
+                        mailtrap_api_key=mailtrap_key,
+                        project_name=project_name,
+                        recipients=emails,
+                        library=subject_library,
+                        version=subject_version,
+                        category=aggregate_category,
+                        summary=summary_text,
+                        source=source_link,
+                        release_date=regular_updates[0].get("release_date"),
+                        updates=regular_updates,
+                        from_email=str(sender_email),
+                    )
+                    self.stdout.write(f"Project digest for {project_name}: {ok} -> {info}")
             else:
                 self.stdout.write(f"No qualifying updates for {project_name}.")
             
@@ -416,27 +443,107 @@ class Command(BaseCommand):
             # Update if confidence increased or info changed
             if not created:
                 update_needed = False
+                confidence_increased = False
+                old_confidence = future_cache.confidence
+                change_reason_parts = []
+                
+                # Check for confidence increase
                 if confidence > future_cache.confidence:
+                    confidence_difference = confidence - future_cache.confidence
+                    future_cache.previous_confidence = future_cache.confidence
                     future_cache.confidence = confidence
                     update_needed = True
+                    confidence_increased = True
+                    
+                    # Determine reason for confidence increase
+                    if source and source != future_cache.source:
+                        # Detect source authority upgrade
+                        old_source_domain = future_cache.source.split('/')[2] if '/' in future_cache.source else ''
+                        new_source_domain = source.split('/')[2] if '/' in source else ''
+                        
+                        # Check if upgraded to official site
+                        official_indicators = ['official', '.org', 'docs.', 'blog.', 'developer.']
+                        is_official_upgrade = any(ind in new_source_domain for ind in official_indicators)
+                        community_indicators = ['reddit', 'medium', 'dev.to', 'stackoverflow']
+                        from_community = any(ind in old_source_domain for ind in community_indicators)
+                        
+                        if is_official_upgrade and from_community:
+                            change_reason_parts.append(f"Featured on official site ({new_source_domain})")
+                        elif is_official_upgrade:
+                            change_reason_parts.append(f"Now confirmed on {new_source_domain}")
+                        else:
+                            change_reason_parts.append(f"Additional source found ({new_source_domain})")
+                    else:
+                        change_reason_parts.append("Increased confidence from same source")
+                
+                # Check for other updates
                 if summary and summary != future_cache.features:
                     future_cache.features = summary
                     update_needed = True
+                    if not change_reason_parts:
+                        change_reason_parts.append("Updated feature details available")
+                
                 if source and source != future_cache.source:
                     future_cache.source = source
                     update_needed = True
+                
                 if parsed_date and parsed_date != future_cache.expected_date:
+                    old_date = future_cache.expected_date
                     future_cache.expected_date = parsed_date
                     update_needed = True
+                    if old_date and parsed_date < old_date:
+                        change_reason_parts.append(f"Release date moved earlier (was {old_date})")
+                    elif old_date:
+                        change_reason_parts.append(f"Release date updated to {parsed_date}")
+                    else:
+                        change_reason_parts.append(f"Release date now available: {parsed_date}")
+                
+                # Save change reason
+                if change_reason_parts:
+                    future_cache.last_change_reason = "; ".join(change_reason_parts)
                 
                 if update_needed:
                     future_cache.save()
                     self.stdout.write(f"[{label}] Updated existing future update entry with new info.")
+                    
+                    # ==== CONFIDENCE INCREASE NOTIFICATION ====
+                    # Threshold for re-notification: 15% increase or more
+                    MIN_CONFIDENCE_INCREASE = 15
+                    
+                    if confidence_increased and confidence_difference >= MIN_CONFIDENCE_INCREASE:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f"[{label}] 📈 Significant confidence increase detected: "
+                                f"{old_confidence}% → {confidence}% (+{confidence_difference}%)"
+                            )
+                        )
+                        
+                        # Import and send confidence update email
+                        from tracker.utils.confidence_email import send_confidence_update_email
+                        from tracker.models import Project
+                        
+                        # Get project and email recipients (we need to pass them)
+                        # Since we don't have project context here, we'll return a special flag
+                        # and handle it in the calling code
+                        return {
+                            "library": library,
+                            "version": version,
+                            "category": "confidence_update",  # Special category for confidence updates
+                            "release_date": expected_date or "TBD",
+                            "summary": summary or "Upcoming release detected.",
+                            "source": source or "",
+                            "component_type": component_type,
+                            "confidence": confidence,
+                            "old_confidence": old_confidence,
+                            "confidence_difference": confidence_difference,
+                            "change_reason": future_cache.last_change_reason,
+                        }
             
-            # Mark as notified
-            future_cache.notification_sent = True
-            future_cache.notification_sent_at = datetime.now()
-            future_cache.save()
+            # Mark as notified (only for first-time detection)
+            if created:
+                future_cache.notification_sent = True
+                future_cache.notification_sent_at = datetime.now()
+                future_cache.save()
             
             self.stdout.write(
                 self.style.SUCCESS(
@@ -445,15 +552,17 @@ class Command(BaseCommand):
                 )
             )
             
-            return {
-                "library": library,
-                "version": version,
-                "category": "future",
-                "release_date": expected_date or "TBD",
-                "summary": summary or "Upcoming release detected.",
-                "source": source or "",
-                "component_type": component_type,
-                "confidence": confidence,
+            # Return notification payload (only for new detections)
+            if created:
+                return {
+                    "library": library,
+                    "version": version,
+                    "category": "future",
+                    "release_date": expected_date or "TBD",
+                    "summary": summary or "Upcoming release detected.",
+                    "source": source or "",
+                    "component_type": component_type,
+                    "confidence": confidence,
             }
 
     @staticmethod

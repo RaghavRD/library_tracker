@@ -153,7 +153,7 @@ class GroqAnalyzer:
             f"Analyze the following search results for the library '{library}'. "
             f"Find the latest release version, update type (major/minor), date, and summary.\n\n"
             f"{_JSON_SCHEMA_HINT}\n\n"
-            f"Latest version hint from search: {serper_results.get('latest_version_candidate') or 'unknown'}\n"
+            f"Latest version hint from search: {serper_results.get('latest_version_candidate') or 'unknown'} (WARNING: Ignore if it looks like a date/year)\n"
             f"{future_snippets}\n"
             f"Search Results:\n{serper_text}"
         )
@@ -219,6 +219,11 @@ class GroqAnalyzer:
             data["version"] = str(serper_results.get("latest_version_candidate", "")).strip()
 
         # --- Cross-check against Serper's candidate ---
+        # --- Cross-check against Serper's candidate ---
+        # User Feedback: Serper often confuses dates (2025.12) with versions.
+        # Groq is more reliable at identifying the true version from context.
+        # We will LOG the mismatch but NOT override Groq's result unless Groq found nothing.
+        
         candidate_version = str(serper_results.get("latest_version_candidate", "")).strip()
         if data["version"] and candidate_version:
             try:
@@ -226,24 +231,11 @@ class GroqAnalyzer:
                 candidate_ver = pkg_version.parse(candidate_version)
                 
                 if candidate_ver > groq_ver:
-                    # Serper found a higher version than Groq detected
-                    import logging
-                    logger = logging.getLogger('libtrack')
-                    logger.warning(
-                        f"[{library}] Version mismatch: Groq detected {data['version']}, "
-                        f"but Serper found {candidate_version}. Using higher version."
-                    )
-                    data["version"] = candidate_version
-                    # Lower confidence since there's a mismatch
-                    data["confidence"] = max(data.get("confidence", 50) - 10, 30)
-            except Exception as e:
-                # If version comparison fails, prefer Serper's candidate if groq version is invalid
-                if candidate_version:
-                    try:
-                        pkg_version.parse(candidate_version)
-                        data["version"] = candidate_version
-                    except Exception:
-                        pass
+                     # Just parse check - do NOT override
+                     # We trust Groq's context-aware extraction over Serper's regex
+                     pass
+            except Exception:
+                pass
 
         # --- Final sanity check ---
         if data["version"]:

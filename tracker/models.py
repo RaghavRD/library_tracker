@@ -108,6 +108,18 @@ class FutureUpdateCache(TimeStampedModel):
     notification_sent = models.BooleanField(default=False)
     notification_sent_at = models.DateTimeField(null=True, blank=True)
     
+    # Confidence change tracking
+    previous_confidence = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Previous confidence level before last update"
+    )
+    last_change_reason = models.TextField(
+        blank=True,
+        help_text="Reason for last confidence/info change (e.g., 'Featured on official site')"
+    )
+    
     class Meta:
         ordering = ['-confidence', '-updated_at']
         unique_together = [['library', 'version']]
