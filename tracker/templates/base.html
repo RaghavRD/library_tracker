@@ -32,11 +32,30 @@
 </head>
 
 <body>
+
+  <!-- 🔹 Global Toast Container -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+    {% if messages %}
+    {% for m in messages %}
+    <div
+      class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+      role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+      <div class="d-flex">
+        <div class="toast-body">
+          {{ m }}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+          aria-label="Close"></button>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
   <nav class="navbar navbar-expand-lg fixed-top navbar-light bg-light">
     <div class="container-fluid">
       <a class="navbar-brand d-flex" href="/">
-        <!-- <img src="{% static 'tracker/images/favicon.png' %}" alt="Logo" width="28" height="28" class="me-2"> -->
-        <img src="{% static 'tracker/images/libtrack_logo.png' %}" alt="Logo" width="100" height="33">
+        <img src="{% static 'tracker/images/libtrack_logo.png' %}" alt="Logo" width="100" height="29">
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -66,8 +85,8 @@
               aria-expanded="false">Profile
             </a>
             <ul class="dropdown-menu dropdown-menu-end me-1" aria-labelledby="userDropdown">
-              <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>{{ user.username }}</a></li>
-              <li><a class="dropdown-item" href="#"><i class="bi bi-sliders2 me-2"></i>Settings</a></li>
+              <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>My Profile</a>
+              </li>
               <li>
                 <hr class="dropdown-divider">
               </li>
@@ -124,6 +143,15 @@
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+      var toastList = toastElList.map(function (toastEl) {
+        return new bootstrap.Toast(toastEl);
+      });
+      toastList.forEach(toast => toast.show());
+    });
+  </script>
   <script src="{% static 'tracker/js/stack_builder.js' %}"></script>
   {% block extra_scripts %}{% endblock %}
 </body>

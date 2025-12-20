@@ -9,4 +9,5 @@ urlpatterns = [
     # path("register/", views.register_project, name="register_project"),
     path("update-history/", views.updateHistory, name="updateHistory"),
     path("future-updates/", views.future_updates, name="future_updates"),
+    path("profile/", views.profile_view, name="profile"),
 ]

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI – Profile{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+  <!-- 🔹 Page Header -->
+  <div class="text-center mb-5">
+    <h1 class="fw-bold mb-2">Account Settings</h1>
+    <p class="text-muted">
+      Manage your profile information and security settings.
+    </p>
+  </div>
+
+  <!-- 🔹 Two Column Layout -->
+  <div class="row g-4 justify-content-center">
+
+    <!-- 🔹 Profile Info Card -->
+    <div class="col-12 col-lg-5">
+      <div class="card bg-primary-subtle text-dark border-0 shadow-sm rounded-4 h-100">
+        <div class="card-body p-4">
+          <h5 class="fw-semibold mb-4">Profile Information</h5>
+
+          <div class="mb-4">
+            <div class="text-muted small text-uppercase fw-semibold mb-1">
+              Username
+            </div>
+            <div class="fs-6 fw-medium">
+              {{ user.username }}
+            </div>
+          </div>
+
+          <div>
+            <div class="text-muted small text-uppercase fw-semibold mb-1">
+              Email Address
+            </div>
+            <div class="fs-6 fw-medium">
+              {{ user.email }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Change Password Card -->
+    <div class="col-12 col-lg-7">
+      <div class="card bg-primary-subtle text-dark border-0 shadow-sm rounded-4 h-100">
+        <div class="card-body p-4">
+          <h5 class="fw-semibold mb-4">Change Password</h5>
+
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% for field in form %}
+            <div class="mb-3">
+              <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                {{ field.label }}
+              </label>
+
+              <div class="input-group has-validation">
+                <input type="{{ field.field.widget.input_type|default:'text' }}" name="{{ field.name }}"
+                  id="{{ field.id_for_label }}" class="form-control {% if field.errors %}is-invalid{% endif %}"
+                  autocomplete="off">
+                <button class="btn bg-light toggle-password" type="button"
+                  data-target="{{ field.id_for_label }}">
+                  <i class="bi bi-eye"></i>
+                </button>
+                {% for error in field.errors %}
+                <div class="invalid-feedback">
+                  {{ error }}
+                </div>
+                {% endfor %}
+              </div>
+
+              {% if field.help_text %}
+              <div class="form-text small text-muted">
+                {{ field.help_text|safe }}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex justify-content-end mt-4">
+              <button type="submit" class="btn btn-primary btn px-4">
+                Update Password
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggles = document.querySelectorAll(".toggle-password");
+    toggles.forEach(toggle => {
+      toggle.addEventListener("click", function () {
+        const targetId = this.getAttribute("data-target");
+        const input = document.getElementById(targetId);
+        const icon = this.querySelector("i");
+
+        if (input && icon) {
+          if (input.type === "password") {
+            input.type = "text";
+            icon.classList.remove("bi-eye");
+            icon.classList.add("bi-eye-slash");
+          } else {
+            input.type = "password";
+            icon.classList.remove("bi-eye-slash");
+            icon.classList.add("bi-eye");
+          }
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
