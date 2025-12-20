@@ -410,7 +410,7 @@ def dashboard(request):
         messages.error(request, "Unknown action.")
         return redirect("dashboard")
 
-    project_qs = Project.objects.prefetch_related("components").order_by("-updated_at")
+    project_qs = Project.objects.prefetch_related("components").order_by("-created_at")
     regs = [_serialize_project(project) for project in project_qs]
 
     cache = UpdateCache.objects.order_by("-updated_at").all()

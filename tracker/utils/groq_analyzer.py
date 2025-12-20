@@ -35,7 +35,7 @@ Return JSON like this:
   "confidence": 0-100,
   "expected_date": "YYYY-MM-DD or empty",
   "summary": "3-4 concise bullet points or sentences about new features or changes",
-  "release_date": "YYYY-MM-DD or empty if unknown",
+  "release_date": "YYYY-MM-DD or 'Not Confirmed' text if unknown",
   "source": "<official URL>"
 }
 
@@ -115,7 +115,6 @@ class GroqAnalyzer:
 
         self.client = Groq(api_key=api_key)
         # ✅ Updated model list — choose safest available
-        # self.model = os.getenv("GROQ_MODEL", "llama-3.2-11b-text")
         self.model = os.getenv("GROQ_MODEL")
         self._validate_model()
 
@@ -149,6 +148,7 @@ class GroqAnalyzer:
                 future_lines.append(f"- {title} :: {snippet} ({link})")
             future_snippets = "\nUpcoming / planned releases:\n" + "\n".join(future_lines)
 
+        # --- few shot Prompt ---
         prompt = (
             f"Analyze the following search results for the library '{library}'. "
             f"Find the latest release version, update type (major/minor), date, and summary.\n\n"
