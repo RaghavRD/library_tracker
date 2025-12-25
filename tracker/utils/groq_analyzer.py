@@ -20,9 +20,13 @@ _SYSTEM_PROMPT = (
     "You are a precise AI release analyzer. "
     "You always respond in valid JSON ONLY (no markdown, no explanations). "
     "Your task: extract and summarize the most relevant version info from the provided search results. "
-    "CRITICAL: ALWAYS prioritize the NEWEST version from the most recent and official sources. "
-    "Ignore results older than 6 months unless no recent information exists. "
-    "If multiple versions are found, return the HIGHEST version number."
+    "CRITICAL PRIORITY RULES: "
+    "1. ALWAYS prioritize OFFICIAL sources over third-party blogs/articles. "
+    "2. Official sources include: npmjs.com, pypi.org, GitHub releases, official docs (.org domains). "
+    "3. NEVER use dev.to, medium.com, or personal blogs as the primary source - only use them for supplementary info. "
+    "4. If version info appears in both official and non-official sources, ALWAYS use the official source for the 'source' field. "
+    "5. Return the NEWEST version from the MOST OFFICIAL source. "
+    "6. Ignore results older than 6 months unless no recent information exists."
 )
 
 _JSON_SCHEMA_HINT = """
@@ -36,23 +40,33 @@ Return JSON like this:
   "expected_date": "YYYY-MM-DD or empty",
   "summary": "3-4 concise bullet points or sentences about new features or changes",
   "release_date": "YYYY-MM-DD or 'Not Confirmed' text if unknown",
-  "source": "<official URL>"
+  "source": "<OFFICIAL URL - MUST be from npmjs.com, pypi.org, github.com/*/releases, or official docs>"
 }
 
-CRITICAL RULES:
+CRITICAL SOURCE PRIORITIZATION RULES:
+1. For JavaScript libraries: Always prefer npmjs.com/package/<name>
+2. For Python libraries: Always prefer pypi.org/project/<name>
+3. For any library: GitHub releases (github.com/<org>/<repo>/releases) are highly authoritative
+4. Official documentation sites (.org, official project sites)
+5. AVOID: dev.to, medium.com, personal blogs, tech news sites for the 'source' field
+6. If you extract version info from a non-official source, you MUST find and link to the official release page
+
+OTHER RULES:
 1. Use "future" category ONLY if the version is NOT yet officially released (beta, RC, planned, announced, roadmap).
 2. Use "major" or "minor" ONLY for officially released stable versions.
 3. Set "is_released" to false for future/planned versions, true for released versions.
 4. Set "expected_date" (YYYY-MM-DD format) for future versions if mentioned in sources.
 5. Set "release_date" (YYYY-MM-DD format) for released versions only.
 6. Provide "confidence" score (0-100) based on source reliability:
-   - 90-100: Official documentation/blog from maintainers (github.com/org/repo/releases, official .org sites)
-   - 70-89: Reputable tech news sites (techcrunch, ars technica, the verge)
-   - 50-69: Community forums, Reddit, dev.to, medium blogs
-   - 0-49: Speculation, rumors, unverified sources
+   - 95-100: NPM registry, PyPI, GitHub releases page, official package manager
+   - 85-94: Official documentation/blog from maintainers (official .org/.io sites)
+   - 70-84: Reputable tech news sites (techcrunch, ars technica)
+   - 50-69: Community forums, Reddit
+   - 0-49: dev.to, medium, personal blogs, speculation, rumors
 7. If you find BOTH a released version AND a future version in results, return the RELEASED version and mention the future version in the summary.
 8. IMPORTANT: Cross-check your detected version against the 'latest_version_candidate' hint provided. If the hint shows a higher version, use that version instead.
 9. When comparing versions, always select the HIGHEST semantic version (e.g., 3.14.2 > 3.11.7 > 3.11.1).
+10. VERIFY: Your 'source' URL must actually mention the version number you're returning. Double-check this.
 """
 
 MAJOR_SIGNALS = {

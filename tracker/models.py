@@ -29,8 +29,53 @@ class Project(TimeStampedModel):
         return self.project_name
 
 
+class Library(TimeStampedModel):
+    """
+    Central source of truth for a library/tool/language.
+    Avoids redundant API calls by storing metadata once for multiple projects.
+    """
+    name = models.CharField(max_length=200, unique=True, db_index=True)
+    key = models.CharField(max_length=200, db_index=True, help_text="Normalized key for searching (e.g. 'react', 'python')")
+    component_type = models.CharField(max_length=50, default="library", choices=[
+        ("library", "Library"), 
+        ("language", "Language"),
+        ("tool", "Tool")
+    ])
+    
+    # Latest known stable version
+    latest_version = models.CharField(max_length=100, blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    
+    homepage_url = models.URLField(blank=True)
+    
+    def __str__(self):
+        return f"{self.name} (v{self.latest_version})"
+
+
+class LibraryRelease(TimeStampedModel):
+    """
+    History of released versions for a specific Library.
+    """
+    library = models.ForeignKey(Library, on_delete=models.CASCADE, related_name="releases")
+    version = models.CharField(max_length=100)
+    release_date = models.DateField(null=True, blank=True)
+    is_security_release = models.BooleanField(default=False)
+    summary = models.TextField(blank=True)
+    source_url = models.URLField(blank=True)
+    
+    class Meta:
+        unique_together = ['library', 'version']
+        ordering = ['-release_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.library.name} v{self.version}"
+
+
 class StackComponent(TimeStampedModel):
     project = models.ForeignKey(Project, related_name="components", on_delete=models.CASCADE)
+    # Optional link to central Library model (populated via migration/sync)
+    library_ref = models.ForeignKey(Library, null=True, blank=True, on_delete=models.SET_NULL, related_name="linked_components")
+    
     category = models.CharField(max_length=100)
     key = models.CharField(max_length=50)
     name = models.CharField(max_length=200)

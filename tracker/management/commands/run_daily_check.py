@@ -4,6 +4,7 @@ import logging
 import schedule
 from time import sleep
 from pathlib import Path
+from datetime import datetime
 from django.db import transaction
 from dotenv import load_dotenv, find_dotenv
 from packaging import version as pkg_version
@@ -13,7 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from tracker.utils.serper_fetcher import SerperFetcher
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.send_mail import send_update_email
-from tracker.models import UpdateCache, Project, FutureUpdateCache
+from tracker.models import UpdateCache, Project, FutureUpdateCache, Library, LibraryRelease, StackComponent
 
 # Get logger
 logger = logging.getLogger('libtrack')
@@ -71,196 +72,274 @@ class Command(BaseCommand):
         sender_email = os.getenv("MAILTRAP_FROM_EMAIL")
 
         if not mailtrap_key or not sender_email:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"❌ Missing Mailtrap credentials.\n"
-                    f"MAILTRAP_MAIN_KEY={bool(mailtrap_key)} | MAILTRAP_FROM_EMAIL={bool(sender_email)}"
-                )
-            )
+            self.stdout.write(self.style.ERROR("❌ Missing Mailtrap credentials."))
             return
 
-        projects = Project.objects.prefetch_related("components").all()
-        if not projects:
-            self.stdout.write("No registrations found.")
-            return
-
-        groq = GroqAnalyzer()
-        serper = SerperFetcher()
-
-        for project in projects:
-            project_name = (project.project_name or "").strip() or "Unnamed Project"
-            
-            # ===== Print project header with separators =====
-            self.stdout.write("\n" + "-"*8)
-            self.stdout.write(
-                self.style.MIGRATE_HEADING(f"📦 Processing Project: {project_name}")
-            )
-            self.stdout.write("-"*8 + "\n")
-            
-            emails = [e.strip() for e in (project.developer_emails or "").split(",") if e.strip()]
-            notify_pref = str(project.notification_type or "both").lower()
-
-            components = list(project.components.all())
-            library_components = [comp for comp in components if comp.key != "language"]
-            language_components = [comp for comp in components if comp.key == "language"]
-
-            lib_pairs = [
-                (comp.name.strip(), comp.version.strip())
-                for comp in library_components
-                if comp.name and comp.version
-            ]
-            language_pairs = [
-                (comp.name.strip(), comp.version.strip())
-                for comp in language_components
-                if comp.name and comp.version
-            ]
-
-            lib_names = [name for name, _ in lib_pairs]
-            lib_versions = [version for _, version in lib_pairs]
-            language_names = [name for name, _ in language_pairs]
-            language_versions = [version for _, version in language_pairs]
-
-            project_updates = []
-            project_updates.extend(
-                self._process_components(
-                    project=project,
-                    project_name=project_name,
-                    names=lib_names,
-                    versions=lib_versions,
-                    component_type="library",
-                    groq=groq,
-                    serper=serper,
-                    notify_pref=notify_pref,
-                )
-            )
-            project_updates.extend(
-                self._process_components(
-                    project=project,
-                    project_name=project_name,
-                    names=language_names,
-                    versions=language_versions,
-                    component_type="language",
-                    groq=groq,
-                    serper=serper,
-                    notify_pref=notify_pref,
-                )
-            )
-
-            if project_updates:
-                # Separate confidence updates from regular updates
-                confidence_updates = [u for u in project_updates if u.get("category") == "confidence_update"]
-                regular_updates = [u for u in project_updates if u.get("category") != "confidence_update"]
-                
-                # Send confidence update emails separately
-                if confidence_updates:
-                    from tracker.utils.confidence_email import send_confidence_update_email
-                    
-                    for conf_update in confidence_updates:
-                        ok, info = send_confidence_update_email(
-                            mailtrap_api_key=mailtrap_key,
-                            project_name=project_name,
-                            recipients=emails,
-                            library=conf_update["library"],
-                            version=conf_update["version"],
-                            old_confidence=conf_update["old_confidence"],
-                            new_confidence=conf_update["confidence"],
-                            change_reason=conf_update["change_reason"],
-                            expected_date=conf_update.get("release_date"),
-                            summary=conf_update["summary"],
-                            source=conf_update["source"],
-                            from_email=str(sender_email),
-                        )
-                        self.stdout.write(f"Confidence update email for {conf_update['library']}: {ok} -> {info}")
-                
-                # Process regular updates
-                if regular_updates:
-                    categories = {update["category"] for update in regular_updates}
-                    aggregate_category = categories.pop() if len(categories) == 1 else "mix"
-
-                    if len(regular_updates) == 1:
-                        first = regular_updates[0]
-                        subject_library = first["library"]
-                        subject_version = first["version"]
-                        summary_text = first["summary"]
-                        source_link = first["source"]
-                    else:
-                        subject_library = f"{regular_updates[0]['library']} + {len(regular_updates) - 1} more"
-                        subject_version = f"{regular_updates[0]['version']} and additional releases"
-                        summary_text = "See release summaries below."
-                        source_link = ""
-
-                    ok, info = send_update_email(
-                        mailtrap_api_key=mailtrap_key,
-                        project_name=project_name,
-                        recipients=emails,
-                        library=subject_library,
-                        version=subject_version,
-                        category=aggregate_category,
-                        summary=summary_text,
-                        source=source_link,
-                        release_date=regular_updates[0].get("release_date"),
-                        updates=regular_updates,
-                        from_email=str(sender_email),
-                    )
-                    self.stdout.write(f"Project digest for {project_name}: {ok} -> {info}")
-            else:
-                self.stdout.write(f"No qualifying updates for {project_name}.")
-            
-            # ===== Add spacing after project completion =====
-            self.stdout.write(self.style.SUCCESS(f"✅ Completed processing for: {project_name}"))
+        # 1. SYNC: Map all components to central `Library` entities
+        self.stdout.write(self.style.MIGRATE_HEADING("1. Syncing Libraries..."))
+        self._sync_libraries()
+        
+        # 2. FETCH: Update each unique Library (Only 1 API call per lib!)
+        self.stdout.write(self.style.MIGRATE_HEADING("2. Fetching Updates for Libraries..."))
+        self._update_libraries()
+        
+        # 3. NOTIFY: Check projects against the updated Library data
+        self.stdout.write(self.style.MIGRATE_HEADING("3. Notifying Projects..."))
+        self._notify_projects(mailtrap_key, sender_email)
 
         self.stdout.write(self.style.SUCCESS("✅ Daily check completed successfully."))
 
-    def _process_components(
-        self,
-        project: Project,
-        project_name: str,
-        names: list[str],
-        versions: list[str],
-        *,
-        component_type: str,
-        groq: GroqAnalyzer,
-        serper: SerperFetcher,
-        notify_pref: str,
-    ) -> list[dict]:
-        """Evaluate a set of components (libraries or languages) and return update payloads."""
-        if not names:
-            return []
-
-        if not versions or len(names) != len(versions):
-            self.stdout.write(
-                self.style.WARNING(
-                    f"⚠️ Skipping {project_name}: {component_type} name/version mismatch",
-                )
+    def _sync_libraries(self):
+        """
+        Iterate over all StackComponents that are not linked to a Library.
+        Create/Find the Library and link it.
+        """
+        components = StackComponent.objects.filter(library_ref__isnull=True)
+        count = components.count()
+        self.stdout.write(f"Found {count} unlinked components.")
+        
+        for comp in components:
+            # Normalize key
+            raw_name = comp.name.strip()
+            key = raw_name.lower().replace(" ", "-") # Simplified normalization
+            
+            # Determine type
+            ctype = "library"
+            if comp.key == "language":
+                ctype = "language"
+            
+            library, created = Library.objects.get_or_create(
+                key=key,
+                defaults={
+                    "name": raw_name,
+                    "component_type": ctype
+                }
             )
-            return []
+            
+            comp.library_ref = library
+            comp.save()
+            if created:
+                self.stdout.write(f"[NEW] Created Library: {library.name}")
+    
+    def _update_libraries(self):
+        """
+        Fetch updates for all Libraries.
+        """
+        groq = GroqAnalyzer()
+        serper = SerperFetcher()
+        
+        # Only check libraries that are actually used (linked to at least one component)
+        # to avoid checking libraries that were deleted from all projects.
+        libraries = Library.objects.filter(linked_components__isnull=False).distinct()
+        self.stdout.write(f"Checking {libraries.count()} unique libraries...")
 
-        updates: list[dict] = []
-        for name, current_version in zip(names, versions):
-            update = self._evaluate_component(
-                project=project,
-                name=name,
-                current_version=current_version,
+        for library in libraries:
+            self.stdout.write(f"   Checking {library.name} (current: v{library.latest_version or 'unknown'})...")
+            
+            # Call Serper/Groq
+            # We pass library.latest_version as "current_version" to detecting NEWER stuff
+            updates = self._evaluate_component(
+                project=None, # No project context needed for simple library check
+                name=library.name,
+                current_version=library.latest_version,
                 groq=groq,
                 serper=serper,
-                notify_pref=notify_pref,
-                component_type=component_type,
+                notify_pref="all", # Get everything
+                component_type=library.component_type,
+                is_library_check=True 
             )
-            if update:
-                updates.append(update)
-            sleep(1.5)
-        return updates
+            
+            # Debug logging to see what Groq returned
+            if updates and isinstance(updates, dict):
+                detected_version = updates.get("version")
+                self.stdout.write(f"[DEBUG] Groq detected version: {detected_version}")
+                self.stdout.write(f"[DEBUG] Current stored version: {library.latest_version or 'empty'}")
+                
+                if detected_version:
+                    # ✅ FIX: Only save if the new version is ACTUALLY newer
+                    should_update = False
+                    skip_reason = ""
+                    
+                    try:
+                        # Handle empty current version
+                        if not library.latest_version:
+                            should_update = True
+                            skip_reason = "no previous version"
+                        else:
+                            parsed_new = pkg_version.parse(detected_version)
+                            parsed_current = pkg_version.parse(library.latest_version)
+                            
+                            if parsed_new > parsed_current:
+                                should_update = True
+                            elif parsed_new == parsed_current:
+                                skip_reason = f"same version ({detected_version})"
+                            else:
+                                skip_reason = f"older version (detected {detected_version} < current {library.latest_version})"
+                        
+                        if should_update:
+                            library.latest_version = detected_version
+                            library.last_checked_at = datetime.now()
+                            library.save()
+                            
+                            # Extract summary and source from updates
+                            summary_text = updates.get("summary", "")
+                            source_url = updates.get("source", "")
+                            release_date_str = updates.get("release_date", "")
+                            
+                            # Parse the release date from Groq (format: YYYY-MM-DD or text like "Not Confirmed")
+                            parsed_release_date = None
+                            if release_date_str:
+                                try:
+                                    # Try to parse as YYYY-MM-DD
+                                    from datetime import datetime as dt
+                                    parsed_release_date = dt.strptime(release_date_str, "%Y-%m-%d").date()
+                                except (ValueError, TypeError):
+                                    # If parsing fails, try other common formats or leave as None
+                                    try:
+                                        # Try MM/DD/YYYY
+                                        parsed_release_date = dt.strptime(release_date_str, "%m/%d/%Y").date()
+                                    except (ValueError, TypeError):
+                                        # If still fails, use today as fallback only if it looks like a valid recent date
+                                        # Otherwise leave as None to avoid showing incorrect dates
+                                        self.stdout.write(f"[WARN] Could not parse release_date: {release_date_str}")
+                                        parsed_release_date = None
+                            
+                            # Fallback to today's date only if no date was provided at all
+                            if parsed_release_date is None:
+                                parsed_release_date = datetime.now().date()
+                            
+                            # Debug: Show what we're about to save
+                            self.stdout.write(f"[DEBUG] Saving LibraryRelease:")
+                            self.stdout.write(f"- Summary: {summary_text[:80]}{'...' if len(summary_text) > 80 else ''}" if summary_text else f"- Summary: EMPTY")
+                            self.stdout.write(f"- Source: {source_url}" if source_url else f"- Source: EMPTY")
+                            self.stdout.write(f"- Release Date: {parsed_release_date} (from Groq: '{release_date_str}')")
+                            
+                            # Save history
+                            release, created = LibraryRelease.objects.get_or_create(
+                                library=library,
+                                version=detected_version,
+                                defaults={
+                                    "release_date": parsed_release_date,
+                                    "summary": summary_text,
+                                    "source_url": source_url,
+                                    "is_security_release": False
+                                }
+                            )
+                            
+                            if not created:
+                                # Update existing release with new data
+                                release.summary = summary_text
+                                release.source_url = source_url
+                                release.release_date = parsed_release_date
+                                release.save()
+                            
+                            self.stdout.write(self.style.SUCCESS(f"✅ Updated to v{detected_version}"))
+                        else:
+                            self.stdout.write(f"⏭️  Skipped: {skip_reason}")
+                            
+                    except Exception as e:
+                        self.stdout.write(self.style.WARNING(f"⚠️  Version comparison failed: {e}"))
+            else:
+                self.stdout.write(f"ℹ️  No update detected by Groq")
+            
+            sleep(1.5) # Rate limiting
 
+    def _notify_projects(self, mailtrap_key, sender_email):
+        """
+        Fan-out notifications to projects.
+        """
+        projects = Project.objects.prefetch_related("components__library_ref").all()
+        
+        for project in projects:
+            project_name = project.project_name
+            emails = [e.strip() for e in (project.developer_emails or "").split(",") if e.strip()]
+            if not emails:
+                continue
+                
+            updates_to_send = []
+            
+            for comp in project.components.all():
+                lib = comp.library_ref
+                if not lib:
+                    continue
+                
+                # Comparison Logic
+                # current: comp.version
+                # latest: lib.latest_version
+                if not lib.latest_version:
+                    continue
+                
+                try:
+                    if pkg_version.parse(lib.latest_version) > pkg_version.parse(comp.version):
+                        # Use the LibraryRelease metadata if available
+                        release = lib.releases.filter(version=lib.latest_version).first()
+                        
+                        # Debug logging
+                        self.stdout.write(f"[NOTIFY] {lib.name} {lib.latest_version}:")
+                        if release:
+                            self.stdout.write(f"- LibraryRelease found: YES")
+                            self.stdout.write(f"- Summary: {release.summary[:80]}{'...' if len(release.summary) > 80 else ''}" if release.summary else "- Summary: EMPTY")
+                            self.stdout.write(f"- Source: {release.source_url}" if release.source_url else "- Source: EMPTY")
+                        else:
+                            self.stdout.write(f"- LibraryRelease found: NO (will use default text)")
+                        
+                        summary = release.summary if release else "New version available"
+                        source = release.source_url if release else ""
+                        
+                        updates_to_send.append({
+                            "library": lib.name,
+                            "version": lib.latest_version,
+                            "category": "major", # Simplify for now
+                            "release_date": str(release.release_date) if release else "",
+                            "summary": summary,
+                            "source": source
+                        })
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"[NOTIFY] Error processing {comp.name}: {e}"))
+                    continue
+
+            if updates_to_send:
+                self.stdout.write(self.style.SUCCESS(f"Sending {len(updates_to_send)} updates to {project_name}"))
+                
+                # Re-use existing email function
+                # Note: We need to adapt the payload to what send_update_email expects
+                # We aggregate everything
+                
+                category = "mix"
+                subject_library = updates_to_send[0]["library"]
+                subject_version = updates_to_send[0]["version"]
+                if len(updates_to_send) > 1:
+                     subject_library += f" + {len(updates_to_send)-1} others"
+                
+                send_update_email(
+                    mailtrap_api_key=mailtrap_key,
+                    project_name=project_name,
+                    recipients=emails,
+                    library=subject_library,
+                    version=subject_version,
+                    category=category,
+                    summary="Updates detected in your stack.",
+                    source="",
+                    release_date="",
+                    updates=updates_to_send,
+                    from_email=sender_email
+                )
+
+    def _process_components(self, *args, **kwargs):
+         # DEPRECATED - Kept empty to satisfy structure if called elsewhere, but we don't use it.
+         pass
+         
     def _evaluate_component(
         self,
         *,
-        project: Project,
+        project: Project | None,
         name: str,
         current_version: str,
         groq: GroqAnalyzer,
         serper: SerperFetcher,
         notify_pref: str,
         component_type: str,
+        is_library_check: bool = False,
     ) -> dict | None:
         """Run Serper+Groq for a single component and return an update dict if we should email."""
         serper_results = serper.search_library(name, current_version, component_type=component_type)
@@ -308,6 +387,18 @@ class Command(BaseCommand):
                 label=label,
                 component_type=component_type,
             )
+
+        if is_library_check:
+             return {
+                 "library": library,
+                 "version": version or current_version or "unknown",
+                 "category": category,
+                 "release_date": release_date or "Unknown",
+                 "summary": summary or "No summary.",
+                 "source": source or "",
+                 "component_type": component_type,
+                 "is_released": is_released
+             }
 
         with transaction.atomic():
             cache, _ = UpdateCache.objects.select_for_update().get_or_create(
@@ -409,7 +500,20 @@ class Command(BaseCommand):
         
         # ===== Store in FutureUpdateCache =====
         from datetime import datetime
-        
+
+        if is_library_check:
+             # Just return it to the caller (update_libraries)
+             return {
+                 "library": library,
+                 "version": version or current_version or "unknown",
+                 "category": category,
+                 "release_date": release_date or "Unknown",
+                 "summary": summary or "No summary.",
+                 "source": source or "",
+                 "component_type": component_type,
+                 "is_released": is_released # Pass this through
+             }
+
         with transaction.atomic():
             # Parse expected_date if provided
             parsed_date = None

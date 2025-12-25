@@ -20,15 +20,42 @@ else:
 SERPER_URL = os.getenv("SERPER_SEARCH_URL", "https://google.serper.dev/search")
 
 # Host scoring to favor official sources when possible
+# Higher scores = higher priority
 _OFFICIAL_HOST_WEIGHTS = {
-    "github.com": 3,
-    "gitlab.com": 3,
-    "pypi.org": 3,
-    "npmjs.com": 3,
-    "rubygems.org": 3,
-    "python.org": 2,
-    "docs.microsoft.com": 2,
-    "developer.mozilla.org": 2,
+    # Package registries (HIGHEST PRIORITY)
+    "npmjs.com": 5,
+    "pypi.org": 5,
+    "rubygems.org": 5,
+    "packagist.org": 5,  # PHP
+    "crates.io": 5,  # Rust
+    "nuget.org": 5,  # .NET
+    
+    # Official source repositories
+    "github.com": 4,
+    "gitlab.com": 4,
+    
+    # Official framework/library sites
+    "react.dev": 4,
+    "reactjs.org": 4,
+    "vuejs.org": 4,
+    "angular.io": 4,
+    "svelte.dev": 4,
+    "djangoproject.com": 4,
+    
+    # Official documentation platforms
+    "readthedocs.io": 3,
+    "docs.rs": 3,  # Rust docs
+    
+    # Official language/platform docs
+    "python.org": 3,
+    "docs.microsoft.com": 3,
+    "developer.mozilla.org": 3,
+    "nodejs.org": 3,
+    
+    # Avoid these (negative weights for filtering)
+    "dev.to": -2,
+    "medium.com": -2,
+    "hackernoon.com": -1,
 }
 
 _FUTURE_KEYWORDS = (
