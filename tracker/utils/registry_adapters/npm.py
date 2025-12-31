@@ -187,6 +187,30 @@ class NpmRegistry(PackageRegistry):
             self._log_error(f"Error fetching pre-releases for {package_name}: {e}")
             return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        """Get source repository URL from npm metadata."""
+        encoded_name = urllib.parse.quote(package_name, safe='')
+        url = f"{self.BASE_URL}/{encoded_name}"
+        
+        try:
+            response = requests.get(url, timeout=self.timeout)
+            if response.status_code != 200: return None
+            
+            data = response.json()
+            
+            # check repository field
+            repository = data.get("repository", {})
+            if isinstance(repository, dict):
+                repo_url = repository.get("url", "")
+            else:
+                repo_url = str(repository)
+            
+            clean_url = self._extract_github_url(repo_url)
+            return clean_url if "github.com" in clean_url else None
+            
+        except:
+            return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on npm registry.

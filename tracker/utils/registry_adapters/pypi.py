@@ -152,6 +152,39 @@ class PyPIRegistry(PackageRegistry):
             self._log_error(f"Error fetching pre-releases for {package_name}: {e}")
             return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        """Get source repository URL from PyPI metadata."""
+        url = f"{self.BASE_URL}/{package_name}/json"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            if resp.status_code != 200: return None
+            
+            info = resp.json().get("info", {})
+            urls = info.get("project_urls") or {}
+            
+            # Common keys for repo URL
+            candidates = ["Source", "Repository", "Source Code", "GitHub", "Code"]
+            
+            # 1. Check known keys
+            for key in candidates:
+                if val := urls.get(key):
+                    if "github.com" in val:
+                        return val
+            
+            # 2. Check all values for github.com
+            for val in urls.values():
+                if val and "github.com" in val:
+                    return val
+            
+            # 3. Check homepage
+            home = info.get("home_page", "")
+            if home and "github.com" in home:
+                return home
+                
+            return None
+        except:
+            return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on PyPI.

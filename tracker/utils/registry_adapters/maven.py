@@ -128,6 +128,9 @@ class MavenRegistry(PackageRegistry):
         # TODO: Implement full Maven pre-release search
         return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if Maven artifact exists.

@@ -142,6 +142,10 @@ class CargoRegistry(PackageRegistry):
         except Exception:
             return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        # TODO: Implement Cargo repository extraction
+        return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if crate exists on crates.io.

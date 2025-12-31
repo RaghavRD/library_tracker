@@ -141,6 +141,10 @@ class RubyGemsRegistry(PackageRegistry):
             self._log_error(f"RubyGems pre-release error: {e}")
             return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        # TODO: Implement RubyGems source_code_uri extraction
+        return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if gem exists on RubyGems.

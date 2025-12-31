@@ -105,6 +105,14 @@ class PackageRegistry(ABC):
         Should return a list of PreReleaseInfo objects.
         """
         pass
+
+    @abstractmethod
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        """
+        Get the source repository URL (e.g. GitHub) for a package.
+        Required for Tier 2 future version detection (Milestones/Releases).
+        """
+        pass
     
     def _log_debug(self, message: str):
         """Log debug message if debug mode enabled."""

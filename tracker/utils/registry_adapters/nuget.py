@@ -129,6 +129,9 @@ class NuGetRegistry(PackageRegistry):
         # TODO: Implement full NuGet pre-release search
         return []
 
+    def get_repository_url(self, package_name: str) -> Optional[str]:
+        return None
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on NuGet.
