@@ -6,9 +6,9 @@ Official API: https://learn.microsoft.com/en-us/nuget/api/overview
 
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class NuGetRegistry(PackageRegistry):
@@ -125,6 +125,10 @@ class NuGetRegistry(PackageRegistry):
             self._log_debug(f"Could not fetch metadata: {e}")
             return None
     
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        # TODO: Implement full NuGet pre-release search
+        return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on NuGet.

@@ -5,7 +5,7 @@ Base classes and data structures for package registry adapters.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,13 +27,28 @@ class VersionInfo:
         changelog_url: Optional URL to changelog/release notes
     """
     version: str
-    release_date: date
+    release_date: Optional[date] # Changed to Optional
     homepage_url: str
     summary: str
     source_url: str
-    trust_level: int
-    is_prerelease: bool
+    trust_level: int = 100 # Added default
+    is_prerelease: bool = False # Added default
     changelog_url: Optional[str] = None
+    
+    # Removed __post_init__ from VersionInfo as per the instruction's implied change
+
+
+@dataclass
+class PreReleaseInfo:
+    """Standardized information about a detected pre-release."""
+    version: str
+    release_date: Optional[date]
+    prerelease_type: str  # alpha, beta, rc, etc.
+    summary: str
+    source_url: str
+    trust_level: int = 95
+    is_published: bool = True  # True if found in registry, False if just a plan
+
     
     def __post_init__(self):
         """Validate trust level range."""
@@ -66,16 +81,6 @@ class PackageRegistry(ABC):
     @abstractmethod
     def get_latest_version(self, package_name: str) -> Optional[VersionInfo]:
         """
-        Fetch the latest stable version of a package.
-        
-        Args:
-            package_name: Name of the package (e.g., "pandas", "react")
-        
-        Returns:
-            VersionInfo object if found, None if package doesn't exist
-        
-        Raises:
-            requests.RequestException: For network/API errors
             ValueError: For invalid package names
         """
         pass
@@ -90,6 +95,14 @@ class PackageRegistry(ABC):
         
         Returns:
             True if this registry supports this package
+        """
+        pass
+    
+    @abstractmethod
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        """
+        Fetch available PRE-RELEASE versions (beta, rc, etc.) of a package.
+        Should return a list of PreReleaseInfo objects.
         """
         pass
     

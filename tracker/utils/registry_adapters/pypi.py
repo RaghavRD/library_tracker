@@ -6,10 +6,11 @@ Official API: https://warehouse.pypa.io/api-reference/json.html
 
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from packaging.version import parse as parse_version
+from tracker.utils.future_version_validator import FutureVersionValidator
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class PyPIRegistry(PackageRegistry):
@@ -105,7 +106,52 @@ class PyPIRegistry(PackageRegistry):
         except Exception as e:
             self._log_error(f"Error fetching {package_name}: {e}")
             raise
-    
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        """Get pre-release versions from PyPI."""
+        url = f"{self.BASE_URL}/{package_name}/json"
+        
+        try:
+            response = requests.get(url, timeout=self.timeout)
+            if response.status_code == 404:
+                return []
+            
+            data = response.json()
+            releases = data.get("releases", {})
+            prereleases = []
+            
+            # Check all available versions
+            for version_str, release_data in releases.items():
+                if not release_data:
+                    continue
+                    
+                try:
+                    parsed = parse_version(version_str)
+                    
+                    if parsed.is_prerelease:
+                        # Get upload time of first distribution
+                        upload_time = release_data[0].get("upload_time", "")
+                        release_date = self._parse_upload_time(upload_time)
+                        
+                        prereleases.append(PreReleaseInfo(
+                            version=version_str,
+                            release_date=release_date,
+                            prerelease_type=FutureVersionValidator.classify_prerelease_type(version_str),
+                            summary=f"Pre-release version for {package_name}",
+                            source_url=f"https://pypi.org/project/{package_name}/{version_str}/",
+                            trust_level=95,
+                            is_published=True
+                        ))
+                except Exception:
+                    continue
+            
+            # Sort by version (newest first)
+            prereleases.sort(key=lambda x: parse_version(x.version), reverse=True)
+            return prereleases
+            
+        except Exception as e:
+            self._log_error(f"Error fetching pre-releases for {package_name}: {e}")
+            return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on PyPI.

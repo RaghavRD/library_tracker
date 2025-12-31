@@ -6,9 +6,9 @@ Official API: https://guides.rubygems.org/rubygems-org-api/
 
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class RubyGemsRegistry(PackageRegistry):
@@ -115,6 +115,32 @@ class RubyGemsRegistry(PackageRegistry):
             self._log_debug(f"Could not fetch gem info: {e}")
             return None
     
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        """Get pre-releases from RubyGems."""
+        url = f"{self.BASE_URL}/versions/{package_name}.json"
+        try:
+            response = requests.get(url, timeout=self.timeout)
+            if response.status_code == 404: return []
+            
+            versions = response.json()
+            prereleases = []
+            
+            for v in versions:
+                if v.get("prerelease"):
+                    prereleases.append(PreReleaseInfo(
+                        version=v["number"],
+                        release_date=self._parse_rubygems_date(v.get("created_at", "")),
+                        prerelease_type="beta" if "beta" in v["number"] else "rc" if "rc" in v["number"] else "pre",
+                        summary=v.get("summary", ""),
+                        source_url=f"https://rubygems.org/gems/{package_name}/versions/{v['number']}",
+                        trust_level=95,
+                        is_published=True
+                    ))
+            return prereleases
+        except Exception as e:
+            self._log_error(f"RubyGems pre-release error: {e}")
+            return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if gem exists on RubyGems.

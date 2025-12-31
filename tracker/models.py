@@ -176,6 +176,51 @@ class FutureUpdateCache(TimeStampedModel):
         help_text="Reason for last confidence/info change (e.g., 'Featured on official site')"
     )
     
+    # Pre-release Classification
+    prerelease_type = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            ('alpha', 'Alpha'),
+            ('beta', 'Beta'), 
+            ('rc', 'Release Candidate'),
+            ('dev', 'Development'),
+            ('milestone', 'Milestone Only'),
+            ('roadmap', 'Roadmap Only'),
+        ],
+        help_text="Type of pre-release (alpha, beta, rc, etc.)"
+    )
+    
+    detection_method = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=[
+            ('registry_prerelease', 'Registry Pre-Release'),
+            ('github_release', 'GitHub Pre-Release'),
+            ('github_milestone', 'GitHub Milestone'),
+            ('github_roadmap', 'GitHub Roadmap File'), 
+            ('official_website', 'Official Website/RSS'),
+            ('serper_groq', 'Web Search (Fallback)'),
+        ],
+        help_text="Method used to detect this future version"
+    )
+    
+    is_published_prerelease = models.BooleanField(
+        default=False,
+        help_text="True if this version is actually installable (e.g. on npm/pypi)"
+    )
+    
+    confirmation_count = models.IntegerField(
+        default=1,
+        help_text="Number of independent sources confirming this version"
+    )
+    
+    milestone_completion_percent = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="GitHub milestone completion % if applicable"
+    )
+    
     class Meta:
         ordering = ['-confidence', '-updated_at']
         unique_together = [['library', 'version']]

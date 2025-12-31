@@ -6,9 +6,9 @@ Official API: https://crates.io/data-access
 
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class CargoRegistry(PackageRegistry):
@@ -113,6 +113,35 @@ class CargoRegistry(PackageRegistry):
             self._log_error(f"Error fetching {package_name}: {e}")
             raise
     
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        """Get pre-releases from crates.io."""
+        url = f"{self.BASE_URL}/{package_name}"
+        headers = {"User-Agent": self.USER_AGENT}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+            if response.status_code != 200: return []
+            
+            data = response.json()
+            versions = data.get("versions", [])
+            prereleases = []
+            
+            for v in versions:
+                # Rust uses SemVer. Pre-releases have a hyphen.
+                if "-" in v.get("num", "") and not v.get("yanked"):
+                    prereleases.append(PreReleaseInfo(
+                        version=v["num"],
+                        release_date=self._parse_crate_time(v.get("created_at", "")),
+                        prerelease_type="pre", # Simplified
+                        summary=f"Crate version {v['num']}",
+                        source_url=f"https://crates.io/crates/{package_name}/{v['num']}",
+                        trust_level=95,
+                        is_published=True
+                    ))
+            return prereleases
+        except Exception:
+            return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if crate exists on crates.io.

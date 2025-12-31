@@ -6,9 +6,9 @@ Official API: https://central.sonatype.org/search/rest-api-guide/
 
 import requests
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class MavenRegistry(PackageRegistry):
@@ -124,6 +124,10 @@ class MavenRegistry(PackageRegistry):
             self._log_error(f"Error fetching {package_name}: {e}")
             raise
     
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        # TODO: Implement full Maven pre-release search
+        return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if Maven artifact exists.

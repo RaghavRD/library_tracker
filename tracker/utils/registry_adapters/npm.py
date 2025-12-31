@@ -7,9 +7,10 @@ Official API: https://github.com/npm/registry/blob/master/docs/REGISTRY-API.md
 import requests
 import urllib.parse
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from tracker.utils.future_version_validator import FutureVersionValidator
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 
 
 class NpmRegistry(PackageRegistry):
@@ -119,6 +120,73 @@ class NpmRegistry(PackageRegistry):
             self._log_error(f"Error fetching {package_name}: {e}")
             raise
     
+    
+    def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
+        """Get pre-release versions from npm registry."""
+        encoded_name = urllib.parse.quote(package_name, safe='')
+        url = f"{self.BASE_URL}/{encoded_name}"
+        
+        try:
+            response = requests.get(url, timeout=self.timeout)
+            if response.status_code == 404:
+                return []
+            
+            data = response.json()
+            dist_tags = data.get("dist-tags", {})
+            versions = data.get("versions", {})
+            time_data = data.get("time", {})
+            
+            prereleases = []
+            seen_versions = set()
+            
+            # 1. Check dist-tags (beta, next, canary, etc.)
+            for tag, version in dist_tags.items():
+                if tag != "latest" and version not in seen_versions:
+                    version_data = versions.get(version, {})
+                    release_time = time_data.get(version, "")
+                    
+                    prereleases.append(PreReleaseInfo(
+                        version=version,
+                        release_date=self._parse_npm_time(release_time),
+                        prerelease_type=tag,  # Use tag as type (e.g. 'canary')
+                        summary=version_data.get("description", f"{tag} release for {package_name}"),
+                        source_url=f"https://www.npmjs.com/package/{package_name}/v/{version}",
+                        trust_level=95,
+                        is_published=True
+                    ))
+                    seen_versions.add(version)
+            
+            # 2. Check recent versions for semantic pre-release markers
+            # (e.g. 1.0.0-beta.1 even if not tagged as 'beta' in dist-tags)
+            latest_ver = dist_tags.get("latest", "")
+            for ver in versions:
+                if ver in seen_versions:
+                    continue
+                
+                if "-" in ver: # Simple check for semver pre-release
+                     # Only include if it looks NEWER than latest stable (simple heuristic)
+                     # ideally we'd use semver compare, but this is a good start
+                     if ver != latest_ver:
+                         release_time = time_data.get(ver, "")
+                         prereleases.append(PreReleaseInfo(
+                            version=ver,
+                            release_date=self._parse_npm_time(release_time),
+                            prerelease_type=FutureVersionValidator.classify_prerelease_type(ver),
+                            summary=f"Pre-release version {ver}",
+                            source_url=f"https://www.npmjs.com/package/{package_name}/v/{ver}",
+                            trust_level=95,
+                            is_published=True
+                        ))
+                         seen_versions.add(ver)
+            
+            # Sort by date
+            prereleases.sort(key=lambda x: x.release_date or datetime.min.date(), reverse=True)
+            return prereleases[:10]  # Return top 10 most recent
+            
+        except Exception as e:
+            self._log_error(f"Error fetching pre-releases for {package_name}: {e}")
+            return []
+
     def supports_package(self, package_name: str) -> bool:
         """
         Check if package exists on npm registry.
