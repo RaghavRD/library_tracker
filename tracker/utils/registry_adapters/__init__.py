@@ -6,7 +6,7 @@ official package registries (PyPI, npm, RubyGems, Cargo, NuGet, Maven)
 instead of relying on web search.
 """
 
-from .base import PackageRegistry, VersionInfo
+from .base import PackageRegistry, VersionInfo, PreReleaseInfo
 from .pypi import PyPIRegistry
 from .npm import NpmRegistry
 from .rubygems import RubyGemsRegistry
@@ -17,6 +17,7 @@ from .maven import MavenRegistry
 __all__ = [
     'PackageRegistry',
     'VersionInfo',
+    'PreReleaseInfo',
     'PyPIRegistry',
     'NpmRegistry',
     'RubyGemsRegistry',

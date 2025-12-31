@@ -156,6 +156,9 @@ class Command(BaseCommand):
                     if not result:
                         self.stdout.write(f"ℹ️  No updates found")
                     
+                    # ===== future version check (Tier 1/2) =====
+                    self._check_future_versions(library)
+
                     # Skip the Groq processing below
                     sleep(0.5)
                     continue
@@ -185,8 +188,12 @@ class Command(BaseCommand):
                 self.stdout.write(f"[DEBUG] Current stored version: {library.latest_version or 'empty'}")
                 
                 if detected_version:
-                    # ✅ FIX: Only save if the new version is ACTUALLY newer
-                    should_update = False
+                    # ✅ FIX: Do NOT update latest_version if it is a future version
+                    if updates.get("category") == "future":
+                        self.stdout.write(f"ℹ️  Future version detected ({detected_version}). Skipping stable version update.")
+                    else:
+                        # ✅ FIX: Only save if the new version is ACTUALLY newer
+                        should_update = False
                     skip_reason = ""
                     
                     try:
@@ -706,3 +713,35 @@ class Command(BaseCommand):
             return True
         except (TypeError, ValueError):
             return False
+
+    def _check_future_versions(self, library):
+        """
+        Check for future versions using the Phase 3 Orchestrator.
+        """
+        try:
+            from tracker.utils.future_version_detector import FutureVersionDetector
+            detector = FutureVersionDetector(timeout=10)
+            
+            # Use current latest version as baseline
+            current = library.latest_version or "0.0.0"
+            
+            candidates = detector.detect_future_versions(library.name, current)
+            
+            if candidates:
+                best = candidates[0]
+                self.stdout.write(self.style.SUCCESS(f"🔮 Future version detected: {best.version} ({best.prerelease_type})"))
+                
+                # Reuse existing handler to save to DB
+                self._handle_future_update(
+                    library=library.name,
+                    version=best.version,
+                    confidence=best.trust_level,
+                    expected_date=str(best.release_date) if best.release_date else "",
+                    summary=best.summary,
+                    source=best.source_url,
+                    notify_pref="all,future", # Force check
+                    label=f"future:{library.name}",
+                    component_type=library.component_type
+                )
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"❌ Future version check failed for {library.name}: {e}"))
