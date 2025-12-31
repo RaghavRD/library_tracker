@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from tracker.utils.serper_fetcher import SerperFetcher
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.send_mail import send_update_email
+from tracker.utils.library_update_helper import LibraryUpdateHelper
 from tracker.models import UpdateCache, Project, FutureUpdateCache, Library, LibraryRelease, StackComponent
 
 # Get logger
@@ -123,10 +124,21 @@ class Command(BaseCommand):
     
     def _update_libraries(self):
         """
-        Fetch updates for all Libraries.
+        Fetch updates for all Libraries using official APIs (with fallback to Serper+Groq).
         """
-        groq = GroqAnalyzer()
-        serper = SerperFetcher()
+        # Feature flag: Use official APIs or fall back to Serper+Groq
+        use_official_apis = os.getenv("USE_OFFICIAL_APIS", "true").lower() == "true"
+        
+        if use_official_apis:
+            self.stdout.write(self.style.SUCCESS("✨ Using official package registry APIs"))
+            helper = LibraryUpdateHelper(use_official_apis=True, debug=False)
+            groq = None
+            serper = None
+        else:
+            self.stdout.write(self.style.WARNING("⚠️  Using legacy Serper+Groq method"))
+            helper = None
+            groq = GroqAnalyzer()
+            serper = SerperFetcher()
         
         # Only check libraries that are actually used (linked to at least one component)
         # to avoid checking libraries that were deleted from all projects.
@@ -136,7 +148,24 @@ class Command(BaseCommand):
         for library in libraries:
             self.stdout.write(f"   Checking {library.name} (current: v{library.latest_version or 'unknown'})...")
             
-            # Call Serper/Groq
+            try:
+                if use_official_apis and helper:
+                    # NEW METHOD: Use VersionDetector via helper
+                    result = helper.update_library(library, stdout_writer=self.stdout.write)
+                    
+                    if not result:
+                        self.stdout.write(f"ℹ️  No updates found")
+                    
+                    # Skip the Groq processing below
+                    sleep(0.5)
+                    continue
+            
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"❌ Error with official APIs: {e}"))
+                logger.error(f"Official API error for {library.name}, falling back to Serper+Groq: {e}")
+                # Fall through to Serper+Groq below
+            
+            # OLD METHOD: Call Serper/Groq (fallback or when USE_OFFICIAL_APIS=false)
             # We pass library.latest_version as "current_version" to detecting NEWER stuff
             updates = self._evaluate_component(
                 project=None, # No project context needed for simple library check

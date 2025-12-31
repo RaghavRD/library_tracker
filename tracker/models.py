@@ -48,6 +48,16 @@ class Library(TimeStampedModel):
     
     homepage_url = models.URLField(blank=True)
     
+    # Version Detection Metadata
+    registry_type = models.CharField(max_length=50, blank=True, help_text="Registry type hint (e.g. 'pypi', 'npm')")
+    detection_trust_level = models.IntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Trust level of the latest version detection source (0-100)"
+    )
+    last_api_call_successful = models.BooleanField(default=True)
+    api_error_message = models.TextField(blank=True)
+    
     def __str__(self):
         return f"{self.name} (v{self.latest_version})"
 
@@ -62,6 +72,7 @@ class LibraryRelease(TimeStampedModel):
     is_security_release = models.BooleanField(default=False)
     summary = models.TextField(blank=True)
     source_url = models.URLField(blank=True)
+    detection_source = models.CharField(max_length=100, blank=True, help_text="Source of detection (e.g. 'api:trust_100', 'serper_groq')")
     
     class Meta:
         unique_together = ['library', 'version']
