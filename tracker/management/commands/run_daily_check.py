@@ -69,6 +69,9 @@ class Command(BaseCommand):
     def run_daily_check(self):
         self.stdout.write(self.style.NOTICE("LibTrack AI: Daily check starting..."))
 
+        self.fresh_future_updates = {} # Store detected future updates here
+
+
         mailtrap_key = os.getenv("MAILTRAP_API_KEY")
         sender_email = os.getenv("MAILTRAP_FROM_EMAIL")
 
@@ -146,6 +149,25 @@ class Command(BaseCommand):
         self.stdout.write(f"Checking {libraries.count()} unique libraries...")
 
         for library in libraries:
+            # Inference: Populate registry_type if missing
+            if not library.registry_type:
+                if library.name.startswith("@") or "/" in library.name:
+                     library.registry_type = "npm"
+                elif ":" in library.name:
+                     library.registry_type = "maven"
+                elif library.component_type == "language":
+                     library.registry_type = "generic" # Skip registry for languages
+                elif library.name.lower() in ["react", "vue", "angular", "next", "vite"]:
+                     library.registry_type = "npm"
+                elif library.name.lower() in ["rails", "devise"]:
+                     library.registry_type = "rubygems"
+                elif library.name.lower() in ["serde", "tokio", "rand"]:
+                     library.registry_type = "cargo"
+                else:
+                     library.registry_type = "pypi" # Default to pypi
+                
+                library.save(update_fields=["registry_type"])
+
             self.stdout.write(f"   Checking {library.name} (current: v{library.latest_version or 'unknown'})...")
             
             try:
@@ -299,6 +321,16 @@ class Command(BaseCommand):
                 if not lib:
                     continue
                 
+                
+                # --- 1. Check for Future Updates (Buffered) ---
+                if lib.name in self.fresh_future_updates:
+                    future_payload = self.fresh_future_updates[lib.name]
+                    # Check if project wants future updates
+                    prefs = [p.strip().lower() for p in (project.notification_type or "").split(",")]
+                    if "future" in prefs or "all" in prefs:
+                        updates_to_send.append(future_payload)
+                
+                # --- 2. Check for Stable updates (Existing Logic) ---
                 # Comparison Logic
                 # current: comp.version
                 # latest: lib.latest_version
@@ -322,10 +354,28 @@ class Command(BaseCommand):
                         summary = release.summary if release else "New version available"
                         source = release.source_url if release else ""
                         
+                        # Calculate category (major vs minor)
+                        parsed_latest = pkg_version.parse(lib.latest_version)
+                        parsed_current = pkg_version.parse(comp.version)
+                        category = "major" if parsed_latest.major > parsed_current.major else "minor"
+
+                        # NEW: Save to History (UpdateCache)
+                        UpdateCache.objects.update_or_create(
+                            project=project,
+                            library=lib.name,
+                            defaults={
+                                "version": lib.latest_version,
+                                "category": category,
+                                "release_date": str(release.release_date) if release and release.release_date else "",
+                                "summary": summary,
+                                "source": source
+                            }
+                        )
+
                         updates_to_send.append({
                             "library": lib.name,
                             "version": lib.latest_version,
-                            "category": "major", # Simplify for now
+                            "category": category,
                             "release_date": str(release.release_date) if release else "",
                             "summary": summary,
                             "source": source
@@ -517,6 +567,7 @@ class Command(BaseCommand):
         notify_pref: str,
         label: str,
         component_type: str,
+        is_library_check: bool = False,
     ) -> dict | None:
         """Handle detection of future/planned updates."""
         
@@ -534,21 +585,11 @@ class Command(BaseCommand):
             )
             return None
         
+        
         # ===== Store in FutureUpdateCache =====
         from datetime import datetime
 
-        if is_library_check:
-             # Just return it to the caller (update_libraries)
-             return {
-                 "library": library,
-                 "version": version or current_version or "unknown",
-                 "category": category,
-                 "release_date": release_date or "Unknown",
-                 "summary": summary or "No summary.",
-                 "source": source or "",
-                 "component_type": component_type,
-                 "is_released": is_released # Pass this through
-             }
+        # (Removed is_library_check early return to ensure DB persistence)
 
         with transaction.atomic():
             # Parse expected_date if provided
@@ -725,14 +766,18 @@ class Command(BaseCommand):
             # Use current latest version as baseline
             current = library.latest_version or "0.0.0"
             
-            candidates = detector.detect_future_versions(library.name, current)
+            candidates = detector.detect_future_versions(
+                library.name, 
+                current,
+                registry_type=library.registry_type # Use inferred type
+            )
             
             if candidates:
                 best = candidates[0]
                 self.stdout.write(self.style.SUCCESS(f"🔮 Future version detected: {best.version} ({best.prerelease_type})"))
                 
                 # Reuse existing handler to save to DB
-                self._handle_future_update(
+                payload = self._handle_future_update(
                     library=library.name,
                     version=best.version,
                     confidence=best.trust_level,
@@ -741,7 +786,16 @@ class Command(BaseCommand):
                     source=best.source_url,
                     notify_pref="all,future", # Force check
                     label=f"future:{library.name}",
-                    component_type=library.component_type
+                    component_type=library.component_type,
+                    is_library_check=True 
                 )
+                
+                # Notification trigger for NEW detections (BUFFERED)
+                if payload and payload.get("category") == "future":
+                    self.stdout.write(f"   [BUFFER] Storing future update for {library.name} {best.version}")
+                    self.fresh_future_updates[library.name] = payload
+                    
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Future version check failed for {library.name}: {e}"))
+
+
