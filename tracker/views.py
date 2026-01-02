@@ -352,7 +352,52 @@ def register_project(request):
 @login_required
 def dashboard(request):
     """
-    Displays project registrations and update cache.
+    New Analytics Dashboard.
+    Displays high-level metrics and charts.
+    """
+    total_projects = Project.objects.count()
+    
+    # Count total libraries (using StackComponent or unique libraries)
+    # Using StackComponent gives us the libraries actually tracked in projects
+    total_components = StackComponent.objects.exclude(key='language').count()
+    
+    # Calculate updates available
+    updates_qs = UpdateCache.objects.all()
+    total_updates = updates_qs.count()
+    
+    major_updates = updates_qs.filter(category='major').count()
+    minor_updates = updates_qs.filter(category='minor').count()
+    
+    # Future updates
+    from tracker.models import FutureUpdateCache
+    future_updates_count = FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed']).count()
+    
+    # Health Score Calculation
+    # Simple logic: 100 - (updates / components * 100)
+    # If components is 0, score is 100.
+    health_score = 100
+    if total_components > 0:
+        ratio = total_updates / total_components
+        # Cap at 100% impact (meaning 0 score) if ratio > 1
+        params = min(ratio, 1.0)
+        health_score = int((1.0 - params) * 100)
+    
+    context = {
+        "total_projects": total_projects,
+        "total_components": total_components,
+        "total_updates": total_updates,
+        "major_updates": major_updates,
+        "minor_updates": minor_updates,
+        "future_updates_count": future_updates_count,
+        "health_score": health_score,
+    }
+    return render(request, "tracker/dashboard.html", context)
+
+
+@login_required
+def projects_view(request):
+    """
+    Displays project active registrations (Renamed from Dashboard).
     """
     if request.method == "POST":
         action = request.POST.get("action")
@@ -370,7 +415,7 @@ def dashboard(request):
                 except Exception:
                     print("Error while creating project:", traceback.format_exc())
                     messages.error(request, "Failed to add project. Please try again.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         if action == "update":
             project_id = request.POST.get("project_id")
@@ -378,12 +423,12 @@ def dashboard(request):
                 project = Project.objects.prefetch_related("components").get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for update.")
-                return redirect("dashboard")
+                return redirect("projects")
 
             payload, error = _build_registration_payload(request)
             if error:
                 messages.error(request, error)
-                return redirect("dashboard")
+                return redirect("projects")
 
             try:
                 _save_project_from_payload(payload, instance=project)
@@ -393,7 +438,7 @@ def dashboard(request):
             except Exception:
                 print("Error while updating project:", traceback.format_exc())
                 messages.error(request, "Failed to update project. Please try again.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         if action == "delete":
             project_id = request.POST.get("project_id")
@@ -401,15 +446,15 @@ def dashboard(request):
                 project = Project.objects.get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for deletion.")
-                return redirect("dashboard")
+                return redirect("projects")
 
             project_name = request.POST.get("project_name") or project.project_name or "Project"
             project.delete()
             messages.success(request, f"{project_name} deleted.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         messages.error(request, "Unknown action.")
-        return redirect("dashboard")
+        return redirect("projects")
 
     project_qs = Project.objects.prefetch_related("components").order_by("-created_at")
     regs = [_serialize_project(project) for project in project_qs]
@@ -430,7 +475,7 @@ def dashboard(request):
 
     return render(
         request,
-        "tracker/dashboard.html",
+        "tracker/projects.html",
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,

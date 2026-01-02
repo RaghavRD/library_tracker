@@ -3,35 +3,178 @@
 {% block title %}LibTrack AI – Login{% endblock %}
 
 {% block content %}
-<div class="container py-5" style="max-width: 500px;">
+<style>
+    :root {
+        --brand-primary: #4e73df;
+        --brand-success: #1cc88a;
+        --brand-info: #36b9cc;
+        --brand-warning: #f6c23e;
+        --brand-danger: #e74a3b;
+        --glass-bg: rgba(255, 255, 255, 0.95);
+    }
 
-    <!-- 🔹 Toast Container (Top-right corner) -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
-        {% if messages %}
-        {% for m in messages %}
-        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
-            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-            <div class="d-flex">
-                <div class="toast-body">
-                    {{ m }}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-                    aria-label="Close"></button>
+    body {
+        background: linear-gradient(135deg, #f8f9fc 0%, #e9ecef 100%);
+        min-height: 100vh;
+    }
+
+    .auth-card {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        background: var(--glass-bg);
+        overflow: hidden;
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .auth-card:hover {
+        box-shadow: 0 25px 75px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    .auth-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #4e73df 0%, #36b9cc 50%, #1cc88a 100%);
+    }
+
+    .auth-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .auth-header h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #2e3338;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.5rem;
+    }
+
+    .auth-header p {
+        color: #6c757d;
+        font-size: 0.95rem;
+    }
+
+    .form-control {
+        border-radius: 0.75rem;
+        border: 1.5px solid #e0e3e7;
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        background-color: #f8f9fa;
+    }
+
+    .form-control:focus {
+        background-color: #ffffff;
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.15);
+    }
+
+    .form-label {
+        color: #2e3338;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-group .btn {
+        border-radius: 0 0.75rem 0.75rem 0;
+        border: 1.5px solid #e0e3e7;
+    }
+
+    .input-group .form-control {
+        border-radius: 0.75rem 0 0 0.75rem;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(78, 115, 223, 0.4);
+    }
+
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+
+    .auth-link {
+        color: #4e73df;
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.3s ease;
+    }
+
+    .auth-link:hover {
+        color: #224abe;
+    }
+
+    .alert {
+        border-radius: 0.75rem;
+        border: none;
+        padding: 1rem;
+    }
+
+    .toast {
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-text {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .text-danger {
+        color: #e74a3b !important;
+        font-size: 0.85rem;
+    }
+</style>
+
+<!-- 🔹 Toast Container (Top-right corner) -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
+    {% if messages %}
+    {% for m in messages %}
+    <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
+        role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+        <div class="d-flex">
+            <div class="toast-body">
+                {{ m }}
             </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                aria-label="Close"></button>
         </div>
-        {% endfor %}
-        {% endif %}
     </div>
+    {% endfor %}
+    {% endif %}
+</div>
 
-    <!-- 🔹 Login Card -->
-    <div class="card border-0 shadow-lg">
-        <div class="card-body p-5">
-            <div class="text-center mb-4">
-                <h2 class="fw-bold text-dark mb-2">Welcome Back</h2>
-                <p class="text-muted">Log in to access dashboard</p>
-            </div>
+<div class="d-flex align-items-center justify-content-center min-vh-100">
+    <div class="w-100" style="max-width: 500px; padding: 1rem;">
+        <!-- 🔹 Login Card -->
+        <div class="card auth-card">
+            <div class="card-body p-5">
+                <div class="auth-header">
+                    <h2>Welcome Back</h2>
+                    <p>Log in to access your dashboard</p>
+                </div>
 
-            <form method="post" novalidate>
+                <form method="post" novalidate>
                 {% csrf_token %}
 
                 <div class="mb-3">
@@ -78,15 +221,10 @@
                             one</a>
                     </p>
                 </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
-
-    <!-- <div class="text-center mt-4">
-        <small class="text-muted">
-            © {{ now|date:"Y" }} LibTrack AI — Track your project dependencies
-        </small>
-    </div> -->
 </div>
 {% endblock %}
 

@@ -275,3 +275,23 @@ INFO 2025-12-25 12:20:08,427 run_daily_check 36773 8439917632 [language:python] 
 INFO 2025-12-25 12:20:08,935 run_daily_check 36773 8439917632 [language:python] Groq detected version: 3.14.2
 INFO 2025-12-25 12:20:20,005 run_daily_check 36773 8439917632 [library:react] Serper found version candidate: 19.2.7
 INFO 2025-12-25 12:20:27,883 run_daily_check 36773 8439917632 [library:react] Groq detected version: 19.2.3
+INFO 2025-12-25 18:12:11,310 run_daily_check 41487 8439917632 [library:django] Serper found version candidate: 25.2
+INFO 2025-12-25 18:12:12,193 run_daily_check 41487 8439917632 [library:django] Groq detected version: 4.2
+INFO 2025-12-25 18:12:23,299 run_daily_check 41487 8439917632 [library:nextjs] Serper found version candidate: 25.2
+INFO 2025-12-25 18:12:23,655 run_daily_check 41487 8439917632 [library:nextjs] Groq detected version: 16.1
+INFO 2025-12-25 18:12:33,892 run_daily_check 41487 8439917632 [library:Pydantic] Serper found version candidate: 30.0
+INFO 2025-12-25 18:12:34,394 run_daily_check 41487 8439917632 [library:Pydantic] Groq detected version: 2.12.5
+INFO 2025-12-25 18:12:43,934 run_daily_check 41487 8439917632 [language:python] Serper found version candidate: 25.1
+INFO 2025-12-25 18:12:44,330 run_daily_check 41487 8439917632 [language:python] Groq detected version: 3.14.2
+INFO 2025-12-25 18:12:53,043 run_daily_check 41487 8439917632 [library:react] Serper found version candidate: 19.2.7
+INFO 2025-12-25 18:13:08,909 run_daily_check 41487 8439917632 [library:react] Groq detected version: 19.2.3
+INFO 2025-12-29 21:59:06,084 run_daily_check 3997 8507403328 [library:django] Serper found version candidate: 25.2
+INFO 2025-12-29 21:59:06,608 run_daily_check 3997 8507403328 [library:django] Groq detected version: 4.2.7
+INFO 2025-12-29 21:59:17,550 run_daily_check 3997 8507403328 [library:nextjs] Serper found version candidate: 26.0
+INFO 2025-12-29 21:59:18,000 run_daily_check 3997 8507403328 [library:nextjs] Groq detected version: 26.0
+INFO 2025-12-29 21:59:27,999 run_daily_check 3997 8507403328 [library:Pydantic] Serper found version candidate: 27.0
+INFO 2025-12-29 21:59:28,607 run_daily_check 3997 8507403328 [library:Pydantic] Groq detected version: 2.12.5
+INFO 2025-12-29 21:59:38,238 run_daily_check 3997 8507403328 [language:python] Serper found version candidate: 47.0.0
+INFO 2025-12-29 21:59:38,745 run_daily_check 3997 8507403328 [language:python] Groq detected version: 3.14.2
+INFO 2025-12-29 21:59:48,887 run_daily_check 3997 8507403328 [library:react] Serper found version candidate: 19.2.7
+INFO 2025-12-29 21:59:59,737 run_daily_check 3997 8507403328 [library:react] Groq detected version: 19.2.3
