@@ -20,25 +20,25 @@ def test_tool_detection(tool_name, current_version):
     results = fetcher.search_library(tool_name, current_version, component_type="tool")
     
     print(f"\n2. Serper Results:")
-    print(f"   - Latest version candidate: {results.get('latest_version_candidate', 'NOT FOUND')}")
-    print(f"   - Number of results: {len(results.get('results', []))}")
+    print(f"- Latest version candidate: {results.get('latest_version_candidate', 'NOT FOUND')}")
+    print(f"- Number of results: {len(results.get('results', []))}")
     
     # Show first result
     if results.get('results'):
         first = results['results'][0]
         print(f"\n3. Top Result:")
-        print(f"   - Title: {first.get('title', 'N/A')}")
-        print(f"   - Link: {first.get('link', 'N/A')}")
-        print(f"   - Versions found: {first.get('versions_found', [])}")
-        print(f"   - Score: {first.get('relevance_score', 0)}")
+        print(f"- Title: {first.get('title', 'N/A')}")
+        print(f"- Link: {first.get('link', 'N/A')}")
+        print(f"- Versions found: {first.get('versions_found', [])}")
+        print(f"- Score: {first.get('relevance_score', 0)}")
     
     print(f"\n4. Running Groq analysis...")
     analysis = groq.analyze(tool_name, results)
     
     print(f"\n5. Groq Analysis:")
-    print(f"   - Detected version: {analysis.get('version', 'NOT FOUND')}")
-    print(f"   - Category: {analysis.get('category', 'N/A')}")
-    print(f"   - Source: {analysis.get('source', 'N/A')}")
+    print(f"- Detected version: {analysis.get('version', 'NOT FOUND')}")
+    print(f"- Category: {analysis.get('category', 'N/A')}")
+    print(f"- Source: {analysis.get('source', 'N/A')}")
     print("\n")
 
 # Test multiple tools

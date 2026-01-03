@@ -91,7 +91,7 @@ def send_update_email(
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('library', 'Unknown')}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('component_type', 'library').title()}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('version', 'n/a')}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a')}</td>
+                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a').title()}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('release_date', 'Unknown')}</td>
                     {f'<td style="padding:8px;border:1px solid #dfe3e7;"><strong>{entry.get("confidence", "N/A")}%</strong></td>' if has_confidence else ''}
                 </tr>
