@@ -3,229 +3,172 @@
 {% block title %}LibTrack AI – Projects{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 1100px;">
+<style>
+  .section-title {
+    font-weight: 700;
+    color: #4e5e7a;
+    letter-spacing: -0.5px;
+  }
+</style>
+
+<div class="projects-container py-4">
 
   <!-- 🔹 Header Section -->
-  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2">
     <div>
-      <h1 class="fw-semibold mb-1">Projects</h1>
-      <p class="text-muted mb-0">
-        View all project registrations stored in LibTrack AI.
-      </p>
+      <h1 class="section-title mb-1">Projects</h1>
+      <p class="text-muted small mb-0">View all project registrations stored in LibTrack AI.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addProjectModal">
-        Add Project
+      <button class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal"
+        data-bs-target="#addProjectModal">
+        <i class="bi bi-plus-circle me-1"></i>Add Project
       </button>
     </div>
   </div>
 
-  <!-- 🔹 Google Sheets Registrations -->
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Registrations</h5>
-      <span class="badge bg-light text-dark">
-        {{ registrations_total }} Project{{ registrations_total|pluralize }}
-      </span>
-    </div>
+  <div class="container py-4" style="max-width: 1100px;">
+    <!-- 🔹 Project Registrations -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Registrations</h5>
+        <span class="badge bg-light text-dark">
+          {{ registrations_total }} Project{{ registrations_total|pluralize }}
+        </span>
+      </div>
 
-    <div class="card-body p-0">
-      {% if registrations_total %}
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead class="table-light text-center">
-            <tr>
-              <th width="1%">#</th>
-              <th width="15%">Project</th>
-              <th width="15%">Team & Emails</th>
-              <th width="30%">Stack</th>
-              <th width="5%">Notifications</th>
-              <th width="5%" class="text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in registrations_page %}
-            <tr>
-              <td class="text-center fw-medium">{{ registrations_page.start_index|add:forloop.counter0 }}</td>
-              <td class="text-start">
-                <div class="fw-semibold text-break">{{ r.project_name }}</div>
-                <div class="text-muted small">
-                  {{ r.language_used }} <span>({{ r.language_version }})</span>
-                </div>
-              </td>
-              <td>
-                <div class="fw-semibold text-break">{{ r.developer_names }}</div>
-                <div class="text-muted small text-break">{{ r.developer_emails }}</div>
-              </td>
-              <td>
-                {% if r.stack_components %}
-                <div class="d-flex flex-wrap gap-2">
-                  {% for comp in r.stack_components %}
-                  <div class="border rounded-3 px-3 py-2 bg-primary-subtle shadow-sm" style="min-width: 150px;">
-                    <div class="small text-uppercase text-muted">{{ comp.category|capfirst }}</div>
-                    <div class="fw-semibold text-break">{{ comp.name }}</div>
-                    <div class="text-muted small">
-                      {{ comp.version|default:"—" }}
-                      {% if comp.scope %}
-                      <span class="ms-1">• {{ comp.scope }}</span>
-                      {% endif %}
+      <div class="card-body p-0">
+        {% if registrations_total %}
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light text-center">
+              <tr>
+                <th width="1%">#</th>
+                <th width="15%">Project</th>
+                <th width="15%">Team & Emails</th>
+                <th width="30%">Stack</th>
+                <th width="5%">Notifications</th>
+                <th width="5%" class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in registrations_page %}
+              <tr>
+                <td class="text-center fw-medium">{{ registrations_page.start_index|add:forloop.counter0 }}</td>
+                <td class="text-start">
+                  <div class="fw-semibold text-break">{{ r.project_name }}</div>
+                  <div class="text-muted small">
+                    {{ r.language_used }} <span>({{ r.language_version }})</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="fw-semibold text-break">{{ r.developer_names }}</div>
+                  <div class="text-muted small text-break">{{ r.developer_emails }}</div>
+                </td>
+                <td>
+                  {% if r.stack_components %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for comp in r.stack_components %}
+                    <div class="border rounded-3 px-3 py-2 bg-primary-subtle shadow-sm" style="min-width: 150px;">
+                      <div class="small text-uppercase text-muted">{{ comp.category|capfirst }}</div>
+                      <div class="fw-semibold text-break">{{ comp.name }}</div>
+                      <div class="text-muted small">
+                        {{ comp.version|default:"—" }}
+                        {% if comp.scope %}
+                        <span class="ms-1">• {{ comp.scope }}</span>
+                        {% endif %}
+                      </div>
                     </div>
+                    {% endfor %}
                   </div>
-                  {% endfor %}
-                </div>
-                {% else %}
-                <span class="text-muted small">No stack defined</span>
-                {% endif %}
-              </td>
-              <td class="text-center">
-                {% if r.notification_list %}
-                <div class="d-flex flex-wrap gap-2 justify-content-center">
-                  {% for notify in r.notification_list %}
-                  <span class="badge bg-secondary-subtle text-secondary text-uppercase small px-3">
-                    {{ notify }}
-                  </span>
-                  {% endfor %}
-                </div>
-                {% else %}
-                <span class="text-muted small">Default (major & minor)</span>
-                {% endif %}
-              </td>
-              <td class="text-end">
-                <div class="btn-group btn-group-sm" role="group">
-                  <button type="button" class="btn btn-outline-primary edit-project-btn" data-bs-toggle="modal"
-                    data-bs-target="#editProjectModal" data-project-id="{{ r.project_id }}"
-                    data-project="{{ r.project_name|default:''|escape }}"
-                    data-developers="{{ r.developer_names|default:''|escape }}"
-                    data-emails="{{ r.developer_emails|default:''|escape }}"
-                    data-notify="{{ r.notification_type|default:''|escape }}"
-                    data-stack="{{ r.stack_json|default:'[]'|escape }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                      class="bi bi-pen-fill" viewBox="0 0 16 16">
-                      <path
-                        d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001" />
-                    </svg>
-                  </button>
-                  <button type="button" class="btn btn-outline-danger delete-project-btn" data-bs-toggle="modal"
-                    data-bs-target="#deleteProjectModal" data-project-id="{{ r.project_id }}"
-                    data-project="{{ r.project_name|default:''|escape }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                      class="bi bi-trash-fill" viewBox="0 0 16 16">
-                      <path
-                        d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="p-4 text-center text-muted">No registrations yet.</div>
-      {% endif %}
-    </div>
-    {% if registrations_total and registrations_page.paginator.num_pages > 1 %}
-    <div class="card-footer border-0 bg-light">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-        <small class="text-muted mb-0">
-          Showing {{ registrations_page.start_index }}-{{ registrations_page.end_index }} of {{ registrations_total }}
-          project{{ registrations_total|pluralize }}
-        </small>
-        <nav aria-label="Dashboard pagination">
-          <ul class="pagination pagination-sm mb-0">
-            <li class="page-item {% if not registrations_page.has_previous %}disabled{% endif %}">
-              {% if registrations_page.has_previous %}
-              <a class="page-link" href="?page={{ registrations_page.previous_page_number }}"
-                aria-label="Previous">Previous</a>
-              {% else %}
-              <span class="page-link">Previous</span>
-              {% endif %}
-            </li>
-            {% for num in registrations_page.paginator.page_range %}
-            <li class="page-item {% if registrations_page.number == num %}active{% endif %}">
-              {% if registrations_page.number == num %}
-              <span class="page-link">{{ num }}</span>
-              {% else %}
-              <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-              {% endif %}
-            </li>
-            {% endfor %}
-            <li class="page-item {% if not registrations_page.has_next %}disabled{% endif %}">
-              {% if registrations_page.has_next %}
-              <a class="page-link" href="?page={{ registrations_page.next_page_number }}" aria-label="Next">Next</a>
-              {% else %}
-              <span class="page-link">Next</span>
-              {% endif %}
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Future Updates Summary Section -->
-  <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-      <div>
-        <h5 class="mb-0">Upcoming Future Updates</h5>
-        <small class="text-muted">Top planned releases detected with high confidence</small>
-      </div>
-      <span class="badge bg-dark">{{ future_updates|length }} Total</span>
-    </div>
-    <div class="card-body p-0">
-      {% if future_updates %}
-      <div class="list-group list-group-flush">
-        {% for future in future_updates|slice:":5" %}
-        <div class="list-group-item">
-          <div class="row align-items-center">
-            <div class="col-md-3">
-              <div class="fw-semibold">{{ future.library }}</div>
-              <span class="badge bg-warning-subtle text-warning-emphasis">v{{ future.version }}</span>
-            </div>
-            <div class="col-md-3">
-              {% if future.expected_date %}
-              <small class="text-muted">Expected: {{ future.expected_date|date:"Y-m-d" }}</small>
-              {% else %}
-              <small class="text-muted">Expected: TBD</small>
-              {% endif %}
-            </div>
-            <div class="col-md-4">
-              <div class="d-flex align-items-center gap-2">
-                <div class="progress flex-grow-1" style="height: 18px;">
-                  <div
-                    class="progress-bar {% if future.confidence >= 90 %}bg-success{% elif future.confidence >= 75 %}bg-info{% elif future.confidence >= 70 %}bg-warning{% else %}bg-danger{% endif %}"
-                    role="progressbar" style="width: {{ future.confidence }}%" aria-valuenow="{{ future.confidence }}">
-                    <small>{{ future.confidence }}%</small>
+                  {% else %}
+                  <span class="text-muted small">No stack defined</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if r.notification_list %}
+                  <div class="d-flex flex-wrap gap-2 justify-content-center">
+                    {% for notify in r.notification_list %}
+                    <span class="badge bg-secondary-subtle text-secondary text-uppercase small px-3">
+                      {{ notify }}
+                    </span>
+                    {% endfor %}
                   </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-2 text-end">
-              <span
-                class="badge {% if future.status == 'confirmed' %}bg-success{% elif future.status == 'detected' %}bg-warning{% else %}bg-secondary{% endif %}">
-                {{ future.status|title }}
-              </span>
-            </div>
-          </div>
+                  {% else %}
+                  <span class="text-muted small">Default (major & minor)</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-primary edit-project-btn" data-bs-toggle="modal"
+                      data-bs-target="#editProjectModal" data-project-id="{{ r.project_id }}"
+                      data-project="{{ r.project_name|default:''|escape }}"
+                      data-developers="{{ r.developer_names|default:''|escape }}"
+                      data-emails="{{ r.developer_emails|default:''|escape }}"
+                      data-notify="{{ r.notification_type|default:''|escape }}"
+                      data-stack="{{ r.stack_json|default:'[]'|escape }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-pen-fill" viewBox="0 0 16 16">
+                        <path
+                          d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001" />
+                      </svg>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger delete-project-btn" data-bs-toggle="modal"
+                      data-bs-target="#deleteProjectModal" data-project-id="{{ r.project_id }}"
+                      data-project="{{ r.project_name|default:''|escape }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-trash-fill" viewBox="0 0 16 16">
+                        <path
+                          d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-        {% endfor %}
+        {% else %}
+        <div class="p-4 text-center text-muted">No registrations yet.</div>
+        {% endif %}
       </div>
-      <div class="card-footer bg-light border-0 text-center">
-        <a href="{% url 'future_updates' %}" class="btn btn-warning btn-sm">
-          View All →
-        </a>
-      </div>
-      {% else %}
-      <div class="p-4 text-center text-muted">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor"
-          class="bi bi-search mb-2 opacity-25" viewBox="0 0 16 16">
-          <path
-            d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
-        </svg>
-        <p class="mb-0">No future updates detected yet.</p>
-        <small>Future updates will appear here when detected with ≥70% confidence.</small>
+      {% if registrations_total and registrations_page.paginator.num_pages > 1 %}
+      <div class="card-footer border-0 bg-light">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+          <small class="text-muted mb-0">
+            Showing {{ registrations_page.start_index }}-{{ registrations_page.end_index }} of {{ registrations_total }}
+            project{{ registrations_total|pluralize }}
+          </small>
+          <nav aria-label="Dashboard pagination">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item {% if not registrations_page.has_previous %}disabled{% endif %}">
+                {% if registrations_page.has_previous %}
+                <a class="page-link" href="?page={{ registrations_page.previous_page_number }}"
+                  aria-label="Previous">Previous</a>
+                {% else %}
+                <span class="page-link">Previous</span>
+                {% endif %}
+              </li>
+              {% for num in registrations_page.paginator.page_range %}
+              <li class="page-item {% if registrations_page.number == num %}active{% endif %}">
+                {% if registrations_page.number == num %}
+                <span class="page-link">{{ num }}</span>
+                {% else %}
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                {% endif %}
+              </li>
+              {% endfor %}
+              <li class="page-item {% if not registrations_page.has_next %}disabled{% endif %}">
+                {% if registrations_page.has_next %}
+                <a class="page-link" href="?page={{ registrations_page.next_page_number }}" aria-label="Next">Next</a>
+                {% else %}
+                <span class="page-link">Next</span>
+                {% endif %}
+              </li>
+            </ul>
+          </nav>
+        </div>
       </div>
       {% endif %}
     </div>

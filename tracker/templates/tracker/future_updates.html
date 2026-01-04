@@ -3,7 +3,16 @@
 {% block title %}LibTrack AI – Future Updates{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 1100px;">
+<style>
+  .section-title {
+    font-weight: 700;
+    color: #4e5e7a;
+    letter-spacing: -0.5px;
+  }
+</style>
+
+
+<div class="projects-container py-4">
 
     <!-- Toast Container -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
@@ -24,14 +33,14 @@
     </div>
 
     <!-- Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2">
         <div>
-            <h1 class="fw-semibold mb-1">Future Updates</h1>
-            <p class="text-muted mb-0">
-                View planned and upcoming releases detected for your projects.
-            </p>
+            <h1 class="section-title mb-1">Future Updates</h1>
+            <p class="text-muted small mb-0">View planned and upcoming releases detected for your projects.</p>
         </div>
     </div>
+
+    <div class="container py-4" style="max-width: 1100px;">
 
     <!-- Future Updates Table -->
     <div class="card border-0 shadow-sm">
@@ -101,12 +110,6 @@
                             </select>
                         </div>
                     </form>
-                </div>
-                <div class="col-md-2 text-md-end">
-                    <p class="mb-0 text-muted small">
-                        <i class="bi bi-info-circle me-1 text-warning"></i>
-                        {{ future_total|default:0 }} total
-                    </p>
                 </div>
             </div>
         </div>
@@ -249,6 +252,7 @@
             </div>
         </div>
         {% endif %}
+    </div>
     </div>
 </div>
 

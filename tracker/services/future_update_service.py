@@ -14,7 +14,11 @@ Workflow:
 
 import logging
 from datetime import datetime
-from tracker.models import FutureUpdateCache
+from django.conf import settings
+from django.utils import timezone
+from django.db import models
+
+from tracker.models import FutureUpdateCache, FutureUpdateHistory
 from tracker.utils.future_version_detector import FutureVersionDetector
 
 logger = logging.getLogger(__name__)
@@ -40,6 +44,72 @@ class FutureUpdateService:
         self.error_count = 0
         # Buffer for future updates to be sent as notifications
         self.fresh_future_updates = {}
+
+    def deduplicate_future_updates(self, library_name: str, stdout_writer=None):
+        """
+        Deduplicate future updates for a library by merging similar versions.
+        Collapses duplicate (library, version) pairs and merges confidence.
+
+        Args:
+            library_name: Library to deduplicate
+            stdout_writer: Optional callable for logging
+        """
+        try:
+            # Get all future updates for this library
+            duplicates = FutureUpdateCache.objects.filter(
+                library=library_name
+            ).values("version").annotate(count=models.Count("id")).filter(count__gt=1)
+            
+            if not duplicates:
+                return  # No duplicates
+            
+            for dup in duplicates:
+                version = dup["version"]
+                # Get all copies of this version
+                copies = FutureUpdateCache.objects.filter(
+                    library=library_name, version=version
+                ).order_by("created_at")
+                
+                if copies.count() <= 1:
+                    continue
+                
+                # Keep the oldest (first detected), merge into it
+                primary = copies.first()
+                secondary_copies = list(copies[1:])
+                
+                # Merge confidence: take the max
+                merged_confidence = max([c.confidence for c in copies])
+                
+                if merged_confidence > primary.confidence:
+                    # Record the change
+                    try:
+                        FutureUpdateHistory.objects.create(
+                            future_update=primary,
+                            library=library_name,
+                            version=version,
+                            old_confidence=primary.confidence,
+                            new_confidence=merged_confidence,
+                            change_reason="source_confirmed",
+                            change_notes="Merged duplicate detections and increased confidence",
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record merge history: {e}")
+                    
+                    primary.confidence = merged_confidence
+                    primary.confirmation_count += len(secondary_copies)
+                    primary.save()
+                
+                # Delete secondary copies
+                for copy in secondary_copies:
+                    copy.delete()
+                
+                self._log(
+                    stdout_writer,
+                    f"   🔀 Deduplicated {library_name} {version}: "
+                    f"merged {len(secondary_copies)} copies, confidence now {merged_confidence}%"
+                )
+        except Exception as e:
+            logger.warning(f"Deduplication error for {library_name}: {e}")
 
     def check_future_versions(self, library, stdout_writer=None):
         """
@@ -260,6 +330,21 @@ class FutureUpdateService:
             f"Confidence increased from {old_confidence}% to {new_confidence}%"
         )
         future_cache.save()
+        
+        # Record history of confidence change
+        try:
+            FutureUpdateHistory.objects.create(
+                future_update=future_cache,
+                library=future_cache.library,
+                version=future_cache.version,
+                old_confidence=old_confidence,
+                new_confidence=new_confidence,
+                change_reason="source_confirmed",
+                change_notes=f"Confidence surge detected (+{confidence_increase}%)",
+                detection_method=future_cache.detection_method,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to record confidence history: {e}")
 
         self.updated_count += 1
 
@@ -272,6 +357,7 @@ class FutureUpdateService:
             "expected_date": str(future_cache.expected_date) or "TBD",
             "summary": future_cache.features,
             "source": future_cache.source,
+            "detection_method": future_cache.detection_method,
         }
 
     def _update_future_cache(

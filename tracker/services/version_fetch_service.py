@@ -15,6 +15,7 @@ Workflow:
 import logging
 import time
 from datetime import datetime
+from django.conf import settings
 from packaging import version as pkg_version
 from packaging.version import InvalidVersion
 
@@ -75,8 +76,9 @@ class VersionFetchService:
 
         for library in libraries:
             self._fetch_library(library, stdout_writer)
-            # Rate limiting between requests
-            time.sleep(0.5)
+            # Rate limiting between requests (configurable)
+            rate_limit = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
+            time.sleep(rate_limit)
 
         summary = {
             "updated_count": self.updated_count,
@@ -115,11 +117,18 @@ class VersionFetchService:
                     library, stdout_writer=stdout_writer
                 )
                 if result:
+                    log_detection = getattr(settings, "LIBTRACK_LOG_DETECTION_METHOD", True)
+                    if log_detection:
+                        logger.info(
+                            f"Version detected for {library.name}: v{library.latest_version}, "
+                            f"detection_method=registry_api, registry_type={library.registry_type}"
+                        )
                     self.updated_count += 1
                 else:
                     self._log(stdout_writer, "ℹ️  No updates found")
                     self.skipped_count += 1
-                time.sleep(1.5)
+                fallback_rate = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
+                time.sleep(fallback_rate)
                 return
 
         except Exception as e:
@@ -127,12 +136,13 @@ class VersionFetchService:
                 stdout_writer,
                 f"❌ Official API error: {e}. Falling back to Serper+Groq...",
             )
-            logger.error(f"Official API error for {library.name}: {e}")
+            logger.error(f"Official API error for {library.name}: {e}", exc_info=True)
             # Fall through to Serper+Groq fallback
 
         # Fallback: Serper + Groq
         self._fetch_with_serper_groq(library, stdout_writer)
-        time.sleep(1.5)
+        fallback_rate_limit = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
+        time.sleep(fallback_rate_limit)
 
     def _fetch_with_serper_groq(self, library: Library, stdout_writer=None):
         """
@@ -189,11 +199,17 @@ class VersionFetchService:
                 analysis,
                 stdout_writer,
             )
+            log_detection = getattr(settings, "LIBTRACK_LOG_DETECTION_METHOD", True)
+            if log_detection:
+                logger.info(
+                    f"Version detected for {library.name}: v{detected_version}, "
+                    f"detection_method=serper_groq, category={analysis.get('category')}"
+                )
             self.updated_count += 1
 
         except Exception as e:
             self._log(stdout_writer, f"❌ Serper+Groq error: {e}")
-            logger.error(f"Serper+Groq error for {library.name}: {e}")
+            logger.error(f"Serper+Groq error for {library.name}: {e}", exc_info=True)
             self.error_count += 1
 
     def _should_update_version(
@@ -268,7 +284,7 @@ class VersionFetchService:
         library.last_checked_at = datetime.now()
         library.save()
 
-        # Save to LibraryRelease history
+        # Save to LibraryRelease history with detection method
         release, created = LibraryRelease.objects.get_or_create(
             library=library,
             version=detected_version,
@@ -277,6 +293,7 @@ class VersionFetchService:
                 "summary": analysis.get("summary", ""),
                 "source_url": analysis.get("source", ""),
                 "is_security_release": False,
+                "detection_source": "serper_groq",  # Track that this was from Serper+Groq fallback
             },
         )
 

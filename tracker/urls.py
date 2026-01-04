@@ -11,4 +11,5 @@ urlpatterns = [
     path("update-history/", views.updateHistory, name="updateHistory"),
     path("future-updates/", views.future_updates, name="future_updates"),
     path("profile/", views.profile_view, name="profile"),
+    path("settings/", views.settings_view, name="settings"),
 ]

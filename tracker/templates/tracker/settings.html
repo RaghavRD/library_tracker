@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    :root {
+        --brand-primary: #4e73df;
+        --brand-success: #1cc88a;
+        --brand-info: #36b9cc;
+        --brand-warning: #f6c23e;
+        --brand-danger: #e74a3b;
+        --card-bg: #ffffff;
+        --glass-bg: rgba(255, 255, 255, 0.9);
+    }
+
+    .settings-container {
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
+        background-color: #f8f9fc;
+    }
+
+    body {
+        background-color: #f8f9fc;
+    }
+
+    .section-title {
+        font-weight: 700;
+        color: #4e5e7a;
+        letter-spacing: -0.5px;
+    }
+
+    .stat-card {
+        border-radius: 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: none;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .settings-card {
+        background: var(--card-bg);
+        color: #1f2428;
+        border: 1px solid #eef1f6;
+    }
+
+    .settings-card h5 {
+        font-weight: 700;
+        color: #1f2a33;
+    }
+
+    .settings-card .form-label {
+        font-weight: 600;
+        color: #4e5e7a;
+    }
+
+    .settings-range {
+        accent-color: var(--brand-primary);
+    }
+
+    .settings-card .form-check-input:checked {
+        background-color: var(--brand-primary);
+        border-color: var(--brand-primary);
+    }
+
+    .settings-card .form-check-input:focus {
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.2);
+    }
+
+    .badge-pill-custom {
+        border-radius: 50rem;
+        padding: 0.35em 0.8em;
+        font-weight: 600;
+    }
+
+    .settings-tip-card {
+        background: var(--card-bg);
+        color: #1f2428;
+    }
+</style>
+
+<div class="settings-container">
+    <div class="container" style="max-width: 1100px;">
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2">
+            <div>
+                <h1 class="section-title mb-1">Project Settings</h1>
+                <p class="text-muted small mb-0">Manage notification preferences for your tracked projects</p>
+            </div>
+        </div>
+
+        <div class="card bg-info-subtle rounded border-0 shadow-sm mt-4 mb-4 settings-tip-card">
+            <div class="card-body">
+                <h6 class="fw-bold text-dark mb-2">
+                    <i class="bi bi-lightbulb me-2"></i>Quick Tips
+                </h6>
+                <ul class="mb-0 small text-muted">
+                    <li><strong>Notifications Paused:</strong> When enabled, all notifications for this project will be
+                        held.</li>
+                    <li><strong>Confidence Threshold:</strong> Updates below this threshold will not trigger alerts (0 =
+                        all updates, 100 = highest confidence only).</li>
+                    <li>Changes are saved when you click "Save Settings".</li>
+                </ul>
+            </div>
+        </div>
+
+        {% if projects %}
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="row g-4">
+                {% for project in projects %}
+                <div class="col-md-6">
+                    <div class="card stat-card shadow-sm settings-card h-100">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-1">Project</h6>
+                                    <h5 class="mb-0">{{ project.project_name }}</h5>
+                                </div>
+                                {% if project.notify_paused %}
+                                <span class="badge badge-pill-custom bg-warning text-dark">Paused</span>
+                                {% else %}
+                                <span class="badge badge-pill-custom bg-success">Active</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Notifications</label>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input"
+                                        id="notify_paused_{{ project.id }}" name="notify_paused_{{ project.id }}" {% if project.notify_paused %}checked{% endif %} />
+                                    <label class="form-check-label" for="notify_paused_{{ project.id }}">
+                                        Pause notifications
+                                    </label>
+                                </div>
+                                <small class="text-muted">Toggle alerts for this project.</small>
+                            </div>
+
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label for="min_confidence_threshold_{{ project.id }}" class="form-label mb-0">
+                                        Confidence Threshold
+                                    </label>
+                                    <span class="fw-bold text-primary" id="threshold-value-{{ project.id }}">
+                                        {{ project.min_confidence_threshold }}%</span>
+                                </div>
+                                <input type="range" class="form-range settings-range" min="0" max="100" step="5"
+                                    id="min_confidence_threshold_{{ project.id }}"
+                                    name="min_confidence_threshold_{{ project.id }}"
+                                    value="{{ project.min_confidence_threshold }}"
+                                    onchange="document.getElementById('threshold-value-{{ project.id }}').textContent = this.value + '%'" />
+                                <small class="text-muted">Only notify updates at or above this confidence.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                    <i class="bi bi-check-circle me-2"></i>Save Settings
+                </button>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </a>
+            </div>
+        </form>
+        {% else %}
+        <div class="alert alert-info shadow-sm">
+            <i class="bi bi-info-circle me-2"></i>
+            No projects registered yet.
+            <a href="{% url 'projects' %}">Create a project</a> to manage notification settings.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

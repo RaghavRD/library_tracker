@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UpdateCache, Project, StackComponent, FutureUpdateCache
+from .models import UpdateCache, Project, StackComponent, FutureUpdateCache, NotificationRecord, FutureUpdateHistory
 
 class StackComponentInline(admin.TabularInline):
     model = StackComponent
@@ -9,33 +9,94 @@ class StackComponentInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("project_name", "developer_names", "notification_type", "updated_at")
+    list_display = ("project_name", "developer_names", "notification_type", "notify_paused", "min_confidence_threshold", "updated_at")
     search_fields = ("project_name", "developer_names", "developer_emails")
+    list_filter = ("notify_paused", "notification_type")
+    fieldsets = (
+        ("Project Information", {
+            "fields": ("project_name", "developer_names", "developer_emails", "notification_type")
+        }),
+        ("Notification Preferences", {
+            "fields": ("notify_paused", "min_confidence_threshold"),
+            "description": "Control notifications for this project"
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+    readonly_fields = ("created_at", "updated_at")
     inlines = [StackComponentInline]
 
 
 @admin.register(UpdateCache)
 class UpdateCacheAdmin(admin.ModelAdmin):
-    list_display = ("library","version","category","release_date","updated_at")
+    list_display = ("library","version","category","detection_method","release_date","updated_at")
     search_fields = ("library","version")
-    list_filter = ("category",)
-    # readonly_fields = ("updated_at",)
+    list_filter = ("category", "detection_method")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Core Information", {
+            "fields": ("library", "version", "category", "detection_method")
+        }),
+        ("Release Details", {
+            "fields": ("release_date", "summary", "source")
+        }),
+        ("Project Link", {
+            "fields": ("project",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
 
-    # def save_model(self, request, obj, form, change):
-    #     obj.updated_at = None
-    #     super().save_model(request, obj, form, change)
 
-    # def save_related(self, request, form, formsets, change):
-    #     super().save_related(request, form, formsets, change)
-    #     UpdateCache.objects.all().update(updated_at=None)
+@admin.register(NotificationRecord)
+class NotificationRecordAdmin(admin.ModelAdmin):
+    list_display = ("library", "version", "success", "attempts", "http_status", "sent_at", "created_at")
+    search_fields = ("library", "version", "project__project_name")
+    list_filter = ("success", "http_status")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Notification", {
+            "fields": ("project", "library", "version")
+        }),
+        ("Result", {
+            "fields": ("success", "attempts", "sent_at")
+        }),
+        ("Details", {
+            "fields": ("status_text", "http_status", "error_text", "response_text"),
+            "classes": ("collapse",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
 
-    # def save_formset(self, request, form, formsets, change):
-    #     super().save_formset(request, form, formsets, change)
-    #     UpdateCache.objects.all().update(updated_at=None)
 
-    # def save_model(self, request, obj, form, change):
-    #     super().save_model(request, obj, form, change)
-    #     UpdateCache.objects.all().update(updated_at=None)
+@admin.register(FutureUpdateHistory)
+class FutureUpdateHistoryAdmin(admin.ModelAdmin):
+    list_display = ("library", "version", "old_confidence", "new_confidence", "change_reason", "created_at")
+    search_fields = ("library", "version")
+    list_filter = ("change_reason", "created_at")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Update", {
+            "fields": ("future_update", "library", "version")
+        }),
+        ("Confidence Change", {
+            "fields": ("old_confidence", "new_confidence", "change_reason", "detection_method")
+        }),
+        ("Notes", {
+            "fields": ("change_notes",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
 
 
 @admin.register(FutureUpdateCache)

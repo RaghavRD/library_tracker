@@ -518,6 +518,14 @@ def updateHistory(request):
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
         entry.release_date_formatted = _format_release_date(entry.release_date)
+        
+        # Fetch latest notification record to show status
+        from tracker.models import NotificationRecord
+        latest_notification = NotificationRecord.objects.filter(
+            library=entry.library
+        ).order_by("-created_at").first()
+        entry.last_notification_success = latest_notification.success if latest_notification else None
+        entry.last_notification_sent_at = latest_notification.sent_at if latest_notification else None
 
     selected_project = (request.GET.get("project") or "").strip()
     if selected_project:
@@ -637,4 +645,49 @@ def profile_view(request):
         form = PasswordChangeForm(request.user)
     return render(request, 'tracker/profile.html', {
         'form': form
+    })
+
+
+@login_required
+def settings_view(request):
+    """
+    User settings page for managing per-project notification preferences.
+    Allows users to toggle notify_paused and set min_confidence_threshold.
+    """
+    projects = Project.objects.all().order_by('project_name')
+    
+    if request.method == 'POST':
+        try:
+            for project in projects:
+                # Get form data for this project
+                notify_paused_key = f"notify_paused_{project.id}"
+                threshold_key = f"min_confidence_threshold_{project.id}"
+                
+                # Handle notify_paused toggle (checkbox)
+                notify_paused = request.POST.get(notify_paused_key) == 'on'
+                
+                # Handle threshold value
+                threshold_str = request.POST.get(threshold_key, "50").strip()
+                try:
+                    threshold = int(threshold_str)
+                    if threshold < 0:
+                        threshold = 0
+                    elif threshold > 100:
+                        threshold = 100
+                except (ValueError, TypeError):
+                    threshold = 50
+                
+                # Update project if changed
+                project.notify_paused = notify_paused
+                project.min_confidence_threshold = threshold
+                project.save()
+            
+            messages.success(request, 'Project settings updated successfully!')
+            return redirect('settings')
+        except Exception as exc:
+            messages.error(request, f'Error updating settings: {str(exc)}')
+            print(f"Error in settings_view POST: {traceback.format_exc()}")
+    
+    return render(request, 'tracker/settings.html', {
+        'projects': projects,
     })

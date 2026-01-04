@@ -21,6 +21,17 @@ class Project(TimeStampedModel):
     developer_names = models.CharField(max_length=255)
     developer_emails = models.TextField()
     notification_type = models.CharField(max_length=100, default="major, minor")
+    
+    # User preferences
+    notify_paused = models.BooleanField(
+        default=False,
+        help_text="Temporarily pause notifications for this project"
+    )
+    min_confidence_threshold = models.IntegerField(
+        default=50,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Only notify about future updates with confidence >= this threshold (0-100)"
+    )
 
     class Meta:
         ordering = ["project_name"]
@@ -115,6 +126,19 @@ class UpdateCache(TimeStampedModel):
     category = models.CharField(max_length=10, choices=UPDATE_CATEGORY_CHOICES)
     summary = models.TextField(blank=True)
     source = models.URLField(blank=True)
+    detection_method = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=[
+            ('registry_api', 'Registry API'),
+            ('serper_groq', 'Web Search (Serper+Groq)'),
+            ('github_release', 'GitHub Release'),
+            ('official_website', 'Official Website'),
+            ('unknown', 'Unknown'),
+        ],
+        default='unknown',
+        help_text="Method used to detect this version"
+    )
     
     class Meta:
         unique_together = [['project', 'library']]
@@ -229,3 +253,92 @@ class FutureUpdateCache(TimeStampedModel):
     
     def __str__(self):
         return f"{self.library} {self.version} (future, {self.confidence}% confidence)"
+
+
+class NotificationRecord(TimeStampedModel):
+    """Records notification delivery attempts and results."""
+
+    project = models.ForeignKey(
+        Project,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="notification_records",
+        help_text="Project targeted by this notification",
+    )
+    update_cache = models.ForeignKey(
+        UpdateCache,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="notification_records",
+        help_text="Associated UpdateCache entry when applicable",
+    )
+    library = models.CharField(max_length=200, db_index=True, blank=True)
+    version = models.CharField(max_length=100, blank=True)
+
+    success = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+    status_text = models.TextField(blank=True)
+    http_status = models.IntegerField(null=True, blank=True)
+    response_text = models.TextField(blank=True)
+    error_text = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Notification Record"
+        verbose_name_plural = "Notification Records"
+
+    def __str__(self):
+        proj = self.project.project_name if self.project else "<no project>"
+        return f"{proj} :: {self.library} {self.version} -> {'OK' if self.success else 'FAIL'}"
+
+
+class FutureUpdateHistory(TimeStampedModel):
+    """Records confidence changes and detection updates for FutureUpdateCache."""
+
+    future_update = models.ForeignKey(
+        FutureUpdateCache,
+        on_delete=models.CASCADE,
+        related_name="history_records",
+        help_text="Associated FutureUpdateCache entry"
+    )
+    library = models.CharField(max_length=200, db_index=True)
+    version = models.CharField(max_length=100)
+
+    # Confidence tracking
+    old_confidence = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    new_confidence = models.IntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+
+    # Metadata about the change
+    change_reason = models.CharField(
+        max_length=100,
+        blank=True,
+        choices=[
+            ('initial_detection', 'Initial Detection'),
+            ('source_confirmed', 'Source Confirmed'),
+            ('milestone_updated', 'Milestone Updated'),
+            ('manual_adjustment', 'Manual Adjustment'),
+            ('source_removed', 'Source Removed'),
+            ('other', 'Other'),
+        ],
+        default='other'
+    )
+    change_notes = models.TextField(blank=True, help_text="Additional context about this change")
+    detection_method = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Future Update History"
+        verbose_name_plural = "Future Update Histories"
+
+    def __str__(self):
+        return f"{self.library} {self.version} @ {self.created_at.strftime('%Y-%m-%d %H:%M')}: {self.old_confidence}% → {self.new_confidence}%"
+

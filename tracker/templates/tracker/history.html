@@ -3,7 +3,15 @@
 {% block title %}LibTrack AI – Last Updates{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 1100px;">
+<style>
+    .section-title {
+        font-weight: 700;
+        color: #4e5e7a;
+        letter-spacing: -0.5px;
+    }
+</style>
+
+<div class="projects-container py-4">
 
     <!-- 🔹 Toast Container (Top-right corner) -->
     <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
@@ -24,15 +32,14 @@
     </div>
 
     <!-- 🔹 Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2">
         <div>
-            <h1 class="fw-semibold mb-1">History Updates</h1>
-            <p class="text-muted mb-0">
-                View the cached release history for every registered project.
-            </p>
+            <h1 class="section-title mb-1">History Updates</h1>
+            <p class="text-muted small mb-0">View the cached release history for every registered project.</p>
         </div>
     </div>
 
+    <div class="container py-4" style="max-width: 1100px;">
     <!-- 🔹 Update Cache Table -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-primary text-white d-flex flex-column flex-md-row justify-content-between gap-2">
@@ -94,24 +101,26 @@
                     <thead class="table-light text-center">
                         <tr>
                             <th width="1%">#</th>
-                            <th width="15%">Library</th>
-                            <th width="25%">Projects</th>
+                            <th class="text-wrap" width="10%">Library</th>
+                            <th width="15%">Projects</th>
                             <th width="10%">Version</th>
                             <th width="10%">Category</th>
-                            <th width="15%">Release Date</th>
+                            <th width="12%">Detection Method</th>
+                            <th width="12%">Release Date</th>
                             <th width="10%">Source</th>
-                            <th width="15%">Updated At</th>
+                            <th width="10%">Notification Status</th>
+                            <th width="10%">Updated At</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for c in history_page %}
+                        {% for record in history_page %}
                         <tr class="text-center">
                             <td class="text-center fw-medium">{{ history_page.start_index|add:forloop.counter0 }}</td>
-                            <td>{{ c.library }}</td>
+                            <td>{{ record.library }}</td>
                             <td>
-                                {% if c.project_names %}
+                                {% if record.project_names %}
                                 <div class="d-flex flex-wrap gap-1 justify-content-center">
-                                    {% for project in c.project_names %}
+                                    {% for project in record.project_names %}
                                     <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-normal px-3">{{ project }}</span>
                                     {% endfor %}
                                 </div>
@@ -120,15 +129,31 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-info text-dark">{{ c.version }}</span>
+                                <span class="badge bg-info text-dark">{{ record.version }}</span>
                             </td>
-                            <td>{{ c.category|capfirst }}</td>
-                            <td>{{ c.release_date_formatted|default:"—" }}</td>
+                            <td>{{ record.category|capfirst }}</td>
                             <td>
-                                <a href="{{ c.source }}" class="link-primary text-decoration-none" target="_blank"
+                                {% if record.detection_method %}
+                                <span class="badge bg-secondary text-white small">{{ record.detection_method|upper }}</span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.release_date_formatted|default:"—" }}</td>
+                            <td>
+                                <a href="{{ record.source }}" class="link-primary text-decoration-none" target="_blank"
                                     rel="noopener">View</a>
                             </td>
-                            <td>{{ c.updated_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if record.last_notification_success %}
+                                    <span class="badge bg-success" title="Notification sent successfully">✓</span>
+                                {% elif record.last_notification_success is False %}
+                                    <span class="badge bg-danger" title="Notification failed">✗</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.updated_at|date:"Y-m-d" }}, <small class="text-muted">{{ record.updated_at|date:"H:i" }}</small></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -185,6 +210,7 @@
             </div>
         </div>
         {% endif %}
+    </div>
     </div>
 </div>
 
