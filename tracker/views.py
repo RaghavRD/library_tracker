@@ -361,6 +361,51 @@ def dashboard(request):
     # Using StackComponent gives us the libraries actually tracked in projects
     total_components = StackComponent.objects.exclude(key='language').count()
     
+    # Calculate unique category breakdown
+    from django.db.models import Count
+    from django.db.models.functions import Lower
+    
+    # Get unique items per category (case-insensitive grouping by name)
+    all_components = StackComponent.objects.all()
+    
+    # Count unique items by category
+    category_counts = {
+        "languages": 0,
+        "libraries": 0,
+        "tools": 0,
+        "modules": 0,
+    }
+    
+    # Group by normalized category and count unique names
+    category_mapping = {
+        "language": "languages",
+        "languages": "languages",
+        "library": "libraries",
+        "libraries": "libraries",
+        "dependency": "libraries",
+        "dependencies": "libraries",
+        "tool": "tools",
+        "tools": "tools",
+        "module": "modules",
+        "modules": "modules",
+    }
+    
+    # Get unique (category, name) combinations
+    seen_items = set()
+    for comp in all_components:
+        category_key = (comp.category or "").strip().lower()
+        key_field = (comp.key or "").strip().lower()
+        name = (comp.name or "").strip().lower()
+        
+        # Use key field if available, otherwise map from category
+        mapped_category = category_mapping.get(key_field) or category_mapping.get(category_key, "libraries")
+        
+        # Create unique identifier (category + name)
+        item_id = (mapped_category, name)
+        if item_id not in seen_items and name:
+            seen_items.add(item_id)
+            category_counts[mapped_category] = category_counts.get(mapped_category, 0) + 1
+    
     # Calculate updates available
     updates_qs = UpdateCache.objects.all()
     total_updates = updates_qs.count()
@@ -390,6 +435,11 @@ def dashboard(request):
         "minor_updates": minor_updates,
         "future_updates_count": future_updates_count,
         "health_score": health_score,
+        # Category breakdown
+        "languages_count": category_counts["languages"],
+        "libraries_count": category_counts["libraries"],
+        "tools_count": category_counts["tools"],
+        "modules_count": category_counts["modules"],
     }
     return render(request, "tracker/dashboard.html", context)
 

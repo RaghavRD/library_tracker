@@ -89,7 +89,8 @@ class PyPIRegistry(PackageRegistry):
                 version=version,
                 release_date=release_date,
                 homepage_url=info.get("home_page") or info.get("project_url", ""),
-                summary=info.get("summary", ""),
+                # summary=info.get("summary", ""),
+                summary=info.get("description", ""),
                 source_url=f"https://pypi.org/project/{package_name}/{version}/",
                 trust_level=100,  # Official PyPI API
                 is_prerelease=is_prerelease,
