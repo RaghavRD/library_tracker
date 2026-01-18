@@ -43,7 +43,7 @@ class TestDashboardAnalytics:
         
         # Check for Chart.js canvas
         assert 'id="updatesChart"' in content
-        assert 'id="typesChart"' in content
+        assert 'id="stackChart"' in content
 
     def test_navigation_links(self):
         """Test validation of navbar links existence"""

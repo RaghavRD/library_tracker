@@ -63,6 +63,12 @@ class DummyRegistry(PackageRegistry):
     def supports_package(self, package_name):
         return True
 
+    def get_prereleases(self, package_name):
+        return []
+
+    def get_repository_url(self, package_name):
+        return "https://github.com/example/repo"
+
 
 class TestPackageRegistry:
     """Test PackageRegistry base class."""

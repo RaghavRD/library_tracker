@@ -35,7 +35,11 @@ class VersionInfo:
     is_prerelease: bool = False # Added default
     changelog_url: Optional[str] = None
     
-    # Removed __post_init__ from VersionInfo as per the instruction's implied change
+    
+    def __post_init__(self):
+        """Validate trust level range."""
+        if not 0 <= self.trust_level <= 100:
+            raise ValueError(f"trust_level must be 0-100, got {self.trust_level}")
 
 
 @dataclass

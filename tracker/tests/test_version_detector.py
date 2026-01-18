@@ -39,7 +39,7 @@ class TestVersionDetector:
     def test_detect_npm_package(self, detector):
         """Test detection of npm package."""
         # Use lodash instead of axios (axios exists on PyPI too)
-        result = detector.detect_version("lodash")
+        result = detector.detect_version("lodash", registry_hint="npm")
         
         assert result is not None
         assert result.version
