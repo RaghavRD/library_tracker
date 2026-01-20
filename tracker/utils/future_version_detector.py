@@ -133,7 +133,7 @@ class FutureVersionDetector:
         return "pypi" 
 
     def _deduplicate(self, candidates: List[PreReleaseInfo]) -> List[PreReleaseInfo]:
-        """Merge duplicates, keeping the most detailed info."""
+        """Merge duplicates, keeping the most detailed info and boosting trust."""
         version_map: Dict[str, PreReleaseInfo] = {}
         
         for cand in candidates:
@@ -142,13 +142,31 @@ class FutureVersionDetector:
                 version_map[v_str] = cand
             else:
                 existing = version_map[v_str]
-                # Merge logic: favor published over unchecked, closer date, etc.
+                
+                # Boost trust because we found it from another source
+                # e.g. If found in Registry (95) and GitHub (95), boost to 99
+                # If found in Milestone (85) and GitHub Release (95), take 95 and boost slightly
+                
+                base_trust = max(existing.trust_level, cand.trust_level)
+                boosted_trust = min(100, base_trust + 5)
+                
+                # Determine which object to keep (the one with higher base trust or published status)
+                keep_cand = False
                 if cand.is_published and not existing.is_published:
-                    version_map[v_str] = cand
-                # If existing is milestone but new is rc, rc wins
-                # (Simple rule: keep whichever has higher trust for now)
+                    keep_cand = True
                 elif cand.trust_level > existing.trust_level:
-                     version_map[v_str] = cand
+                    keep_cand = True
+                elif cand.release_date and not existing.release_date:
+                    keep_cand = True
+                    
+                target = cand if keep_cand else existing
+                target.trust_level = boosted_trust
+                
+                # Merge logic: Ensure we have the best metadata
+                if not target.release_date:
+                    target.release_date = cand.release_date if keep_cand else existing.release_date
+                    
+                version_map[v_str] = target
                      
         return list(version_map.values())
 

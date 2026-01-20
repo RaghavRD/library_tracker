@@ -143,8 +143,19 @@ class CargoRegistry(PackageRegistry):
             return []
 
     def get_repository_url(self, package_name: str) -> Optional[str]:
-        # TODO: Implement Cargo repository extraction
-        return None
+        """Get source repository URL from crate metadata."""
+        url = f"{self.BASE_URL}/crates/{package_name}"
+        headers = {"User-Agent": self.USER_AGENT}
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+            if response.status_code != 200: return None
+            
+            data = response.json()
+            crate = data.get("crate", {})
+            return crate.get("repository")
+        except:
+            return None
 
     def supports_package(self, package_name: str) -> bool:
         """

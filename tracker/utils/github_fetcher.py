@@ -11,7 +11,7 @@ from datetime import datetime
 import base64
 from django.conf import settings
 from tracker.utils.future_version_validator import FutureVersionValidator
-from tracker.utils.registry_adapters.base import PreReleaseInfo
+from tracker.utils.registry_adapters.base import PreReleaseInfo, VersionInfo
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +87,42 @@ class GitHubFetcher:
             except Exception:
                 continue
         return None
+
+    def get_latest_stable_version(self, repo_url: str) -> Optional[VersionInfo]:
+        """
+        Get latest stable version from GitHub Releases.
+        """
+        owner, repo = self._parse_repo_url(repo_url)
+        if not owner or not repo: return None
+        
+        # specific endpoint for latest release (excludes prereleases)
+        url = f"{self.BASE_URL}/repos/{owner}/{repo}/releases/latest"
+        
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=10)
+            if resp.status_code == 404:
+                # No "latest" release (might purely use tags or pre-releases)
+                return None
+            if resp.status_code != 200:
+                return None
+                
+            release = resp.json()
+            tag_name = release.get("tag_name", "")
+            version = tag_name.lstrip("v")
+            
+            return VersionInfo(
+                version=version,
+                release_date=self._parse_date(release.get("published_at")) or datetime.now().date(),
+                homepage_url=release.get("html_url", ""),
+                summary=release.get("body", "")[:500],
+                source_url=release.get("html_url", ""),
+                trust_level=95, # High trust for GitHub API
+                is_prerelease=False,
+                changelog_url=release.get("html_url", "")
+            )
+        except Exception as e:
+            logger.error(f"Error fetching latest GitHub release for {owner}/{repo}: {e}")
+            return None
 
     def get_prereleases(self, owner: str, repo: str) -> List[PreReleaseInfo]:
         """Fetch pre-releases from GitHub Releases API."""

@@ -115,8 +115,9 @@ class VersionDetector:
             return version_info
         
         # TIER 2: GitHub Releases API
-        # TODO: Implement in future iteration
-        logger.debug("GitHub Releases API not yet implemented")
+        # Handled dynamically via Serper discovery in fallback method below
+        # since we don't always know the repo URL upfront.
+        
         
         # TIER 3: Serper + Groq (fallback)
         logger.warning(f"⚠️ Falling back to Serper+Groq for {library_name}")
@@ -214,6 +215,7 @@ class VersionDetector:
         Fallback to Serper + Groq when official APIs fail.
         
         This is the existing method but with lower trust level.
+        Also attempts to upgrade to Tier 2 (GitHub API) if a repo URL is found.
         """
         try:
             # Lazy-load Serper and Groq
@@ -232,6 +234,24 @@ class VersionDetector:
                 component_type=component_type
             )
             
+            # TIER 2 ATTEMPT: Check for GitHub URL in search results
+            # If we find a GitHub link, we can use the high-trust GitHub API
+            # instead of relying on LLM parsing.
+            github_url = self._extract_github_url_from_results(serper_results)
+            if github_url:
+                logger.info(f"found GitHub URL in search results: {github_url}. Attempting Tier 2 detection.")
+                from tracker.utils.github_fetcher import GitHubFetcher
+                gh_fetcher = GitHubFetcher()
+                gh_version = gh_fetcher.get_latest_stable_version(github_url)
+                
+                if gh_version:
+                    # Validate version
+                     if self.validator.is_valid_semantic_version(gh_version.version):
+                         # If current_version provided, ensure it's newer
+                         if not current_version or self.validator.is_newer(gh_version.version, current_version):
+                             logger.info(f"✅ Found {library_name} v{gh_version.version} via GitHub API (Tier 2)")
+                             return gh_version
+
             analysis = self._groq.analyze(library_name, serper_results)
             
             if analysis and not analysis.get("error"):
@@ -243,6 +263,18 @@ class VersionDetector:
         except Exception as e:
             logger.error(f"Serper+Groq fallback failed: {e}")
             return None
+
+    def _extract_github_url_from_results(self, serper_results: dict) -> Optional[str]:
+        """Extract the most relevant GitHub URL from search results."""
+        results = serper_results.get("results", [])
+        for result in results:
+            link = result.get("link", "")
+            if "github.com" in link:
+                # Basic validation: github.com/owner/repo
+                parts = link.split('/')
+                if len(parts) >= 5:
+                    return link
+        return None
     
     def _convert_groq_to_version_info(self, analysis: dict) -> Optional[VersionInfo]:
         """

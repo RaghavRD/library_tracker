@@ -56,10 +56,12 @@ class MavenRegistry(PackageRegistry):
             "wt": "json",
         }
         
+        headers = {"User-Agent": "LibTrack-AI-Test/1.0"}
+        
         self._log_debug(f"Fetching from {self.BASE_URL} with query: {params['q']}")
         
         try:
-            response = requests.get(self.BASE_URL, params=params, timeout=self.timeout)
+            response = requests.get(self.BASE_URL, params=params, headers=headers, timeout=self.timeout)
             response.raise_for_status()
             data = response.json()
             
@@ -125,10 +127,58 @@ class MavenRegistry(PackageRegistry):
             raise
     
     def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
-        # TODO: Implement full Maven pre-release search
-        return []
+        """Get pre-releases from Maven Central."""
+        if ":" not in package_name: return []
+        group_id, artifact_id = package_name.split(":", 1)
+        
+        # Fetch multiple rows to find pre-releases
+        params = {
+            "q": f"g:{group_id} AND a:{artifact_id}",
+            "rows": 20,
+            "wt": "json",
+            "core": "gav" 
+        }
+        headers = {"User-Agent": "LibTrack-AI-Test/1.0"}
+        
+        try:
+            response = requests.get(self.BASE_URL, params=params, headers=headers, timeout=self.timeout)
+            if response.status_code != 200: return []
+            
+            docs = response.json().get("response", {}).get("docs", [])
+            prereleases = []
+            
+            for doc in docs:
+                version = doc.get("v")
+                if not version: continue
+                
+                # Check for pre-release markers
+                if any(x in version.upper() for x in ["ALPHA", "BETA", "RC", "M", "SNAPSHOT"]):
+                    timestamp = doc.get("timestamp", 0)
+                    prereleases.append(PreReleaseInfo(
+                        version=version,
+                        release_date=self._parse_maven_timestamp(timestamp),
+                        prerelease_type="snapshot" if "SNAPSHOT" in version else "pre",
+                        summary=f"Maven artifact {version}",
+                        source_url=f"https://mvnrepository.com/artifact/{group_id}/{artifact_id}/{version}",
+                        trust_level=95,
+                        is_published=True
+                    ))
+            return prereleases
+        except:
+            return []
 
     def get_repository_url(self, package_name: str) -> Optional[str]:
+        """Get source repository URL from Maven metadata if possible."""
+        # Using MVNRepository as a proxy for source URL discovery often works
+        # e.g. https://mvnrepository.com/artifact/org.springframework/spring-core
+        if ":" not in package_name: return None
+        group_id, artifact_id = package_name.split(":", 1)
+        
+        # We can't reliably get the SCM url from Search API alone without POM parsing logic.
+        # But we can return a constructed potential GitHub URL if the groupID looks like one?
+        # No, that's unsafe.
+        
+        # Return None for now as Search API doesn't provide it
         return None
 
     def supports_package(self, package_name: str) -> bool:

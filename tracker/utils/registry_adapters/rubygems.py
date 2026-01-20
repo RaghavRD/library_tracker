@@ -142,7 +142,20 @@ class RubyGemsRegistry(PackageRegistry):
             return []
 
     def get_repository_url(self, package_name: str) -> Optional[str]:
-        # TODO: Implement RubyGems source_code_uri extraction
+        """Get source repository URL from gem metadata."""
+        gem_info = self._get_gem_info(package_name)
+        if not gem_info:
+            return None
+            
+        # Check source_code_uri first
+        if source_code := gem_info.get("source_code_uri"):
+            return source_code
+            
+        # Fallback to homepage if it looks like a repo
+        if homepage := gem_info.get("homepage_uri"):
+            if "github.com" in homepage or "gitlab.com" in homepage:
+                return homepage
+                
         return None
 
     def supports_package(self, package_name: str) -> bool:

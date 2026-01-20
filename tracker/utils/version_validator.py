@@ -25,6 +25,23 @@ class VersionValidator:
     """
     
     @staticmethod
+    def _sanitize_version(version_str: str) -> str:
+        """
+        Sanitize version string to be PEP 440 compatible.
+        Handles Maven styles like 7.0.0-M6 -> 7.0.0a6, SNAPSHOT -> dev.
+        """
+        if not version_str:
+            return version_str
+            
+        # Handle Maven Milestones: -M6 -> a6
+        v = re.sub(r'[-.]M(\d+)', r'a\1', version_str)
+        
+        # Handle SNAPSHOT -> dev
+        v = v.replace("SNAPSHOT", "dev")
+        
+        return v
+
+    @staticmethod
     def is_valid_semantic_version(version_str: str) -> bool:
         """
         Validate that a string is a proper semantic version.
@@ -47,8 +64,11 @@ class VersionValidator:
             return False
         
         try:
+            # Sanitize before parsing
+            clean_ver = VersionValidator._sanitize_version(version_str)
+            
             # Must be parseable by packaging library
-            parsed = pkg_parse(version_str)
+            parsed = pkg_parse(clean_ver)
             
             # Split into parts for additional validation
             # Remove pre-release and build metadata for analysis
@@ -123,8 +143,8 @@ class VersionValidator:
             False
         """
         try:
-            new = pkg_parse(new_version)
-            current = pkg_parse(current_version)
+            new = pkg_parse(VersionValidator._sanitize_version(new_version))
+            current = pkg_parse(VersionValidator._sanitize_version(current_version))
             return new > current
         except InvalidVersion as e:
             logger.error(f"Invalid version comparison: '{new_version}' vs '{current_version}': {e}")
@@ -147,8 +167,8 @@ class VersionValidator:
         Raises:
             InvalidVersion: If versions cannot be parsed
         """
-        v1 = pkg_parse(version1)
-        v2 = pkg_parse(version2)
+        v1 = pkg_parse(VersionValidator._sanitize_version(version1))
+        v2 = pkg_parse(VersionValidator._sanitize_version(version2))
         
         if v1 < v2:
             return -1

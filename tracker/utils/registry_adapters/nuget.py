@@ -102,13 +102,14 @@ class NuGetRegistry(PackageRegistry):
             self._log_error(f"Error fetching {package_name}: {e}")
             raise
     
-    def _get_package_metadata(self, package_name: str) -> Optional[dict]:
+    def _get_package_metadata(self, package_name: str, include_prerelease: bool = False) -> Optional[dict]:
         """
         Fetch package metadata from NuGet search API.
         
         Provides additional details like description, project URL, etc.
         """
-        url = f"{self.SEARCH_URL}?q=packageid:{package_name}&prerelease=false"
+        prerelease_str = "true" if include_prerelease else "false"
+        url = f"{self.SEARCH_URL}?q=packageid:{package_name}&prerelease={prerelease_str}"
         
         try:
             response = requests.get(url, timeout=self.timeout)
@@ -126,10 +127,39 @@ class NuGetRegistry(PackageRegistry):
             return None
     
     def get_prereleases(self, package_name: str) -> List[PreReleaseInfo]:
-        # TODO: Implement full NuGet pre-release search
-        return []
+        """Get pre-releases from NuGet."""
+        # Use Search API which includes versions
+        metadata = self._get_package_metadata(package_name, include_prerelease=True)
+        if not metadata: return []
+        
+        versions = metadata.get("versions", [])
+        prereleases = []
+        
+        for v_obj in versions:
+            v_str = v_obj.get("version", "")
+            if "-" in v_str:
+                prereleases.append(PreReleaseInfo(
+                    version=v_str,
+                    # Search API doesn't give per-version dates easily without more calls.
+                    # We'll use current date as fallback or need another call.
+                    # For efficiency, we use fallback/metadata date or skip date.
+                    release_date=datetime.now().date(), 
+                    prerelease_type="pre",
+                    summary=f"NuGet pre-release {v_str}",
+                    source_url=f"https://www.nuget.org/packages/{package_name}/{v_str}",
+                    trust_level=95,
+                    is_published=True
+                ))
+        return sorted(prereleases, key=lambda x: x.version, reverse=True)
 
     def get_repository_url(self, package_name: str) -> Optional[str]:
+        """Get source repository URL from NuGet metadata."""
+        metadata = self._get_package_metadata(package_name, include_prerelease=False)
+        if not metadata: return None
+        
+        if repo_url := metadata.get("projectUrl"):
+            if "github.com" in repo_url: return repo_url
+            
         return None
 
     def supports_package(self, package_name: str) -> bool:
