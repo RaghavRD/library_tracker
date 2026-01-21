@@ -52,6 +52,7 @@ class PreReleaseInfo:
     source_url: str
     trust_level: int = 95
     is_published: bool = True  # True if found in registry, False if just a plan
+    confirmation_count: int = 1  # Number of independent sources confirming this
 
     
     def __post_init__(self):

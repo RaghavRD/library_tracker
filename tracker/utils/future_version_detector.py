@@ -111,7 +111,7 @@ class FutureVersionDetector:
                 base_trust=v.trust_level,
                 prerelease_type=v.prerelease_type,
                 has_date=bool(v.release_date),
-                source_count=1 # TODO: Logic to count duplicate sightings
+                source_count=v.confirmation_count
             )
             
         # 7. Sort by version descending
@@ -165,6 +165,9 @@ class FutureVersionDetector:
                 # Merge logic: Ensure we have the best metadata
                 if not target.release_date:
                     target.release_date = cand.release_date if keep_cand else existing.release_date
+                
+                # Merge confirmation counts
+                target.confirmation_count = existing.confirmation_count + cand.confirmation_count
                     
                 version_map[v_str] = target
                      
