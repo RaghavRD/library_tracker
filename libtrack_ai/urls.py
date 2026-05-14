@@ -5,8 +5,8 @@ from django.conf import settings
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", RedirectView.as_view(url="/tracker/login/", permanent=False)),
-    path("tracker/", include("tracker.urls")),
+    path("", RedirectView.as_view(url="/libtracker/login/", permanent=False)),
+    path("libtracker/", include("tracker.urls")),
 ]
 
 # handler404 = "tracker.views.page_not_found"
