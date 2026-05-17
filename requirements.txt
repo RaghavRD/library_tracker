@@ -15,6 +15,7 @@ idna==3.11
 mailtrap==2.3.0
 
 oauthlib==3.3.1
+# explicitly pinned — used by tracker.services.notification_service for SemVer comparisons
 packaging==25.0
 pyasn1==0.6.1
 pyasn1_modules==0.4.2

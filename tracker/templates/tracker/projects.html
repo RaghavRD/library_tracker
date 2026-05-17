@@ -3,31 +3,20 @@
 {% block title %}LibTrack AI – Projects{% endblock %}
 
 {% block content %}
-<style>
-  .section-title {
-    font-weight: 700;
-    color: #4e5e7a;
-    letter-spacing: -0.5px;
-  }
-</style>
-
-<div class="projects-container py-4">
+<div class="container-xl">
 
   <!-- 🔹 Header Section -->
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
     <div>
-      <h1 class="section-title mb-1">Projects</h1>
-      <p class="text-muted small mb-0">View all project registrations stored in LibTrack AI.</p>
+      <h1 class="section-title">Projects</h1>
+      <p class="page-subtitle">All project registrations stored in LibTrack AI.</p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-      <button class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal"
-        data-bs-target="#addProjectModal">
-        <i class="bi bi-plus-circle me-1"></i>Add Project
-      </button>
-    </div>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+      <i class="bi bi-plus-circle me-1"></i>Add Project
+    </button>
   </div>
 
-  <div class="container py-4" style="max-width: 1100px;">
+  <div>
     <!-- 🔹 Project Registrations -->
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -40,8 +29,8 @@
       <div class="card-body p-0">
         {% if registrations_total %}
         <div class="table-responsive">
-          <table class="table align-middle mb-0">
-            <thead class="table-light text-center">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="text-center">
               <tr>
                 <th width="1%">#</th>
                 <th width="15%">Project</th>
@@ -134,7 +123,7 @@
         {% endif %}
       </div>
       {% if registrations_total and registrations_page.paginator.num_pages > 1 %}
-      <div class="card-footer border-0 bg-light">
+      <div class="card-footer border-0">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
           <small class="text-muted mb-0">
             Showing {{ registrations_page.start_index }}-{{ registrations_page.end_index }} of {{ registrations_total }}
@@ -222,7 +211,7 @@
               data-datalist-id="dashboardStackTypes" data-initial-rows='[]' data-min-rows="1">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
+                  <thead>
                     <tr>
                       <th style="width: 20%">Type</th>
                       <th style="width: 30%">Name</th>
@@ -315,7 +304,7 @@
               data-datalist-id="dashboardStackTypes" data-min-rows="1">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light">
+                  <thead>
                     <tr>
                       <th style="width: 20%">Type</th>
                       <th style="width: 30%">Name</th>

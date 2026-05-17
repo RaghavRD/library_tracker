@@ -54,6 +54,6 @@ class TestDashboardAnalytics:
         if 'dashboard' not in content and 'projects' not in content:
             print("FAILED TO FIND LINKS")
         
-        # Verify the key links are present (allowing for prefix)
-        assert 'href="/tracker/dashboard/"' in content or 'href="/dashboard/"' in content
-        assert 'href="/tracker/projects/"' in content or 'href="/projects/"' in content
+        # Verify the key links are present (resolved via {% url %}, prefix-agnostic)
+        assert reverse('dashboard') in content
+        assert reverse('projects') in content

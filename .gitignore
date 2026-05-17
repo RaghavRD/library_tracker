@@ -1,10 +1,17 @@
 venv/
 __pycache__/
 .env
+*.env
+.venv
+*.venv
 libtracker_db.sqlite3
 
+# Credential files only — don't ignore all JSON (fixtures, package.json, etc.)
 credentials.json
-*.json
-*.env
-*.DS_Store
+credentials*.json
+service_account*.json
+
 *.log
+*.DS_Store
+.DS_Store
+staticfiles/

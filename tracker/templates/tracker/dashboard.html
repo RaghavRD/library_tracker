@@ -1,376 +1,220 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block title %}LibTrack AI – Dashboard{% endblock %}
+
 {% block content %}
-<style>
-    :root {
-        --brand-primary: #4e73df;
-        --brand-success: #1cc88a;
-        --brand-info: #36b9cc;
-        --brand-warning: #f6c23e;
-        --brand-danger: #e74a3b;
-        --card-bg: #ffffff;
-        --glass-bg: rgba(255, 255, 255, 0.9);
-    }
+<div class="container-xl">
 
-    .dashboard-container {
-        /* padding: 1.5rem; */
-        padding-top: 1.5rem;
-        padding-bottom: 1.5rem;
-        background-color: #f8f9fc;
-    }
+  <!-- Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
+    <div>
+      <h1 class="section-title">Dashboard Overview</h1>
+      <p class="page-subtitle">Real-time insights for your tracked projects</p>
+    </div>
+    <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-gear-fill me-1"></i> Manage Projects
+    </a>
+  </div>
 
-    body {
-        background-color: #f8f9fc;
-    }
-
-    .stat-card {
-        border-radius: 1rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border: none;
-        overflow: hidden;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    .glass-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .card-gradient-primary {
-        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
-    }
-
-    .card-gradient-success {
-        background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
-    }
-
-    .card-gradient-dark {
-        background: linear-gradient(135deg, #1a1c23 0%, #2e313c 100%);
-    }
-
-    .card-gradient-secondary {
-        background: linear-gradient(135deg, #858796 0%, #60616f 100%);
-    }
-
-    .kpi-value {
-        font-size: 2.2rem;
-        letter-spacing: -1px;
-    }
-
-    .chart-container {
-        border-radius: 1rem;
-        background: white;
-        padding: 1.5rem;
-    }
-
-    .section-title {
-        font-weight: 700;
-        color: #4e5e7a;
-        margin-bottom: 1.5rem;
-        letter-spacing: -0.5px;
-    }
-
-    .badge-pill-custom {
-        border-radius: 50rem;
-        padding: 0.35em 0.8em;
-        font-weight: 600;
-    }
-</style>
-
-<div class="dashboard-container">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-2">
-        <div>
-            <h1 class="section-title mb-1">Dashboard Overview</h1>
-            <p class="text-muted small mb-0">Real-time insights for your tracked projects</p>
+  <!-- KPI Cards -->
+  <div class="row g-3 g-md-4 mb-4">
+    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'projects' %}'" style="cursor:pointer;">
+      <div class="card stat-card h-100 card-gradient-primary text-white">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Total Projects</h6>
+            <div class="kpi-icon"><i class="bi bi-folder2-open"></i></div>
+          </div>
+          <div class="kpi-value">{{ total_projects }}</div>
+          <p class="small mb-0 mt-3 opacity-75">
+            <i class="bi bi-layers-fill me-1"></i> {{ total_unique_stack_count }} unique stacks
+          </p>
         </div>
-        <div class="btn-toolbar">
-            <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm">
-                <i class="bi bi-gear-fill me-1"></i> Manage Projects
-            </a>
-        </div>
+      </div>
     </div>
 
-    <!-- KPI Cards -->
-    <div class="row g-4 mb-5">
-        <!-- Projects Card -->
-        <div class="col-md-3" onclick="window.location.href='{% url 'projects' %}'" style="cursor: pointer;">
-            <div class="card stat-card h-100 shadow-sm card-gradient-primary text-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h6 class="text-uppercase small fw-bold opacity-75">Total Projects</h6>
-                        <div class="bg-white bg-opacity-25 rounded-circle p-2">
-                            <i class="bi bi-folder2-open fs-5"></i>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-baseline">
-                        <h2 class="kpi-value mb-0 fw-bold">{{ total_projects }}</h2>
-                    </div>
-                    <p class="small mb-0 mt-3 opacity-75">
-                        <i class="bi bi-layers-fill me-1"></i> {{ total_unique_stack_count }} unique stacks
-                    </p>
-                </div>
-            </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="card stat-card h-100 card-gradient-success text-white">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Health Score</h6>
+            <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
+          </div>
+          <div class="kpi-value">{{ health_score }}%</div>
+          <p class="small mb-0 mt-3 opacity-75">
+            <i class="bi bi-check-circle-fill me-1"></i> {{ total_components }} tracked libraries
+          </p>
         </div>
-
-        <!-- Health Score Card -->
-        <div class="col-md-3">
-            <div class="card stat-card h-100 shadow-sm card-gradient-success text-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h6 class="text-uppercase small fw-bold opacity-75">Health Score</h6>
-                        <div class="bg-white bg-opacity-25 rounded-circle p-2">
-                            <i class="bi bi-shield-check fs-5"></i>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-baseline">
-                        <h2 class="kpi-value mb-0 fw-bold">{{ health_score }}%</h2>
-                    </div>
-                    <p class="small mb-0 mt-3 opacity-75">
-                        <i class="bi bi-check-circle-fill me-1"></i> {{ total_components }} tracked libraries
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Updates Pending Card -->
-        <div class="col-md-3" onclick="window.location.href='{% url 'updateHistory' %}'" style="cursor: pointer;">
-            <div class="card stat-card h-100 shadow-sm card-gradient-dark text-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h6 class="text-uppercase small fw-bold opacity-75">Updates Available</h6>
-                        <div class="bg-white bg-opacity-25 rounded-circle p-2 text-warning">
-                            <i class="bi bi-lightning-fill fs-5"></i>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center mb-2">
-                        <h2 class="kpi-value mb-0 fw-bold me-2">{{ total_updates }}</h2>
-                        <span class="badge badge-pill-custom bg-danger shadow-sm">{{ major_updates }} Major</span>
-                    </div>
-                    <p class="small mb-0 mt-2 text-warning fw-medium">
-                        {{ minor_updates }} Minor updates pending
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Future Updates Card -->
-        <div class="col-md-3" onclick="window.location.href='{% url 'future_updates' %}'" style="cursor: pointer;">
-            <div class="card stat-card h-100 shadow-sm card-gradient-secondary text-white">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <h6 class="text-uppercase small fw-bold opacity-75">Future Roadmap</h6>
-                        <div class="bg-white bg-opacity-25 rounded-circle p-2">
-                            <i class="bi bi-rocket-takeoff fs-5"></i>
-                        </div>
-                    </div>
-                    <h2 class="kpi-value mb-0 fw-bold">{{ future_updates_count }}</h2>
-                    <p class="small mb-0 mt-3 opacity-75">Predicted versions</p>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <!-- Charts Row -->
-    <div class="row g-4 mb-4">
-        <!-- Chart: Update Distribution -->
-        <div class="col-md-8">
-            <div class="card border-0 shadow-sm chart-container h-100">
-                <div class="card-header bg-transparent border-0 p-0 mb-4 h-100">
-                    <h5 class="fw-bold text-dark mb-0">Update Status Distribution</h5>
-                    <p class="text-muted small">Status breakdown across all packages</p>
-                </div>
-                <div class="card-body p-0 h-100">
-                    <canvas id="updatesChart" style="min-height: 350px;"></canvas>
-                </div>
-            </div>
+    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'updateHistory' %}'" style="cursor:pointer;">
+      <div class="card stat-card h-100 card-gradient-dark text-white">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Updates Available</h6>
+            <div class="kpi-icon"><i class="bi bi-lightning-fill"></i></div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="kpi-value">{{ total_updates }}</span>
+            <span class="badge badge-pill-custom bg-danger">{{ major_updates }} Major</span>
+          </div>
+          <p class="small mb-0 mt-3 fw-medium opacity-75">{{ minor_updates }} Minor updates pending</p>
         </div>
-
-        <!-- Chart: Stack Composition -->
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm chart-container h-100">
-                <div class="card-header bg-transparent border-0 p-0 mb-4">
-                    <h5 class="fw-bold text-dark mb-0">Stack Composition</h5>
-                    <p class="text-muted small">Technology breakdown</p>
-                </div>
-                <div class="card-body p-0 d-flex flex-column align-items-center justify-content-center">
-                    <div style="width: 100%; max-width: 280px;">
-                        <canvas id="stackChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <!-- Hidden Analytics Data for JS -->
-    <div id="analytics-data" data-total-components="{{ total_components|default:0 }}"
-        data-total-updates="{{ total_updates|default:0 }}" data-major-updates="{{ major_updates|default:0 }}"
-        data-minor-updates="{{ minor_updates|default:0 }}" data-future-updates="{{ future_updates_count|default:0 }}"
-        data-languages-count="{{ languages_count|default:0 }}" data-libraries-count="{{ libraries_count|default:0 }}"
-        data-tools-count="{{ tools_count|default:0 }}" data-modules-count="{{ modules_count|default:0 }}"
-        style="display: none;">
+    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'future_updates' %}'" style="cursor:pointer;">
+      <div class="card stat-card h-100 card-gradient-secondary text-white">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Future Roadmap</h6>
+            <div class="kpi-icon"><i class="bi bi-rocket-takeoff"></i></div>
+          </div>
+          <div class="kpi-value">{{ future_updates_count }}</div>
+          <p class="small mb-0 mt-3 opacity-75">Predicted versions</p>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="row g-3 g-md-4">
+    <div class="col-lg-8">
+      <div class="card chart-card h-100">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Update Status Distribution</h5>
+          <p class="page-subtitle">Status breakdown across all packages</p>
+        </div>
+        <div class="card-body">
+          <canvas id="updatesChart" style="min-height: 320px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card chart-card h-100">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Stack Composition</h5>
+          <p class="page-subtitle">Technology breakdown</p>
+        </div>
+        <div class="card-body d-flex align-items-center justify-content-center">
+          <div style="width: 100%; max-width: 280px;">
+            <canvas id="stackChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="analytics-data" data-total-components="{{ total_components|default:0 }}"
+    data-total-updates="{{ total_updates|default:0 }}" data-major-updates="{{ major_updates|default:0 }}"
+    data-minor-updates="{{ minor_updates|default:0 }}" data-future-updates="{{ future_updates_count|default:0 }}"
+    data-languages-count="{{ languages_count|default:0 }}" data-libraries-count="{{ libraries_count|default:0 }}"
+    data-tools-count="{{ tools_count|default:0 }}" data-modules-count="{{ modules_count|default:0 }}"
+    style="display:none;"></div>
 
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const dataEl = document.getElementById('analytics-data');
-        if (!dataEl) return;
+  document.addEventListener("DOMContentLoaded", function () {
+    const dataEl = document.getElementById('analytics-data');
+    if (!dataEl || typeof Chart === 'undefined') return;
 
-        const totalComponents = parseInt(dataEl.dataset.totalComponents) || 0;
-        const totalUpdates = parseInt(dataEl.dataset.totalUpdates) || 0;
-        const majorCount = parseInt(dataEl.dataset.majorUpdates) || 0;
-        const minorCount = parseInt(dataEl.dataset.minorUpdates) || 0;
-        const futureCount = parseInt(dataEl.dataset.futureUpdates) || 0;
+    const n = (k) => parseInt(dataEl.dataset[k]) || 0;
+    const totalComponents = n('totalComponents');
+    const totalUpdates = n('totalUpdates');
+    const futureCount = n('futureUpdates');
+    const upToDate = Math.max(0, totalComponents - totalUpdates);
 
-        const upToDate = Math.max(0, totalComponents - totalUpdates);
+    const stackParts = [
+      { label: 'Languages', value: n('languagesCount'), color: '#2563eb' },
+      { label: 'Libraries', value: n('librariesCount'), color: '#10b981' },
+      { label: 'Tools', value: n('toolsCount'), color: '#f59e0b' },
+      { label: 'Modules', value: n('modulesCount'), color: '#06b6d4' },
+    ].filter(p => p.value > 0);
 
-        const ctxUpdates = document.getElementById('updatesChart').getContext('2d');
+    let charts = [];
 
-        // Define Gradients
-        const purpleGrad = ctxUpdates.createLinearGradient(0, 0, 0, 400);
-        purpleGrad.addColorStop(0, 'rgba(78, 115, 223, 0.8)');
-        purpleGrad.addColorStop(1, 'rgba(78, 115, 223, 0.4)');
+    function themeColors() {
+      const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+      return {
+        tick: dark ? '#94a3b8' : '#64748b',
+        grid: dark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)',
+        tooltipBg: dark ? '#1e293b' : '#0f172a',
+      };
+    }
 
-        const successGrad = ctxUpdates.createLinearGradient(0, 0, 0, 400);
-        successGrad.addColorStop(0, 'rgba(28, 200, 138, 0.8)');
-        successGrad.addColorStop(1, 'rgba(28, 200, 138, 0.4)');
+    function buildCharts() {
+      charts.forEach(c => c.destroy());
+      charts = [];
+      const c = themeColors();
 
-        const dangerGrad = ctxUpdates.createLinearGradient(0, 0, 0, 400);
-        dangerGrad.addColorStop(0, 'rgba(231, 74, 59, 0.8)');
-        dangerGrad.addColorStop(1, 'rgba(231, 74, 59, 0.4)');
+      charts.push(new Chart(document.getElementById('updatesChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Up to Date', 'Updates Available', 'Future Predicted'],
+          datasets: [{
+            data: [upToDate, totalUpdates, futureCount],
+            backgroundColor: ['#10b981', '#ef4444', '#2563eb'],
+            borderRadius: 8,
+            barThickness: 46,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { padding: 12, backgroundColor: c.tooltipBg, cornerRadius: 8 }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, color: c.tick }, grid: { color: c.grid } },
+            x: { grid: { display: false }, ticks: { color: c.tick, font: { weight: 'bold' } } }
+          }
+        }
+      }));
 
-        // 1. Bar Chart: Overall Status
-        new Chart(ctxUpdates, {
-            type: 'bar',
-            data: {
-                labels: ['Up to Date', 'Updates Available', 'Future Predicted'],
-                datasets: [{
-                    label: 'Count',
-                    data: [upToDate, totalUpdates, futureCount],
-                    backgroundColor: [successGrad, dangerGrad, purpleGrad],
-                    borderRadius: 8,
-                    barThickness: 45,
-                }]
+      charts.push(new Chart(document.getElementById('stackChart'), {
+        type: 'doughnut',
+        data: {
+          labels: stackParts.map(p => p.label),
+          datasets: [{
+            data: stackParts.map(p => p.value),
+            backgroundColor: stackParts.map(p => p.color),
+            borderWidth: 0,
+            hoverOffset: 14,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '66%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { padding: 14, usePointStyle: true, color: c.tick, font: { size: 11, weight: 'bold' } }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        padding: 12,
-                        backgroundColor: 'rgba(28, 33, 39, 0.9)',
-                        titleFont: { size: 14, weight: 'bold' },
-                        bodyFont: { size: 13 },
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { stepSize: 1, padding: 10, color: '#858796' },
-                        grid: { borderDash: [5, 5], color: '#e3e6f0' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#4e5e7a', font: { weight: 'bold' } }
-                    }
+            tooltip: {
+              padding: 12, cornerRadius: 8, backgroundColor: c.tooltipBg,
+              callbacks: {
+                label: function (ctx) {
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
+                  return `${ctx.label}: ${ctx.raw} (${Math.round((ctx.raw / total) * 100)}%)`;
                 }
+              }
             }
-        });
-
-        // 2. Doughnut Chart: Stack Composition
-        const languagesCount = parseInt(dataEl.dataset.languagesCount) || 0;
-        const librariesCount = parseInt(dataEl.dataset.librariesCount) || 0;
-        const toolsCount = parseInt(dataEl.dataset.toolsCount) || 0;
-        const modulesCount = parseInt(dataEl.dataset.modulesCount) || 0;
-
-        const ctxStack = document.getElementById('stackChart').getContext('2d');
-
-        // Filter out zero values for cleaner chart
-        const stackLabels = [];
-        const stackData = [];
-        const stackColors = [];
-        const stackHoverColors = [];
-
-        if (languagesCount > 0) {
-            stackLabels.push('Languages');
-            stackData.push(languagesCount);
-            stackColors.push('#4e73df');
-            stackHoverColors.push('#2e59d9');
+          }
         }
-        if (librariesCount > 0) {
-            stackLabels.push('Libraries');
-            stackData.push(librariesCount);
-            stackColors.push('#1cc88a');
-            stackHoverColors.push('#17a673');
-        }
-        if (toolsCount > 0) {
-            stackLabels.push('Tools');
-            stackData.push(toolsCount);
-            stackColors.push('#f6c23e');
-            stackHoverColors.push('#dda20a');
-        }
-        if (modulesCount > 0) {
-            stackLabels.push('Modules');
-            stackData.push(modulesCount);
-            stackColors.push('#36b9cc');
-            stackHoverColors.push('#2c9faf');
-        }
+      }));
+    }
 
-        new Chart(ctxStack, {
-            type: 'doughnut',
-            data: {
-                labels: stackLabels,
-                datasets: [{
-                    data: stackData,
-                    backgroundColor: stackColors,
-                    hoverBackgroundColor: stackHoverColors,
-                    borderWidth: 0,
-                    hoverOffset: 15
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '65%',
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            usePointStyle: true,
-                            font: { size: 11, weight: 'bold' }
-                        }
-                    },
-                    tooltip: {
-                        padding: 12,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: function (context) {
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = Math.round((context.raw / total) * 100);
-                                return `${context.label}: ${context.raw} (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    });
+    buildCharts();
+    document.addEventListener('lt-theme-change', buildCharts);
+  });
 </script>
 {% endblock %}

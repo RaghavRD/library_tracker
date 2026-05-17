@@ -3,14 +3,12 @@
 {% block title %}LibTrack AI – Profile{% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container-xl">
 
   <!-- 🔹 Page Header -->
-  <div class="text-center mb-5">
-    <h1 class="fw-bold mb-2">Account Settings</h1>
-    <p class="text-muted">
-      Manage your profile information and security settings.
-    </p>
+  <div class="text-center page-header">
+    <h1 class="section-title">Account Settings</h1>
+    <p class="page-subtitle">Manage your profile information and security settings.</p>
   </div>
 
   <!-- 🔹 Two Column Layout -->
@@ -18,7 +16,7 @@
 
     <!-- 🔹 Profile Info Card -->
     <div class="col-12 col-lg-5">
-      <div class="card bg-light-subtle text-dark border-0 shadow-sm rounded-4 h-100">
+      <div class="card h-100">
         <div class="card-body p-4">
           <h5 class="fw-semibold mb-4">Profile Information</h5>
 
@@ -45,7 +43,7 @@
 
     <!-- 🔹 Change Password Card -->
     <div class="col-12 col-lg-7">
-      <div class="card bg-light-subtle text-dark border-0 shadow-sm rounded-4 h-100">
+      <div class="card h-100">
         <div class="card-body p-4">
           <h5 class="fw-semibold mb-4">Change Password</h5>
 
@@ -62,7 +60,7 @@
                 <input type="{{ field.field.widget.input_type|default:'text' }}" name="{{ field.name }}"
                   id="{{ field.id_for_label }}" class="form-control {% if field.errors %}is-invalid{% endif %}"
                   autocomplete="off">
-                <button class="btn bg-light border border-1 toggle-password" type="button"
+                <button class="btn btn-outline-secondary toggle-password" type="button"
                   data-target="{{ field.id_for_label }}">
                   <i class="bi bi-eye"></i>
                 </button>

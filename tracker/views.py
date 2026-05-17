@@ -1,19 +1,18 @@
-import json
-import traceback
+import logging
 from collections import defaultdict
-from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count
-from django.db import transaction
+from django.utils.http import url_has_allowed_host_and_scheme
 
-from tracker.models import UpdateCache, Project, StackComponent, FutureUpdateCache
+from tracker.models import UpdateCache, Project, StackComponent, FutureUpdateCache, NotificationRecord
 from tracker.forms import LoginForm, RegistrationForm
-from tracker.services.project_service import ProjectService 
+from tracker.services.project_service import ProjectService
+
+logger = logging.getLogger("libtrack")
 
 def login_view(request):
     """
@@ -31,8 +30,14 @@ def login_view(request):
             if user is not None:
                 login(request, user)
                 messages.success(request, f'Welcome back, {username}!')
-                next_url = request.GET.get('next', 'dashboard')
-                return redirect(next_url)
+                next_url = request.GET.get('next', '')
+                if next_url and url_has_allowed_host_and_scheme(
+                    next_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    return redirect(next_url)
+                return redirect('dashboard')
             else:
                 messages.error(request, 'Invalid username or password.')
         else:
@@ -76,34 +81,6 @@ def register_view(request):
     return render(request, 'tracker/register.html', {'form': form})
 
 
-def register_project(request):
-    """
-    Handles project registration via HTML form.
-    Validates input and stores project details in Google Sheets.
-    Shows success/error toast messages on redirect.
-    """
-    if request.method == "POST":
-        payload, error = ProjectService.build_registration_payload(request)
-        if error:
-            messages.error(request, error)
-            return render(request, "tracker/register.html")
-
-        try:
-            ProjectService.save_project_from_payload(payload)
-            messages.success(request, f"Project '{payload['project_name']}' saved successfully!")
-        except ValueError as exc:
-            messages.error(request, str(exc))
-            return render(request, "tracker/register.html")
-        except Exception:
-            print("Error while saving registration:", traceback.format_exc())
-            messages.error(request, "Failed to save project. Please try again later.")
-            return render(request, "tracker/register.html")
-
-        return redirect("dashboard")
-
-    return render(request, "tracker/register.html")
-
-
 @login_required
 def dashboard(request):
     """
@@ -118,7 +95,6 @@ def dashboard(request):
     
     # Calculate unique category breakdown using optimized SQL
     from django.db.models import Case, When, Value, CharField, Count
-    from django.db.models.functions import Lower
 
     # Annotate components with normalized category buckets
     # Logic mirrors previous python mapping: language -> languages, tool -> tools, module -> modules, else -> libraries
@@ -168,7 +144,6 @@ def dashboard(request):
     minor_updates = updates_qs.filter(category='minor').count()
     
     # Future updates
-    from tracker.models import FutureUpdateCache
     future_updates_count = FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed']).count()
     
     # Health Score Calculation
@@ -218,7 +193,7 @@ def projects_view(request):
                 except ValueError as exc:
                     messages.error(request, str(exc))
                 except Exception:
-                    print("Error while creating project:", traceback.format_exc())
+                    logger.exception("Error while creating project")
                     messages.error(request, "Failed to add project. Please try again.")
             return redirect("projects")
 
@@ -241,7 +216,7 @@ def projects_view(request):
             except ValueError as exc:
                 messages.error(request, str(exc))
             except Exception:
-                print("Error while updating project:", traceback.format_exc())
+                logger.exception("Error while updating project")
                 messages.error(request, "Failed to update project. Please try again.")
             return redirect("projects")
 
@@ -265,9 +240,7 @@ def projects_view(request):
     regs = [ProjectService.serialize_project(project) for project in project_qs]
 
     cache = UpdateCache.objects.order_by("-updated_at").all()
-    
-    # ===== NEW: Fetch future updates =====
-    from tracker.models import FutureUpdateCache
+
     future_updates = FutureUpdateCache.objects.filter(
         status__in=['detected', 'confirmed']
     ).order_by('-confidence', '-updated_at')[:10]
@@ -323,9 +296,8 @@ def updateHistory(request):
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
         entry.release_date_formatted = ProjectService.format_release_date(entry.release_date)
-        
+
         # Fetch latest notification record to show status
-        from tracker.models import NotificationRecord
         latest_notification = NotificationRecord.objects.filter(
             library=entry.library
         ).order_by("-created_at").first()
@@ -362,32 +334,25 @@ def future_updates(request):
     """
     Displays future/planned updates with filtering and pagination.
     """
-    from tracker.models import FutureUpdateCache
-    
     # Build project lookup for filtering
-    project_names = []
-    project_lookup = {}  # {library_key: [project_names]}
-    
-    if True:  # Always build lookup for filtering
-        from collections import defaultdict
-        map_temp = defaultdict(set)
-        projects_set = set()
-        
-        project_qs = Project.objects.prefetch_related("components").all()
-        for project in project_qs:
-            project_name = (project.project_name or "").strip()
-            if not project_name:
+    map_temp = defaultdict(set)
+    projects_set = set()
+
+    project_qs = Project.objects.prefetch_related("components").all()
+    for project in project_qs:
+        project_name = (project.project_name or "").strip()
+        if not project_name:
+            continue
+        projects_set.add(project_name)
+        for component in project.components.all():
+            lib_key = (component.name or "").strip().lower()
+            if not lib_key:
                 continue
-            projects_set.add(project_name)
-            for component in project.components.all():
-                lib_key = (component.name or "").strip().lower()
-                if not lib_key:
-                    continue
-                map_temp[lib_key].add(project_name)
-        
-        project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
-        project_names = sorted(projects_set, key=str.casefold)
-    
+            map_temp[lib_key].add(project_name)
+
+    project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
+    project_names = sorted(projects_set, key=str.casefold)
+
     # Get all future updates
     future_qs = FutureUpdateCache.objects.order_by('-confidence', '-updated_at').all()
     future_list = list(future_qs)
@@ -491,7 +456,7 @@ def settings_view(request):
             return redirect('settings')
         except Exception as exc:
             messages.error(request, f'Error updating settings: {str(exc)}')
-            print(f"Error in settings_view POST: {traceback.format_exc()}")
+            logger.exception("Error in settings_view POST")
     
     return render(request, 'tracker/settings.html', {
         'projects': projects,

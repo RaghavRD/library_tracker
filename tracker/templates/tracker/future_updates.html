@@ -3,48 +3,21 @@
 {% block title %}LibTrack AI – Future Updates{% endblock %}
 
 {% block content %}
-<style>
-  .section-title {
-    font-weight: 700;
-    color: #4e5e7a;
-    letter-spacing: -0.5px;
-  }
-</style>
-
-
-<div class="projects-container py-4">
-
-    <!-- Toast Container -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
-        {% if messages %}
-        {% for m in messages %}
-        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
-            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-            <div class="d-flex">
-                <div class="toast-body">
-                    {{ m }}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-                    aria-label="Close"></button>
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-    </div>
+<div class="container-xl">
 
     <!-- Header Section -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
         <div>
-            <h1 class="section-title mb-1">Future Updates</h1>
-            <p class="text-muted small mb-0">View planned and upcoming releases detected for your projects.</p>
+            <h1 class="section-title">Future Updates</h1>
+            <p class="page-subtitle">Planned and upcoming releases detected for your projects.</p>
         </div>
     </div>
 
-    <div class="container py-4" style="max-width: 1100px;">
+    <div>
 
     <!-- Future Updates Table -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-warning text-dark d-flex flex-column flex-md-row justify-content-between gap-2">
+        <!-- <div class="card-header bg-warning text-dark d-flex flex-column flex-md-row justify-content-between gap-2">
             <div>
                 <h5 class="mb-1">Upcoming Releases</h5>
             </div>
@@ -57,9 +30,9 @@
                     {% endif %}
                 </span>
             </div>
-        </div>
+        </div> -->
 
-        <div class="card-body border-bottom bg-light">
+        <div class="card-body border-bottom bg-body-tertiary">
             <div class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
@@ -69,8 +42,8 @@
                         {% if selected_status %}
                         <input type="hidden" name="status" value="{{ selected_status }}">
                         {% endif %}
-                        <div class="input-group shadow-sm">
-                            <span class="input-group-text bg-white">
+                        <div class="input-group">
+                            <span class="input-group-text">
                                 <i class="bi bi-funnel-fill text-warning"></i>
                             </span>
                             <select id="projectFilter" name="project" class="form-select" {% if not project_names%}
@@ -96,8 +69,8 @@
                         {% if selected_project %}
                         <input type="hidden" name="project" value="{{ selected_project }}">
                         {% endif %}
-                        <div class="input-group shadow-sm">
-                            <span class="input-group-text bg-white">
+                        <div class="input-group">
+                            <span class="input-group-text">
                                 <i class="bi bi-filter-circle-fill text-warning"></i>
                             </span>
                             <select id="statusFilter" name="status" class="form-select">
@@ -117,8 +90,8 @@
         <div class="card-body p-0">
             {% if future_total and future_page %}
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead class="table-light text-center">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="text-center">
                         <tr>
                             <th>#</th>
                             <th>Library</th>
@@ -151,9 +124,9 @@
                             </td>
                             <td>
                                 {% if entry.expected_date %}
-                                <span class="text-dark">{{ entry.expected_date|date:"Y-m-d" }}</span>
+                                <span>{{ entry.expected_date|date:"Y-m-d" }}</span>
                                 {% else %}
-                                <span class="text-muted">TBD</span>
+                                <span>TBD</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -213,7 +186,7 @@
         </div>
 
         {% if future_total and future_page and future_page.paginator.num_pages > 1 %}
-        <div class="card-footer border-0 bg-light">
+        <div class="card-footer border-0">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
                 <small class="text-muted mb-0">
                     Showing {{ future_page.start_index }}-{{ future_page.end_index }} of {{ future_total }} update{{ future_total|pluralize }}
@@ -261,12 +234,6 @@
 {% block extra_scripts %}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const toastElList = [].slice.call(document.querySelectorAll(".toast"));
-        toastElList.forEach(function (toastEl) {
-            const t = new bootstrap.Toast(toastEl);
-            t.show();
-        });
-
         // Project filter auto-submit
         const projectFilter = document.getElementById("projectFilter");
         if (projectFilter) {
