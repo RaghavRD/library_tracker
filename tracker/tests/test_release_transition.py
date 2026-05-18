@@ -133,7 +133,7 @@ class TestReleasedVersionNotifications:
             'MAILTRAP_MAIN_KEY': 'test_key',
             'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
         }):
-            success, message = send_update_email(
+            result = send_update_email(
                 mailtrap_api_key='test_key',
                 project_name='Release Test Project',
                 recipients='dev@example.com',
@@ -146,7 +146,7 @@ class TestReleasedVersionNotifications:
                 future_opt_in=False  # This is an actual release
             )
         
-        assert success
+        assert result['success']
         # Should NOT have "Future Update Alert" in subject since it's released
     
     def test_different_subjects_future_vs_released(self, mock_project):
@@ -159,7 +159,7 @@ class TestReleasedVersionNotifications:
             'MAILTRAP_MAIN_KEY': 'test_key',
             'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
         }):
-            future_success, _ = send_update_email(
+            future_result = send_update_email(
                 mailtrap_api_key='test_key',
                 project_name='Test',
                 recipients='dev@test.com',
@@ -171,7 +171,7 @@ class TestReleasedVersionNotifications:
                 future_opt_in=True
             )
             
-            released_success, _ = send_update_email(
+            released_result = send_update_email(
                 mailtrap_api_key='test_key',
                 project_name='Test',
                 recipients='dev@test.com',
@@ -183,8 +183,8 @@ class TestReleasedVersionNotifications:
                 future_opt_in=False
             )
         
-        assert future_success
-        assert released_success
+        assert future_result['success']
+        assert released_result['success']
 
 
 @pytest.mark.django_db

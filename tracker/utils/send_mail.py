@@ -1,9 +1,13 @@
 import os
 import requests
+import logging
 from typing import Iterable
 from dotenv import load_dotenv
+from django.conf import settings
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Mailtrap Transactional/Bulk API endpoint
 MAILTRAP_BASE = "https://bulk.api.mailtrap.io/api/send"
@@ -23,7 +27,7 @@ def send_update_email(
     timeout: int = 15,
     updates: list[dict[str, str]] | None = None,
     future_opt_in: bool = False,
-) -> tuple[bool, str]:
+) -> dict:
     """
     Send an HTML email via Mailtrap's Bulk (Transactional) API.
 
@@ -43,17 +47,28 @@ def send_update_email(
         future_opt_in: True when registration enabled future update notifications
 
     Returns:
-        (success: bool, status_text: str)
+        dict: {
+            'success': bool,
+            'status_text': str,
+            'http_status': int|None,
+            'response_text': str|None,
+            'error': str|None,
+            'request_id': str|None,
+        }
     """
 
     api_key = mailtrap_api_key or os.getenv("MAILTRAP_API_KEY")
     from_addr = from_email or os.getenv("MAILTRAP_FROM_EMAIL")
 
     if not api_key or not from_addr:
-        return (
-            False,
-            "❌ Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
-        )
+        return {
+            "success": False,
+            "status_text": "❌ Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
+            "http_status": None,
+            "response_text": None,
+            "error": "missing_credentials",
+            "request_id": None,
+        }
 
     # Normalize recipients (support both list and comma-separated string)
     if isinstance(recipients, str):
@@ -61,7 +76,14 @@ def send_update_email(
 
     recipients = list(recipients or [])
     if not recipients:
-        return False, "❌ No valid recipients provided"
+        return {
+            "success": False,
+            "status_text": "❌ No valid recipients provided",
+            "http_status": None,
+            "response_text": None,
+            "error": "no_recipients",
+            "request_id": None,
+        }
     
     # ===== NEW: Different subject for future updates =====
     if category == "future" or future_opt_in:
@@ -91,7 +113,7 @@ def send_update_email(
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('library', 'Unknown')}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('component_type', 'library').title()}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('version', 'n/a')}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a')}</td>
+                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a').title()}</td>
                     <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('release_date', 'Unknown')}</td>
                     {f'<td style="padding:8px;border:1px solid #dfe3e7;"><strong>{entry.get("confidence", "N/A")}%</strong></td>' if has_confidence else ''}
                 </tr>
@@ -193,23 +215,67 @@ def send_update_email(
     }
 
     # get global TEST_MODE from settings
-    TEST_MODE = os.getenv("TEST_MODE", True)
+    TEST_MODE = os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"}
     if TEST_MODE:
         print("TEST_MODE: Email subject:", subject)
         print("TEST_MODE: Email content:", html_content)
-        return True, "🧪🧪 Email would be sent in TEST_MODE 🧪🧪"
-
-    # try:
-    #     resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=15)
-    #     ok = 200 <= resp.status_code < 300
-    #     status_text = f"Mailtrap: {resp.status_code} - {resp.text}"
-    #     if ok:
-    #         print(f"✅ Email sent successfully: {status_text}")
-    #     else:
-    #         print(f"❌ Email failed to send: {status_text}")
-    #     return ok, status_text
-    # except Exception as e:
-    #     return False, f"Mailtrap exception: {e}"
+        return {
+            "success": True,
+            "status_text": "🧪🧪 Email would be sent in TEST_MODE 🧪🧪",
+            "http_status": None,
+            "response_text": None,
+            "error": None,
+            "request_id": None,
+        }
+    try:
+        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
+        ok = 200 <= resp.status_code < 300
+        status_text = f"Mailtrap: {resp.status_code}"
+        resp_text = resp.text
+        request_id = resp.headers.get("X-Request-Id") or resp.headers.get("X-Request-Id".lower())
+        
+        # Log structured information
+        log_http_status = getattr(settings, "LIBTRACK_LOG_HTTP_STATUS", True)
+        if log_http_status:
+            logger.info(
+                f"Mailtrap email send: status={resp.status_code}, request_id={request_id}, "
+                f"recipients={len(recipients)}, library={library}"
+            )
+        
+        if ok:
+            print(f"✅ Email sent successfully: {status_text}")
+            return {
+                "success": True,
+                "status_text": status_text,
+                "http_status": resp.status_code,
+                "response_text": resp_text,
+                "error": None,
+                "request_id": request_id,
+            }
+        else:
+            print(f"❌ Email failed to send: {status_text}")
+            logger.warning(
+                f"Mailtrap email failed: status={resp.status_code}, request_id={request_id}, "
+                f"library={library}, error_response={resp_text[:200]}"
+            )
+            return {
+                "success": False,
+                "status_text": status_text,
+                "http_status": resp.status_code,
+                "response_text": resp_text,
+                "error": "http_error",
+                "request_id": request_id,
+            }
+    except Exception as e:
+        logger.error(f"Mailtrap exception: {e}", exc_info=True)
+        return {
+            "success": False,
+            "status_text": "Mailtrap exception",
+            "http_status": None,
+            "response_text": None,
+            "error": str(e),
+            "request_id": None,
+        }
 
 
 # from tracker.utils.send_mail import send_update_email  # adjust import path if different

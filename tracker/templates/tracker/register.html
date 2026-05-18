@@ -3,46 +3,24 @@
 {% block title %}LibTrack AI – Register{% endblock %}
 
 {% block content %}
-<div class="container py-5" style="max-width: 550px;">
-
-  <!-- 🔹 Toast Container (Top-right corner) -->
-  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
-    {% if messages %}
-    {% for m in messages %}
-    <div
-      class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
-      role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-      <div class="d-flex">
-        <div class="toast-body">
-          {{ m }}
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-          aria-label="Close"></button>
-      </div>
-    </div>
-    {% endfor %}
-    {% endif %}
-  </div>
-
-  <!-- 🔹 Registration Card -->
-  <div class="card border-0 shadow-lg">
-    <div class="card-body p-5">
-      <div class="text-center mb-4">
-        <h2 class="fw-bold text-dark mb-2">Create Account</h2>
-        <p class="text-muted">Join LibTrack AI and start tracking your projects</p>
+<div class="auth-shell">
+  <div class="auth-card" style="max-width: 480px;">
+    <div class="p-4 p-md-5">
+      <div class="auth-header">
+        <div class="brand-mark"><i class="bi bi-box-seam"></i></div>
+        <h2>Create your account</h2>
+        <p>Join LibTrack AI and start tracking your projects</p>
       </div>
 
       <form method="post" novalidate>
         {% csrf_token %}
 
         <div class="mb-3">
-          <label for="{{ form.username.id_for_label }}" class="form-label text-dark fw-semibold">Username</label>
+          <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
           {{ form.username }}
           {% if form.username.errors %}
           <div class="text-danger small mt-1">
-            {% for error in form.username.errors %}
-            {{ error }}
-            {% endfor %}
+            {% for error in form.username.errors %}{{ error }}{% endfor %}
           </div>
           {% else %}
           <div class="form-text small">{{ form.username.help_text }}</div>
@@ -50,19 +28,17 @@
         </div>
 
         <div class="mb-3">
-          <label for="{{ form.email.id_for_label }}" class="form-label text-dark fw-semibold">Email</label>
+          <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
           {{ form.email }}
           {% if form.email.errors %}
           <div class="text-danger small mt-1">
-            {% for error in form.email.errors %}
-            {{ error }}
-            {% endfor %}
+            {% for error in form.email.errors %}{{ error }}{% endfor %}
           </div>
           {% endif %}
         </div>
 
         <div class="mb-3">
-          <label for="{{ form.password1.id_for_label }}" class="form-label text-dark fw-semibold">Password</label>
+          <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
           <div class="input-group">
             {{ form.password1 }}
             <button class="btn btn-outline-secondary" type="button" id="togglePassword1">
@@ -71,9 +47,7 @@
           </div>
           {% if form.password1.errors %}
           <div class="text-danger small mt-1">
-            {% for error in form.password1.errors %}
-            {{ error }}
-            {% endfor %}
+            {% for error in form.password1.errors %}{{ error }}{% endfor %}
           </div>
           {% else %}
           <div class="form-text small">{{ form.password1.help_text }}</div>
@@ -81,8 +55,7 @@
         </div>
 
         <div class="mb-4">
-          <label for="{{ form.password2.id_for_label }}" class="form-label text-dark fw-semibold">Confirm
-            Password</label>
+          <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
           <div class="input-group">
             {{ form.password2 }}
             <button class="btn btn-outline-secondary" type="button" id="togglePassword2">
@@ -91,77 +64,47 @@
           </div>
           {% if form.password2.errors %}
           <div class="text-danger small mt-1">
-            {% for error in form.password2.errors %}
-            {{ error }}
-            {% endfor %}
+            {% for error in form.password2.errors %}{{ error }}{% endfor %}
           </div>
           {% endif %}
         </div>
 
         {% if form.non_field_errors %}
-        <div class="alert alert-danger" role="alert">
-          {{ form.non_field_errors.0 }}
-        </div>
+        <div class="alert alert-danger py-2" role="alert">{{ form.non_field_errors.0 }}</div>
         {% endif %}
 
         <div class="d-grid mb-3">
           <button type="submit" class="btn btn-primary btn-lg">Create Account</button>
         </div>
 
-        <div class="text-center">
-          <p class="text-muted mb-0">
-            Already have an account?
-            <a href="{% url 'login' %}" class="text-primary fw-semibold text-decoration-none">Log in</a>
-          </p>
-        </div>
+        <p class="text-center text-muted mb-0">
+          Already have an account?
+          <a href="{% url 'login' %}" class="fw-semibold">Log in</a>
+        </p>
       </form>
     </div>
   </div>
-
-  <!-- <div class="text-center mt-4">
-    <small class="text-muted">
-      © {{ now|date:"Y" }} LibTrack AI — Track your project dependencies
-    </small>
-  </div> -->
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const toastElList = [].slice.call(document.querySelectorAll(".toast"));
-    toastElList.forEach(function (toastEl) {
-      const t = new bootstrap.Toast(toastEl);
-      t.show();
-    });
-
-    // Toggle password visibility for password1
-    const togglePassword1 = document.getElementById('togglePassword1');
-    const password1Field = document.getElementById('{{ form.password1.id_for_label }}');
-    const toggleIcon1 = document.getElementById('togglePassword1Icon');
-
-    if (togglePassword1 && password1Field) {
-      togglePassword1.addEventListener('click', function () {
-        const type = password1Field.getAttribute('type') === 'password' ? 'text' : 'password';
-        password1Field.setAttribute('type', type);
-        toggleIcon1.classList.toggle('bi-eye');
-        toggleIcon1.classList.toggle('bi-eye-slash');
+    [["togglePassword1", "{{ form.password1.id_for_label }}", "togglePassword1Icon"],
+     ["togglePassword2", "{{ form.password2.id_for_label }}", "togglePassword2Icon"]]
+      .forEach(function (ids) {
+        const btn = document.getElementById(ids[0]);
+        const field = document.getElementById(ids[1]);
+        const icon = document.getElementById(ids[2]);
+        if (btn && field) {
+          btn.addEventListener('click', function () {
+            const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+            field.setAttribute('type', type);
+            icon.classList.toggle('bi-eye');
+            icon.classList.toggle('bi-eye-slash');
+          });
+        }
       });
-    }
-
-    // Toggle password visibility for password2
-    const togglePassword2 = document.getElementById('togglePassword2');
-    const password2Field = document.getElementById('{{ form.password2.id_for_label }}');
-    const toggleIcon2 = document.getElementById('togglePassword2Icon');
-
-    if (togglePassword2 && password2Field) {
-      togglePassword2.addEventListener('click', function () {
-        const type = password2Field.getAttribute('type') === 'password' ? 'text' : 'password';
-        password2Field.setAttribute('type', type);
-        toggleIcon2.classList.toggle('bi-eye');
-        toggleIcon2.classList.toggle('bi-eye-slash');
-      });
-    }
   });
 </script>
 {% endblock %}

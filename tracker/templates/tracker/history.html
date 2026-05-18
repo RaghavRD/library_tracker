@@ -3,42 +3,22 @@
 {% block title %}LibTrack AI – Last Updates{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 1100px;">
-
-    <!-- 🔹 Toast Container (Top-right corner) -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080">
-        {% if messages %}
-        {% for m in messages %}
-        <div class="toast align-items-center text-white {% if m.tags == 'success' %}bg-success{% elif m.tags == 'error' %}bg-danger{% elif m.tags == 'warning' %}bg-warning text-dark{% else %}bg-info{% endif %} border-0 mb-2"
-            role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-            <div class="d-flex">
-                <div class="toast-body">
-                    {{ m }}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-                    aria-label="Close"></button>
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-    </div>
+<div class="container-xl">
 
     <!-- 🔹 Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
         <div>
-            <h1 class="fw-semibold mb-1">History Updates</h1>
-            <p class="text-muted mb-0">
-                View the cached release history for every registered project.
-            </p>
+            <h1 class="section-title">Update History</h1>
+            <p class="page-subtitle">Cached release history for every registered project.</p>
         </div>
     </div>
 
+    <div>
     <!-- 🔹 Update Cache Table -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-primary text-white d-flex flex-column flex-md-row justify-content-between gap-2">
+        <!-- <div class="card-header bg-primary text-white d-flex flex-column flex-md-row justify-content-between gap-2">
             <div>
                 <h5 class="mb-1">Update Cache</h5>
-                <!-- <p class="mb-0 small text-white-50">Filter by project to spotlight the relevant releases.</p> -->
             </div>
             <div class="text-md-end">
                 <span class="badge bg-light text-dark">
@@ -49,17 +29,17 @@
                     {% endif %}
                 </span>
             </div>
-        </div>
+        </div> -->
 
-        <div class="card-body border-bottom bg-light">
+        <div class="card-body border-bottom bg-body-tertiary">
             <div class="row g-3 align-items-end">
                 <div class="col-md-6">
                     <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
                         Project Filter
                     </label>
                     <form method="get" id="historyFilterForm" class="w-100">
-                        <div class="input-group shadow-sm">
-                            <span class="input-group-text bg-white">
+                        <div class="input-group">
+                            <span class="input-group-text">
                                 <i class="bi bi-funnel-fill text-primary"></i>
                             </span>
                             <select id="projectFilter" name="project" class="form-select" {% if not project_names %}disabled{% endif %}>
@@ -90,28 +70,30 @@
         <div class="card-body p-0">
             {% if history_total and history_page %}
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead class="table-light text-center">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="text-center">
                         <tr>
-                            <th>#</th>
-                            <th>Library</th>
-                            <th>Projects</th>
-                            <th>Version</th>
-                            <th>Category</th>
-                            <th>Release Date</th>
-                            <th>Source</th>
-                            <th>Updated At</th>
+                            <th width="1%">#</th>
+                            <th class="text-wrap" width="10%">Library</th>
+                            <th width="15%">Projects</th>
+                            <th width="10%">Version</th>
+                            <th width="10%">Category</th>
+                            <th width="12%">Detection Method</th>
+                            <th width="12%">Release Date</th>
+                            <th width="10%">Source</th>
+                            <th width="10%">Notification Status</th>
+                            <th width="10%">Updated At</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for c in history_page %}
+                        {% for record in history_page %}
                         <tr class="text-center">
                             <td class="text-center fw-medium">{{ history_page.start_index|add:forloop.counter0 }}</td>
-                            <td>{{ c.library }}</td>
+                            <td>{{ record.library }}</td>
                             <td>
-                                {% if c.project_names %}
+                                {% if record.project_names %}
                                 <div class="d-flex flex-wrap gap-1 justify-content-center">
-                                    {% for project in c.project_names %}
+                                    {% for project in record.project_names %}
                                     <span class="badge rounded-pill bg-secondary-subtle text-secondary fw-normal px-3">{{ project }}</span>
                                     {% endfor %}
                                 </div>
@@ -120,15 +102,31 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-info text-dark">{{ c.version }}</span>
+                                <span class="badge bg-info text-dark">{{ record.version }}</span>
                             </td>
-                            <td>{{ c.category }}</td>
-                            <td>{{ c.release_date_formatted|default:"—" }}</td>
+                            <td>{{ record.category|capfirst }}</td>
                             <td>
-                                <a href="{{ c.source }}" class="link-primary text-decoration-none" target="_blank"
+                                {% if record.detection_method %}
+                                <span class="badge bg-secondary text-white small">{{ record.detection_method|upper }}</span>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.release_date_formatted|default:"—" }}</td>
+                            <td>
+                                <a href="{{ record.source }}" class="link-primary text-decoration-none" target="_blank"
                                     rel="noopener">View</a>
                             </td>
-                            <td>{{ c.updated_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if record.last_notification_success %}
+                                    <span class="badge bg-success" title="Notification sent successfully">✓</span>
+                                {% elif record.last_notification_success is False %}
+                                    <span class="badge bg-danger" title="Notification failed">✗</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.updated_at|date:"Y-m-d" }}, <small class="text-muted">{{ record.updated_at|date:"H:i" }}</small></td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -145,7 +143,7 @@
             {% endif %}
         </div>
         {% if history_total and history_page and history_page.paginator.num_pages > 1 %}
-        <div class="card-footer border-0 bg-light">
+        <div class="card-footer border-0">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
                 <small class="text-muted mb-0">
                     Showing {{ history_page.start_index }}-{{ history_page.end_index }} of {{ history_total }} record{{ history_total|pluralize }}
@@ -186,6 +184,7 @@
         </div>
         {% endif %}
     </div>
+    </div>
 </div>
 
 {% endblock %}
@@ -193,11 +192,6 @@
 {% block extra_scripts %}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const toastElList = [].slice.call(document.querySelectorAll(".toast"));
-        toastElList.forEach(function (toastEl) {
-            const t = new bootstrap.Toast(toastEl);
-            t.show();
-        });
         const filterSelect = document.getElementById("projectFilter");
         if (filterSelect) {
             filterSelect.addEventListener("change", function () {

@@ -114,7 +114,7 @@ class TestFutureUpdateNotifications:
             'MAILTRAP_MAIN_KEY': 'test_key',
             'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
         }):
-            success, message = send_update_email(
+            result = send_update_email(
                 mailtrap_api_key='test_key',
                 project_name='Test Project',
                 recipients='dev@test.com',
@@ -137,8 +137,8 @@ class TestFutureUpdateNotifications:
                 future_opt_in=True
             )
         
-        assert success
-        assert 'Test email sent' in message
+        assert result['success']
+        assert 'Email would be sent' in result.get('status_text', '') or 'Email sent' in result.get('status_text', '')
     
     def test_future_update_subject_line(self, mock_project):
         """Test that future updates have distinct subject lines."""
@@ -149,7 +149,7 @@ class TestFutureUpdateNotifications:
             'MAILTRAP_MAIN_KEY': 'test_key',
             'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
         }):
-            success, _ = send_update_email(
+            result = send_update_email(
                 mailtrap_api_key='test_key',
                 project_name='Test Project',
                 recipients='dev@test.com',
@@ -162,7 +162,7 @@ class TestFutureUpdateNotifications:
             )
         
         # The subject should contain "Future Update Alert"
-        assert success
+        assert result['success']
     
     def test_confidence_in_email(self, mock_project):
         """Test that confidence percentage appears in future update emails."""
@@ -179,7 +179,7 @@ class TestFutureUpdateNotifications:
                 mock_response.status_code = 200
                 mock_post.return_value = mock_response
                 
-                success, _ = send_update_email(
+                result = send_update_email(
                     mailtrap_api_key='test_key',
                     project_name='Test Project',
                     recipients='dev@test.com',

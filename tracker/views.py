@@ -1,264 +1,18 @@
-import json
-import traceback
+import logging
 from collections import defaultdict
-from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.utils.http import url_has_allowed_host_and_scheme
 
-from tracker.models import UpdateCache, Project, StackComponent
+from tracker.models import UpdateCache, Project, StackComponent, FutureUpdateCache, NotificationRecord
 from tracker.forms import LoginForm, RegistrationForm
+from tracker.services.project_service import ProjectService
 
-VALID_NOTIFICATION_TYPES = {"both", "major", "minor", "future"}
-NOTIFICATION_ORDER = ("major", "minor", "future")
-STANDARD_DATE_OUTPUT = "%Y-%m-%d"
-
-def _normalize_notification_types(selected: list[str]) -> set[str]:
-    normalized: set[str] = set()
-    for choice in selected:
-        value = choice.strip().lower()
-        if not value:
-            continue
-        if value == "both":
-            normalized.update({"major", "minor"})
-            continue
-        if value in VALID_NOTIFICATION_TYPES and value != "both":
-            normalized.add(value)
-    if not normalized:
-        normalized.update({"major", "minor"})
-    return normalized
-
-def _validate_emails(csv: str):
-    """
-    Validates a comma-separated string of emails.
-    Returns a list of valid emails or None if any are invalid.
-    """
-    emails = [e.strip() for e in csv.split(",") if e.strip()]
-    for e in emails:
-        try:
-            validate_email(e)
-        except ValidationError:
-            return None
-    return emails
-
-
-def _build_registration_payload(request):
-    """
-    Extracts and validates registration form data from POST requests.
-    Returns a tuple of (payload_dict, error_message).
-    """
-    project_name = request.POST.get("project_name", "").strip()
-    developer_names = request.POST.get("developer_names", "").strip()
-    developer_emails_raw = request.POST.get("developer_emails", "").strip()
-    notification_selections = request.POST.getlist("notification_types")
-    normalized_preferences = _normalize_notification_types(notification_selections or ["major", "minor"])
-    notification_type = ", ".join([option for option in NOTIFICATION_ORDER if option in normalized_preferences])
-
-    if not all([project_name, developer_names, developer_emails_raw]):
-        return None, "Please complete the project and team fields before submitting."
-
-    emails = _validate_emails(developer_emails_raw)
-    if emails is None:
-        return None, "One or more developer emails are invalid."
-
-    component_types = request.POST.getlist("component_type[]")
-    component_names = request.POST.getlist("component_name[]")
-    component_versions = request.POST.getlist("component_version[]")
-    component_scopes = request.POST.getlist("component_scope[]")
-
-    components: list[dict] = []
-    for idx, raw_name in enumerate(component_names):
-        name = raw_name.strip()
-        if not name:
-            continue
-
-        version = component_versions[idx].strip() if idx < len(component_versions) else ""
-        if not version:
-            return None, f"Please provide a version for '{name}'."
-
-        type_label = component_types[idx].strip() if idx < len(component_types) else ""
-        scope = component_scopes[idx].strip() if idx < len(component_scopes) else ""
-        category = type_label or "Dependency"
-        key = category.strip().lower() or "dependency"
-        if "language" in key:
-            key = "language"
-        components.append(
-            {
-                "category": category,
-                "key": key,
-                "name": name,
-                "version": version,
-                "scope": scope,
-            }
-        )
-
-    if not components:
-        return None, "Add at least one technology component to the stack."
-
-    languages = [c for c in components if c["key"] == "language"]
-    others = [c for c in components if c["key"] != "language"]
-
-    payload = {
-        "project_name": project_name,
-        "developer_names": developer_names,
-        "developer_emails": ", ".join(emails),
-        "language_used": ", ".join([c["name"] for c in languages]),
-        "language_version": ", ".join([c["version"] for c in languages]),
-        "libraries": ", ".join([c["name"] for c in others]),
-        "library_versions": ", ".join([c["version"] for c in others]),
-        "notification_type": notification_type,
-        "tech_stack": json.dumps(components),
-    }
-    payload["stack_components"] = components
-    return payload, None
-
-
-def _format_release_date(raw: str | None) -> str:
-    value = (raw or "").strip()
-    if not value:
-        return ""
-
-    known_formats = (
-        "%Y-%m-%d",
-        "%d-%m-%Y",
-        "%Y/%m/%d",
-        "%d/%m/%Y",
-        "%b %d, %Y",
-        "%B %d, %Y",
-        "%d %b %Y",
-        "%d %B %Y",
-    )
-
-    for fmt in known_formats:
-        try:
-            parsed = datetime.strptime(value, fmt)
-            return parsed.strftime(STANDARD_DATE_OUTPUT)
-        except ValueError:
-            continue
-
-    try:
-        normalized = value.replace("Z", "+00:00")
-        parsed = datetime.fromisoformat(normalized)
-        return parsed.strftime(STANDARD_DATE_OUTPUT)
-    except ValueError:
-        pass
-
-    return value
-
-
-def _normalize_component_key(category: str, key: str | None) -> str:
-    candidate = (key or category or "dependency").strip().lower() or "dependency"
-    if "language" in candidate:
-        return "language"
-    return candidate
-
-
-def _parse_stack_payload(payload: dict) -> list[dict]:
-    stack = payload.get("stack_components")
-    if stack is None:
-        try:
-            stack = json.loads(payload.get("tech_stack", "[]") or "[]")
-        except json.JSONDecodeError:
-            stack = []
-
-    normalized: list[dict] = []
-    for component in stack or []:
-        name = str(component.get("name", "")).strip()
-        version = str(component.get("version", "")).strip()
-        if not name or not version:
-            continue
-        category = str(component.get("category") or component.get("type") or "Dependency").strip() or "Dependency"
-        key = _normalize_component_key(category, component.get("key"))
-        scope = str(component.get("scope", "")).strip()
-        normalized.append(
-            {
-                "category": category,
-                "key": key,
-                "name": name,
-                "version": version,
-                "scope": scope,
-            }
-        )
-    return normalized
-
-
-def _save_project_from_payload(payload: dict, *, instance: Project | None = None) -> Project:
-    stack = _parse_stack_payload(payload)
-    if not stack:
-        raise ValueError("Add at least one technology component to the stack.")
-
-    notification_value = payload.get("notification_type") or "major, minor"
-
-    with transaction.atomic():
-        if instance is None:
-            instance = Project.objects.create(
-                project_name=payload["project_name"],
-                developer_names=payload["developer_names"],
-                developer_emails=payload["developer_emails"],
-                notification_type=notification_value,
-            )
-        else:
-            instance.project_name = payload["project_name"]
-            instance.developer_names = payload["developer_names"]
-            instance.developer_emails = payload["developer_emails"]
-            instance.notification_type = notification_value
-            instance.save()
-            instance.components.all().delete()
-
-        StackComponent.objects.bulk_create(
-            [
-                StackComponent(
-                    project=instance,
-                    category=item["category"],
-                    key=item["key"],
-                    name=item["name"],
-                    version=item["version"],
-                    scope=item["scope"],
-                )
-                for item in stack
-            ]
-        )
-
-    return instance
-
-
-def _serialize_project(project: Project) -> dict:
-    components = [
-        {
-            "id": component.id,
-            "category": component.category,
-            "key": component.key,
-            "name": component.name,
-            "version": component.version,
-            "scope": component.scope,
-        }
-        for component in project.components.all()
-    ]
-
-    languages = [comp for comp in components if comp["key"] == "language"]
-    notification_list = [item.strip() for item in (project.notification_type or "").split(",") if item.strip()]
-    if not notification_list:
-        notification_list = ["major", "minor"]
-
-    return {
-        "project_id": project.id,
-        "project_name": project.project_name,
-        "developer_names": project.developer_names,
-        "developer_emails": project.developer_emails,
-        "language_used": ", ".join([comp["name"] for comp in languages]),
-        "language_version": ", ".join([comp["version"] for comp in languages]),
-        "stack_components": components,
-        "stack_json": json.dumps(components),
-        "notification_type": project.notification_type,
-        "notification_list": notification_list,
-    }
-
+logger = logging.getLogger("libtrack")
 
 def login_view(request):
     """
@@ -276,8 +30,14 @@ def login_view(request):
             if user is not None:
                 login(request, user)
                 messages.success(request, f'Welcome back, {username}!')
-                next_url = request.GET.get('next', 'dashboard')
-                return redirect(next_url)
+                next_url = request.GET.get('next', '')
+                if next_url and url_has_allowed_host_and_scheme(
+                    next_url,
+                    allowed_hosts={request.get_host()},
+                    require_https=request.is_secure(),
+                ):
+                    return redirect(next_url)
+                return redirect('dashboard')
             else:
                 messages.error(request, 'Invalid username or password.')
         else:
@@ -321,56 +81,121 @@ def register_view(request):
     return render(request, 'tracker/register.html', {'form': form})
 
 
-def register_project(request):
-    """
-    Handles project registration via HTML form.
-    Validates input and stores project details in Google Sheets.
-    Shows success/error toast messages on redirect.
-    """
-    if request.method == "POST":
-        payload, error = _build_registration_payload(request)
-        if error:
-            messages.error(request, error)
-            return render(request, "tracker/register.html")
-
-        try:
-            _save_project_from_payload(payload)
-            messages.success(request, f"Project '{payload['project_name']}' saved successfully!")
-        except ValueError as exc:
-            messages.error(request, str(exc))
-            return render(request, "tracker/register.html")
-        except Exception:
-            print("Error while saving registration:", traceback.format_exc())
-            messages.error(request, "Failed to save project. Please try again later.")
-            return render(request, "tracker/register.html")
-
-        return redirect("dashboard")
-
-    return render(request, "tracker/register.html")
-
-
 @login_required
 def dashboard(request):
     """
-    Displays project registrations and update cache.
+    New Analytics Dashboard.
+    Displays high-level metrics and charts.
+    """
+    total_projects = Project.objects.count()
+    
+    # Count total libraries (using StackComponent or unique libraries)
+    # Using StackComponent gives us the libraries actually tracked in projects
+    total_components = StackComponent.objects.exclude(key='language').count()
+    
+    # Calculate unique category breakdown using optimized SQL
+    from django.db.models import Case, When, Value, CharField, Count
+
+    # Annotate components with normalized category buckets
+    # Logic mirrors previous python mapping: language -> languages, tool -> tools, module -> modules, else -> libraries
+    annotated_components = StackComponent.objects.annotate(
+        norm_cat=Case(
+            When(key__icontains='language', then=Value('languages')),
+            When(category__icontains='language', then=Value('languages')),
+            When(category__icontains='tool', then=Value('tools')),
+            When(category__icontains='module', then=Value('modules')),
+            default=Value('libraries'),
+            output_field=CharField(),
+        )
+    )
+
+    # Get unique counts per category bucket
+    # We want count of unique NAMES per bucket
+    category_aggs = annotated_components.values('norm_cat').annotate(
+        unique_count=Count('name', distinct=True)
+    )
+
+    # Convert to dictionary for context
+    category_counts = {
+        "languages": 0,
+        "libraries": 0, 
+        "tools": 0,
+        "modules": 0
+    }
+    
+    total_unique_items = 0
+    for entry in category_aggs:
+        cat = entry['norm_cat']
+        count = entry['unique_count']
+        if cat in category_counts:
+            category_counts[cat] = count
+        # For total unique, complex because same name could appear in diff buckets (rare but possible)
+        # We'll trust the sum of buckets or doing a separate distinct count
+    
+    # Total unique stack count (across all categories)
+    total_unique_stack_count = StackComponent.objects.values('name', 'category').distinct().count()
+
+    
+    # Calculate updates available
+    updates_qs = UpdateCache.objects.all()
+    total_updates = updates_qs.count()
+    
+    major_updates = updates_qs.filter(category='major').count()
+    minor_updates = updates_qs.filter(category='minor').count()
+    
+    # Future updates
+    future_updates_count = FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed']).count()
+    
+    # Health Score Calculation
+    # Simple logic: 100 - (updates / components * 100)
+    # If components is 0, score is 100.
+    health_score = 100
+    if total_components > 0:
+        ratio = total_updates / total_components
+        # Cap at 100% impact (meaning 0 score) if ratio > 1
+        params = min(ratio, 1.0)
+        health_score = int((1.0 - params) * 100)
+    
+    context = {
+        "total_projects": total_projects,
+        "total_components": total_components,
+        "total_updates": total_updates,
+        "major_updates": major_updates,
+        "minor_updates": minor_updates,
+        "future_updates_count": future_updates_count,
+        "total_unique_stack_count": total_unique_stack_count,
+        "health_score": health_score,
+        # Category breakdown
+        "languages_count": category_counts["languages"],
+        "libraries_count": category_counts["libraries"],
+        "tools_count": category_counts["tools"],
+        "modules_count": category_counts["modules"],
+    }
+    return render(request, "tracker/dashboard.html", context)
+
+
+@login_required
+def projects_view(request):
+    """
+    Displays project active registrations (Renamed from Dashboard).
     """
     if request.method == "POST":
         action = request.POST.get("action")
 
         if action == "create":
-            payload, error = _build_registration_payload(request)
+            payload, error = ProjectService.build_registration_payload(request)
             if error:
                 messages.error(request, error)
             else:
                 try:
-                    _save_project_from_payload(payload)
+                    ProjectService.save_project_from_payload(payload)
                     messages.success(request, f"Project '{payload['project_name']}' added successfully.")
                 except ValueError as exc:
                     messages.error(request, str(exc))
                 except Exception:
-                    print("Error while creating project:", traceback.format_exc())
+                    logger.exception("Error while creating project")
                     messages.error(request, "Failed to add project. Please try again.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         if action == "update":
             project_id = request.POST.get("project_id")
@@ -378,22 +203,22 @@ def dashboard(request):
                 project = Project.objects.prefetch_related("components").get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for update.")
-                return redirect("dashboard")
+                return redirect("projects")
 
-            payload, error = _build_registration_payload(request)
+            payload, error = ProjectService.build_registration_payload(request)
             if error:
                 messages.error(request, error)
-                return redirect("dashboard")
+                return redirect("projects")
 
             try:
-                _save_project_from_payload(payload, instance=project)
+                ProjectService.save_project_from_payload(payload, instance=project)
                 messages.success(request, f"Project '{payload['project_name']}' updated.")
             except ValueError as exc:
                 messages.error(request, str(exc))
             except Exception:
-                print("Error while updating project:", traceback.format_exc())
+                logger.exception("Error while updating project")
                 messages.error(request, "Failed to update project. Please try again.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         if action == "delete":
             project_id = request.POST.get("project_id")
@@ -401,23 +226,21 @@ def dashboard(request):
                 project = Project.objects.get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for deletion.")
-                return redirect("dashboard")
+                return redirect("projects")
 
             project_name = request.POST.get("project_name") or project.project_name or "Project"
             project.delete()
             messages.success(request, f"{project_name} deleted.")
-            return redirect("dashboard")
+            return redirect("projects")
 
         messages.error(request, "Unknown action.")
-        return redirect("dashboard")
+        return redirect("projects")
 
     project_qs = Project.objects.prefetch_related("components").order_by("-created_at")
-    regs = [_serialize_project(project) for project in project_qs]
+    regs = [ProjectService.serialize_project(project) for project in project_qs]
 
     cache = UpdateCache.objects.order_by("-updated_at").all()
-    
-    # ===== NEW: Fetch future updates =====
-    from tracker.models import FutureUpdateCache
+
     future_updates = FutureUpdateCache.objects.filter(
         status__in=['detected', 'confirmed']
     ).order_by('-confidence', '-updated_at')[:10]
@@ -430,7 +253,7 @@ def dashboard(request):
 
     return render(
         request,
-        "tracker/dashboard.html",
+        "tracker/projects.html",
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,
@@ -472,7 +295,14 @@ def updateHistory(request):
     for entry in cache:
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
-        entry.release_date_formatted = _format_release_date(entry.release_date)
+        entry.release_date_formatted = ProjectService.format_release_date(entry.release_date)
+
+        # Fetch latest notification record to show status
+        latest_notification = NotificationRecord.objects.filter(
+            library=entry.library
+        ).order_by("-created_at").first()
+        entry.last_notification_success = latest_notification.success if latest_notification else None
+        entry.last_notification_sent_at = latest_notification.sent_at if latest_notification else None
 
     selected_project = (request.GET.get("project") or "").strip()
     if selected_project:
@@ -504,32 +334,25 @@ def future_updates(request):
     """
     Displays future/planned updates with filtering and pagination.
     """
-    from tracker.models import FutureUpdateCache
-    
     # Build project lookup for filtering
-    project_names = []
-    project_lookup = {}  # {library_key: [project_names]}
-    
-    if True:  # Always build lookup for filtering
-        from collections import defaultdict
-        map_temp = defaultdict(set)
-        projects_set = set()
-        
-        project_qs = Project.objects.prefetch_related("components").all()
-        for project in project_qs:
-            project_name = (project.project_name or "").strip()
-            if not project_name:
+    map_temp = defaultdict(set)
+    projects_set = set()
+
+    project_qs = Project.objects.prefetch_related("components").all()
+    for project in project_qs:
+        project_name = (project.project_name or "").strip()
+        if not project_name:
+            continue
+        projects_set.add(project_name)
+        for component in project.components.all():
+            lib_key = (component.name or "").strip().lower()
+            if not lib_key:
                 continue
-            projects_set.add(project_name)
-            for component in project.components.all():
-                lib_key = (component.name or "").strip().lower()
-                if not lib_key:
-                    continue
-                map_temp[lib_key].add(project_name)
-        
-        project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
-        project_names = sorted(projects_set, key=str.casefold)
-    
+            map_temp[lib_key].add(project_name)
+
+    project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
+    project_names = sorted(projects_set, key=str.casefold)
+
     # Get all future updates
     future_qs = FutureUpdateCache.objects.order_by('-confidence', '-updated_at').all()
     future_list = list(future_qs)
@@ -592,4 +415,49 @@ def profile_view(request):
         form = PasswordChangeForm(request.user)
     return render(request, 'tracker/profile.html', {
         'form': form
+    })
+
+
+@login_required
+def settings_view(request):
+    """
+    User settings page for managing per-project notification preferences.
+    Allows users to toggle notify_paused and set min_confidence_threshold.
+    """
+    projects = Project.objects.all().order_by('project_name')
+    
+    if request.method == 'POST':
+        try:
+            for project in projects:
+                # Get form data for this project
+                notify_paused_key = f"notify_paused_{project.id}"
+                threshold_key = f"min_confidence_threshold_{project.id}"
+                
+                # Handle notify_paused toggle (checkbox)
+                notify_paused = request.POST.get(notify_paused_key) == 'on'
+                
+                # Handle threshold value
+                threshold_str = request.POST.get(threshold_key, "50").strip()
+                try:
+                    threshold = int(threshold_str)
+                    if threshold < 0:
+                        threshold = 0
+                    elif threshold > 100:
+                        threshold = 100
+                except (ValueError, TypeError):
+                    threshold = 50
+                
+                # Update project if changed
+                project.notify_paused = notify_paused
+                project.min_confidence_threshold = threshold
+                project.save()
+            
+            messages.success(request, 'Project settings updated successfully!')
+            return redirect('settings')
+        except Exception as exc:
+            messages.error(request, f'Error updating settings: {str(exc)}')
+            logger.exception("Error in settings_view POST")
+    
+    return render(request, 'tracker/settings.html', {
+        'projects': projects,
     })

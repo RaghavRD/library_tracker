@@ -1,14 +1,17 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
-DEBUG = os.getenv("DEBUG", "True") == "True"
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()] or ["*"]
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
+if DEBUG and not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -55,7 +58,12 @@ DATABASES = {
     }
 }
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Kolkata")
@@ -65,16 +73,15 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
-    BASE_DIR / "tracker" / "static",  # ✅ add this
+    BASE_DIR / "tracker" / "static",
 ]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Authentication settings
-LOGIN_URL = "/tracker/login/"
-LOGIN_REDIRECT_URL = "/tracker/dashboard/"
-LOGOUT_REDIRECT_URL = "/tracker/login/"
+# Authentication settings (resolved against the current URLConf)
+LOGIN_URL = reverse_lazy("login")
+LOGIN_REDIRECT_URL = reverse_lazy("dashboard")
+LOGOUT_REDIRECT_URL = reverse_lazy("login")
 
 # Logging configuration
 LOGGING = {
@@ -138,3 +145,60 @@ LOGGING = {
         },
     },
 }
+
+# ============================================================================
+# LibTrack AI Configuration Settings
+# ============================================================================
+
+# Notification Service Settings
+LIBTRACK_MAX_NOTIFICATION_RETRIES = os.getenv("LIBTRACK_MAX_NOTIFICATION_RETRIES", "3")
+try:
+    LIBTRACK_MAX_NOTIFICATION_RETRIES = int(LIBTRACK_MAX_NOTIFICATION_RETRIES)
+except (ValueError, TypeError):
+    LIBTRACK_MAX_NOTIFICATION_RETRIES = 3
+
+# Future Update Detection Settings
+LIBTRACK_MIN_FUTURE_CONFIDENCE = os.getenv("LIBTRACK_MIN_FUTURE_CONFIDENCE", "50")
+try:
+    LIBTRACK_MIN_FUTURE_CONFIDENCE = int(LIBTRACK_MIN_FUTURE_CONFIDENCE)
+except (ValueError, TypeError):
+    LIBTRACK_MIN_FUTURE_CONFIDENCE = 50
+
+LIBTRACK_MAX_FUTURE_CONFIDENCE = os.getenv("LIBTRACK_MAX_FUTURE_CONFIDENCE", "100")
+try:
+    LIBTRACK_MAX_FUTURE_CONFIDENCE = int(LIBTRACK_MAX_FUTURE_CONFIDENCE)
+except (ValueError, TypeError):
+    LIBTRACK_MAX_FUTURE_CONFIDENCE = 100
+
+# Version Fetch Service Settings
+LIBTRACK_USE_OFFICIAL_APIS = os.getenv("LIBTRACK_USE_OFFICIAL_APIS", "True") == "True"
+LIBTRACK_FETCH_DEBUG_MODE = os.getenv("LIBTRACK_FETCH_DEBUG_MODE", "False") == "True"
+
+# Email / Notification Settings
+LIBTRACK_ENABLE_EMAIL_NOTIFICATIONS = os.getenv("LIBTRACK_ENABLE_EMAIL_NOTIFICATIONS", "True") == "True"
+LIBTRACK_EMAIL_BATCH_SIZE = os.getenv("LIBTRACK_EMAIL_BATCH_SIZE", "5")
+try:
+    LIBTRACK_EMAIL_BATCH_SIZE = int(LIBTRACK_EMAIL_BATCH_SIZE)
+except (ValueError, TypeError):
+    LIBTRACK_EMAIL_BATCH_SIZE = 5
+
+# Deduplication & Rate Limiting
+LIBTRACK_DEDUP_WINDOW_HOURS = os.getenv("LIBTRACK_DEDUP_WINDOW_HOURS", "24")
+try:
+    LIBTRACK_DEDUP_WINDOW_HOURS = int(LIBTRACK_DEDUP_WINDOW_HOURS)
+except (ValueError, TypeError):
+    LIBTRACK_DEDUP_WINDOW_HOURS = 24
+
+LIBTRACK_API_RATE_LIMIT_SECONDS = os.getenv("LIBTRACK_API_RATE_LIMIT_SECONDS", "1.5")
+try:
+    LIBTRACK_API_RATE_LIMIT_SECONDS = float(LIBTRACK_API_RATE_LIMIT_SECONDS)
+except (ValueError, TypeError):
+    LIBTRACK_API_RATE_LIMIT_SECONDS = 1.5
+
+# Logging Configuration
+LIBTRACK_LOG_DETECTION_METHOD = os.getenv("LIBTRACK_LOG_DETECTION_METHOD", "True") == "True"
+LIBTRACK_LOG_HTTP_STATUS = os.getenv("LIBTRACK_LOG_HTTP_STATUS", "True") == "True"
+LIBTRACK_LOG_RAW_PAYLOADS = os.getenv("LIBTRACK_LOG_RAW_PAYLOADS", "False") == "True"
+LIBTRACK_LOG_LEVEL = os.getenv("LIBTRACK_LOG_LEVEL", "INFO")
+
+# ============================================================================

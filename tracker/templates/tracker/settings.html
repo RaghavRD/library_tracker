@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-xl">
+    <div>
+        <div class="d-flex justify-content-between align-items-center page-header">
+            <div>
+                <h1 class="section-title">Project Settings</h1>
+                <p class="page-subtitle">Manage notification preferences for your tracked projects</p>
+            </div>
+        </div>
+
+        <div class="card bg-info-subtle border-0 mb-4">
+            <div class="card-body">
+                <h6 class="fw-bold text-info-emphasis mb-2">
+                    <i class="bi bi-lightbulb me-2"></i>Quick Tips
+                </h6>
+                <ul class="mb-0 small text-muted">
+                    <li><strong>Notifications Paused:</strong> When enabled, all notifications for this project will be
+                        held.</li>
+                    <li><strong>Confidence Threshold:</strong> Updates below this threshold will not trigger alerts (0 =
+                        all updates, 100 = highest confidence only).</li>
+                    <li>Changes are saved when you click "Save Settings".</li>
+                </ul>
+            </div>
+        </div>
+
+        {% if projects %}
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="row g-4">
+                {% for project in projects %}
+                <div class="col-md-6">
+                    <div class="card stat-card shadow-sm settings-card h-100">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h6 class="text-uppercase small fw-bold text-muted mb-1">Project</h6>
+                                    <h5 class="mb-0">{{ project.project_name }}</h5>
+                                </div>
+                                {% if project.notify_paused %}
+                                <span class="badge badge-pill-custom bg-warning text-dark">Paused</span>
+                                {% else %}
+                                <span class="badge badge-pill-custom bg-success">Active</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Notifications</label>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" class="form-check-input"
+                                        id="notify_paused_{{ project.id }}" name="notify_paused_{{ project.id }}" {% if project.notify_paused %}checked{% endif %} />
+                                    <label class="form-check-label" for="notify_paused_{{ project.id }}">
+                                        Pause notifications
+                                    </label>
+                                </div>
+                                <small class="text-muted">Toggle alerts for this project.</small>
+                            </div>
+
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label for="min_confidence_threshold_{{ project.id }}" class="form-label mb-0">
+                                        Confidence Threshold
+                                    </label>
+                                    <span class="fw-bold text-primary" id="threshold-value-{{ project.id }}">
+                                        {{ project.min_confidence_threshold }}%</span>
+                                </div>
+                                <input type="range" class="form-range settings-range" min="0" max="100" step="5"
+                                    id="min_confidence_threshold_{{ project.id }}"
+                                    name="min_confidence_threshold_{{ project.id }}"
+                                    value="{{ project.min_confidence_threshold }}"
+                                    onchange="document.getElementById('threshold-value-{{ project.id }}').textContent = this.value + '%'" />
+                                <small class="text-muted">Only notify updates at or above this confidence.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                    <i class="bi bi-check-circle me-2"></i>Save Settings
+                </button>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </a>
+            </div>
+        </form>
+        {% else %}
+        <div class="alert alert-info shadow-sm">
+            <i class="bi bi-info-circle me-2"></i>
+            No projects registered yet.
+            <a href="{% url 'projects' %}">Create a project</a> to manage notification settings.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

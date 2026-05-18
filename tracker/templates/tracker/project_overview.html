@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LibTrack AI — Project Overview</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; line-height:1.6; color:#222; padding:24px; }
+    h1,h2,h3 { color:#0b4d78 }
+    code { background:#f3f4f6; padding:2px 6px; border-radius:4px; font-size:90%; }
+    .box { background:#fbfdff; border:1px solid #e6eef6; padding:14px; border-radius:8px; margin:12px 0 }
+    ul { margin:6px 0 12px 22px }
+    table { border-collapse:collapse; width:100%; margin:12px 0 }
+    th,td { text-align:left; padding:8px; border-bottom:1px solid #eee }
+  </style>
+</head>
+<body>
+  <h1>LibTrack AI — Project Overview</h1>
+
+  <p class="box"><strong>Purpose:</strong> Detect library/language/tool releases and planned future versions, summarize changes, and notify project teams by email. Uses official registries when available, with a Serper+Groq fallback for web analysis.</p>
+
+  <h2>High-level architecture</h2>
+  <ul>
+    <li><strong>Data Store:</strong> Django models (SQLite by default in this repo).</li>
+    <li><strong>Detection Engine:</strong> <code>tracker.management.commands.run_daily_check</code> coordinates detection.</li>
+    <li><strong>Fetchers & Analyzers:</strong> Registry helpers in <code>tracker/utils</code> (official API helpers, <code>serper_fetcher</code>, <code>groq_analyzer</code>).</li>
+    <li><strong>Notification:</strong> HTML emails via Mailtrap / Sender implemented in <code>tracker/utils/send_mail.py</code>.</li>
+    <li><strong>User-facing:</strong> Django templates and views under <code>tracker/templates/tracker</code> and <code>tracker/views.py</code>.</li>
+  </ul>
+
+  <h2>Core features</h2>
+  <ul>
+    <li>Project registration with team emails and tech-stack components.</li>
+    <li>Central <em>Library</em> entities to minimize repeated API calls.</li>
+    <li>Release detection (official registries preferred).</li>
+    <li>Future/planned version detection (roadmap/beta/RC) using web search + Groq.</li>
+    <li>Per-project notification rules: major/minor/future.</li>
+    <li>History of releases and future update lifecycle tracking.</li>
+  </ul>
+
+  <h2>Key data models (summary)</h2>
+  <table>
+    <thead><tr><th>Model</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Project</strong></td><td>Registered projects and team contact info.</td></tr>
+      <tr><td><strong>StackComponent</strong></td><td>Components declared by a project; linked to <code>Library</code> where possible.</td></tr>
+      <tr><td><strong>Library</strong></td><td>Canonical library/tool record to reduce duplicate API calls.</td></tr>
+      <tr><td><strong>LibraryRelease</strong></td><td>History of releases for a library.</td></tr>
+      <tr><td><strong>UpdateCache</strong></td><td>Recently detected released updates per project.</td></tr>
+      <tr><td><strong>FutureUpdateCache</strong></td><td>Detected future/planned versions, confidence, status (detected/confirmed/released/cancelled).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Detection & run_daily_check flow</h2>
+  <div class="box">
+    <ol>
+      <li><strong>Sync Libraries</strong>: Link unlinked StackComponents to Library rows (<code>_sync_libraries()</code>).</li>
+      <li><strong>Fetch Updates</strong>: For each unique Library, call official registry APIs (if enabled) via <code>LibraryUpdateHelper</code>; otherwise use Serper + Groq fallback (<code>serper_fetcher</code> + <code>groq_analyzer</code>).</li>
+      <li><strong>Analyze results</strong>: Groq returns a structured JSON hint (version, category, is_released, confidence, expected_date, summary).</li>
+      <li><strong>Handle future updates</strong>: <code>_handle_future_update()</code> saves candidates into <code>FutureUpdateCache</code> when confidence >= threshold (default 70) and user opted in.</li>
+      <li><strong>Notify Projects</strong>: For each Project subscribed to relevant categories, assemble HTML email payload and call <code>send_update_email()</code>.</li>
+    </ol>
+  </div>
+
+  <h2>Future version lifecycle</h2>
+  <p>States: <strong>detected → confirmed → released</strong> (or <strong>cancelled</strong>). Transition triggers:</p>
+  <ul>
+    <li><strong>Detected:</strong> Automated detection via Groq/Serper or registry pre-release</li>
+    <li><strong>Confirmed:</strong> Manual via Django admin or API—update confidence and status</li>
+    <li><strong>Released:</strong> Auto-promoted when a subsequent run detects the version as officially released</li>
+    <li><strong>Cancelled:</strong> Manual change when roadmap or announcement is withdrawn</li>
+  </ul>
+
+  <h2>Where implementations live (important files)</h2>
+  <ul>
+    <li><code>tracker/management/commands/run_daily_check.py</code> — Orchestrator for sync, fetch, notify.</li>
+    <li><code>tracker/utils/library_update_helper.py</code> — Official registry API logic and adapters.</li>
+    <li><code>tracker/utils/serper_fetcher.py</code> — Web search wrapper (Serper.dev).</li>
+    <li><code>tracker/utils/groq_analyzer.py</code> — Groq prompt + JSON parsing and heuristics.</li>
+    <li><code>tracker/utils/send_mail.py</code> — Email templating & Mailtrap integration.</li>
+    <li><code>tracker/views.py</code> & templates — Project registration UI and history pages.</li>
+    <li><code>tracker/models.py</code> — Data model definitions and constraints.</li>
+  </ul>
+
+  <h2>Configuration & running</h2>
+  <ul>
+    <li>Set environment in <code>.env</code> (Mailtrap keys, USE_OFFICIAL_APIS, SERPER url, Groq keys etc.).</li>
+    <li>Run once with: <code>python manage.py run_daily_check</code>. Use <code>--auto --time HH:MM</code> to schedule daily runs.</li>
+  </ul>
+
+  <h2>Testing</h2>
+  <ul>
+    <li>Unit tests are under <code>tests/</code> and some tracker tests in <code>tracker/tests.py</code>.</li>
+    <li>Use <code>pytest -q</code> to run tests locally.</li>
+  </ul>
+
+  <h2>Implementation notes & important heuristics</h2>
+  <ul>
+    <li>Groq is configured to always return strict JSON using a guided system prompt and schema hints.</li>
+    <li>Priority for sources: registries (npm/pypi) → GitHub releases → official docs → reputable sites.</li>
+    <li>Confidence scores drive whether future updates are saved and whether notifications are sent (default threshold 70%).</li>
+    <li>Libraries are deduplicated and linked to StackComponents to limit API calls.</li>
+  </ul>
+
+  <h2>Ideas & recommended improvements</h2>
+  <ul>
+    <li><strong>Retry & backoff:</strong> Add robust retry/backoff around external API calls and rate-limit handling.</li>
+    <li><strong>Observability:</strong> Add structured logging and Sentry integration; persist raw fetch payloads for debug.</li>
+    <li><strong>Admin actions:</strong> Add bulk actions in admin to confirm/cancel/promote future updates.</li>
+    <li><strong>Authorization for webhooks:</strong> Provide webhook endpoints to push official release events (GitHub webhooks) to auto-promote.</li>
+    <li><strong>Scheduler:</strong> Replace long-running script + schedule with a job runner (Django-Q or cron via OS) for reliability.</li>
+    <li><strong>UI:</strong> Add an Overview / Diagnostics page (this file) inside the app sidebar and link it from the admin/dashboard.</li>
+    <li><strong>Testing:</strong> Add unit tests for <code>groq_analyzer</code> with recorded example Groq outputs and for <code>serper_fetcher</code> using VCR or responses.</li>
+    <li><strong>User controls:</strong> Per-project sensitivity settings (confidence threshold override, pause notifications).</li>
+  </ul>
+
+  <h2>Next steps I can take</h2>
+  <ul>
+    <li>Create a link to this page in the app header or dashboard template.</li>
+    <li>Add a condensed admin-only diagnostics view that shows recent fetch logs and raw Groq responses.</li>
+    <li>Implement one suggested improvement (pick one).</li>
+  </ul>
+
+  <p style="margin-top:18px">File created: <code>tracker/templates/tracker/project_overview.html</code></p>
+</body>
+</html>
