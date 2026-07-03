@@ -14,6 +14,10 @@ from tracker.services.project_service import ProjectService
 
 logger = logging.getLogger("libtrack")
 
+
+def _user_projects_queryset(request):
+    return Project.objects.filter(owner=request.user)
+
 def login_view(request):
     """
     Handles user login.
@@ -87,18 +91,19 @@ def dashboard(request):
     New Analytics Dashboard.
     Displays high-level metrics and charts.
     """
-    total_projects = Project.objects.count()
+    projects_qs = _user_projects_queryset(request)
+    total_projects = projects_qs.count()
     
     # Count total libraries (using StackComponent or unique libraries)
     # Using StackComponent gives us the libraries actually tracked in projects
-    total_components = StackComponent.objects.exclude(key='language').count()
+    total_components = StackComponent.objects.filter(project__owner=request.user).exclude(key='language').count()
     
     # Calculate unique category breakdown using optimized SQL
     from django.db.models import Case, When, Value, CharField, Count
 
     # Annotate components with normalized category buckets
     # Logic mirrors previous python mapping: language -> languages, tool -> tools, module -> modules, else -> libraries
-    annotated_components = StackComponent.objects.annotate(
+    annotated_components = StackComponent.objects.filter(project__owner=request.user).annotate(
         norm_cat=Case(
             When(key__icontains='language', then=Value('languages')),
             When(category__icontains='language', then=Value('languages')),
@@ -133,18 +138,26 @@ def dashboard(request):
         # We'll trust the sum of buckets or doing a separate distinct count
     
     # Total unique stack count (across all categories)
-    total_unique_stack_count = StackComponent.objects.values('name', 'category').distinct().count()
+    total_unique_stack_count = StackComponent.objects.filter(project__owner=request.user).values('name', 'category').distinct().count()
 
     
     # Calculate updates available
-    updates_qs = UpdateCache.objects.all()
+    updates_qs = UpdateCache.objects.filter(project__owner=request.user)
     total_updates = updates_qs.count()
     
     major_updates = updates_qs.filter(category='major').count()
     minor_updates = updates_qs.filter(category='minor').count()
     
     # Future updates
-    future_updates_count = FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed']).count()
+    tracked_libraries = StackComponent.objects.filter(
+        project__owner=request.user
+    ).exclude(key="language").values_list("name", flat=True)
+    tracked_library_keys = {name.strip().lower() for name in tracked_libraries if name and name.strip()}
+    future_updates_count = sum(
+        1
+        for update in FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed'])
+        if (update.library or "").strip().lower() in tracked_library_keys
+    )
     
     # Health Score Calculation
     # Simple logic: 100 - (updates / components * 100)
@@ -188,7 +201,7 @@ def projects_view(request):
                 messages.error(request, error)
             else:
                 try:
-                    ProjectService.save_project_from_payload(payload)
+                    ProjectService.save_project_from_payload(payload, owner=request.user)
                     messages.success(request, f"Project '{payload['project_name']}' added successfully.")
                 except ValueError as exc:
                     messages.error(request, str(exc))
@@ -200,7 +213,7 @@ def projects_view(request):
         if action == "update":
             project_id = request.POST.get("project_id")
             try:
-                project = Project.objects.prefetch_related("components").get(pk=int(project_id))
+                project = _user_projects_queryset(request).prefetch_related("components").get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for update.")
                 return redirect("projects")
@@ -211,7 +224,7 @@ def projects_view(request):
                 return redirect("projects")
 
             try:
-                ProjectService.save_project_from_payload(payload, instance=project)
+                ProjectService.save_project_from_payload(payload, instance=project, owner=request.user)
                 messages.success(request, f"Project '{payload['project_name']}' updated.")
             except ValueError as exc:
                 messages.error(request, str(exc))
@@ -223,7 +236,7 @@ def projects_view(request):
         if action == "delete":
             project_id = request.POST.get("project_id")
             try:
-                project = Project.objects.get(pk=int(project_id))
+                project = _user_projects_queryset(request).get(pk=int(project_id))
             except (TypeError, ValueError, Project.DoesNotExist):
                 messages.error(request, "Invalid project reference for deletion.")
                 return redirect("projects")
@@ -236,14 +249,24 @@ def projects_view(request):
         messages.error(request, "Unknown action.")
         return redirect("projects")
 
-    project_qs = Project.objects.prefetch_related("components").order_by("-created_at")
+    project_qs = _user_projects_queryset(request).prefetch_related("components").order_by("-created_at")
     regs = [ProjectService.serialize_project(project) for project in project_qs]
 
-    cache = UpdateCache.objects.order_by("-updated_at").all()
+    cache = UpdateCache.objects.filter(project__owner=request.user).order_by("-updated_at").all()
 
-    future_updates = FutureUpdateCache.objects.filter(
-        status__in=['detected', 'confirmed']
-    ).order_by('-confidence', '-updated_at')[:10]
+    user_library_keys = {
+        component.name.strip().lower()
+        for project in project_qs
+        for component in project.components.all()
+        if component.name and component.name.strip()
+    }
+    future_updates = [
+        update
+        for update in FutureUpdateCache.objects.filter(
+            status__in=['detected', 'confirmed']
+        ).order_by('-confidence', '-updated_at')
+        if (update.library or "").strip().lower() in user_library_keys
+    ][:10]
 
     registrations_total = len(regs)
     registrations_page = None
@@ -271,7 +294,7 @@ def updateHistory(request):
     project_lookup: dict[str, list[str]] = {}
     project_names: list[str] = []
 
-    projects = Project.objects.prefetch_related("components").all()
+    projects = _user_projects_queryset(request).prefetch_related("components").all()
     if projects:
         map_temp: dict[str, set[str]] = defaultdict(set)
         projects_set: set[str] = set()
@@ -290,7 +313,7 @@ def updateHistory(request):
         project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
         project_names = sorted(projects_set, key=str.casefold)
 
-    cache_qs = UpdateCache.objects.order_by("-updated_at").all()
+    cache_qs = UpdateCache.objects.filter(project__owner=request.user).order_by("-updated_at").all()
     cache = list(cache_qs)
     for entry in cache:
         lib_key = (entry.library or "").strip().lower()
@@ -299,6 +322,7 @@ def updateHistory(request):
 
         # Fetch latest notification record to show status
         latest_notification = NotificationRecord.objects.filter(
+            project=entry.project,
             library=entry.library
         ).order_by("-created_at").first()
         entry.last_notification_success = latest_notification.success if latest_notification else None
@@ -338,7 +362,7 @@ def future_updates(request):
     map_temp = defaultdict(set)
     projects_set = set()
 
-    project_qs = Project.objects.prefetch_related("components").all()
+    project_qs = _user_projects_queryset(request).prefetch_related("components").all()
     for project in project_qs:
         project_name = (project.project_name or "").strip()
         if not project_name:
@@ -361,6 +385,7 @@ def future_updates(request):
     for entry in future_list:
         lib_key = (entry.library or "").strip().lower()
         entry.project_names = project_lookup.get(lib_key, [])
+    future_list = [entry for entry in future_list if entry.project_names]
     
     # Filter by project if selected
     selected_project = (request.GET.get("project") or "").strip()
@@ -424,7 +449,7 @@ def settings_view(request):
     User settings page for managing per-project notification preferences.
     Allows users to toggle notify_paused and set min_confidence_threshold.
     """
-    projects = Project.objects.all().order_by('project_name')
+    projects = _user_projects_queryset(request).order_by('project_name')
     
     if request.method == 'POST':
         try:

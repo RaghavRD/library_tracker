@@ -20,7 +20,7 @@ from packaging import version as pkg_version
 from packaging.version import InvalidVersion
 from django.conf import settings
 
-from tracker.models import Project, UpdateCache, FutureUpdateCache, NotificationRecord
+from tracker.models import Project, UpdateCache, FutureUpdateCache, NotificationRecord, ProjectFutureNotification
 from tracker.utils.send_mail import send_update_email
 
 logger = logging.getLogger(__name__)
@@ -115,30 +115,37 @@ class NotificationService:
 
         # Collect all relevant updates for this project
         updates_to_send = []
+        seen_updates = set()
 
         for component in project.components.all():
             lib = component.library_ref
             if not lib:
                 continue
 
-            # Check for future updates (from buffer), respecting confidence threshold
-            if lib.name in self.fresh_future_updates and "future" in prefs:
-                future_payload = self.fresh_future_updates[lib.name]
-                # Only include if confidence meets project threshold
-                confidence = future_payload.get("confidence", 0)
-                if confidence >= project.min_confidence_threshold:
-                    updates_to_send.append(future_payload)
-                else:
-                    self._log(
-                        stdout_writer,
-                        f"  ⏭️  Skipped {lib.name} future update: "
-                        f"confidence {confidence}% < threshold {project.min_confidence_threshold}%"
+            # Check for future updates, respecting project-specific delivery state
+            if "future" in prefs:
+                future_payload = self._check_future_update(project, lib, stdout_writer)
+                if future_payload:
+                    future_key = (
+                        future_payload.get("category"),
+                        future_payload.get("library"),
+                        future_payload.get("version"),
                     )
+                    if future_key not in seen_updates:
+                        seen_updates.add(future_key)
+                        updates_to_send.append(future_payload)
 
             # Check for stable release updates
             stable_update = self._check_stable_update(lib, component, prefs, stdout_writer)
             if stable_update:
-                updates_to_send.append(stable_update)
+                stable_key = (
+                    stable_update.get("category"),
+                    stable_update.get("library"),
+                    stable_update.get("version"),
+                )
+                if stable_key not in seen_updates:
+                    seen_updates.add(stable_key)
+                    updates_to_send.append(stable_update)
 
         # Send email if there are updates
         if updates_to_send:
@@ -146,6 +153,105 @@ class NotificationService:
         else:
             self._log(stdout_writer, f"{project.project_name}: no new updates")
             self.skipped_count += 1
+
+    def _check_future_update(self, project: Project, library, stdout_writer=None) -> dict | None:
+        """
+        Pick the best future update for a project/library if it has not already
+        been successfully delivered to that project.
+        """
+        candidate_payload = self.fresh_future_updates.get(library.name)
+        candidate_cache = None
+
+        if candidate_payload:
+            candidate_cache = self._future_cache_for_payload(candidate_payload)
+        else:
+            candidate_cache = FutureUpdateCache.objects.filter(
+                library__iexact=library.name,
+                status__in=["detected", "confirmed"],
+            ).order_by("-confidence", "-updated_at").first()
+            if candidate_cache:
+                candidate_payload = self._future_payload_from_cache(candidate_cache)
+
+        if not candidate_payload:
+            return None
+
+        confidence = candidate_payload.get("confidence", 0) or 0
+        if confidence < project.min_confidence_threshold:
+            self._log(
+                stdout_writer,
+                f"  ⏭️  Skipped {library.name} future update: "
+                f"confidence {confidence}% < threshold {project.min_confidence_threshold}%"
+            )
+            return None
+
+        if candidate_cache and ProjectFutureNotification.objects.filter(
+            project=project,
+            future_update=candidate_cache,
+            success=True,
+        ).exists():
+            return None
+
+        return candidate_payload
+
+    @staticmethod
+    def _future_payload_from_cache(future_cache: FutureUpdateCache) -> dict:
+        return {
+            "future_update_id": future_cache.id,
+            "library": future_cache.library,
+            "version": future_cache.version,
+            "category": "future",
+            "confidence": future_cache.confidence,
+            "expected_date": str(future_cache.expected_date) if future_cache.expected_date else "TBD",
+            "summary": future_cache.features or "Upcoming release detected.",
+            "source": future_cache.source or "",
+            "prerelease_type": future_cache.prerelease_type,
+            "detection_method": future_cache.detection_method,
+        }
+
+    @staticmethod
+    def _future_cache_for_payload(payload: dict) -> FutureUpdateCache | None:
+        future_update_id = payload.get("future_update_id")
+        if future_update_id:
+            return FutureUpdateCache.objects.filter(pk=future_update_id).first()
+
+        library = payload.get("library", "")
+        version = payload.get("version", "")
+        if not library or not version:
+            return None
+        return FutureUpdateCache.objects.filter(library=library, version=version).first()
+
+    def _record_future_delivery(
+        self,
+        project: Project,
+        updates: list,
+        *,
+        success: bool,
+        attempts: int,
+        status_text: str,
+    ):
+        for upd in updates:
+            if upd.get("category") != "future":
+                continue
+
+            future_cache = self._future_cache_for_payload(upd)
+            if not future_cache:
+                continue
+
+            ProjectFutureNotification.objects.update_or_create(
+                project=project,
+                future_update=future_cache,
+                defaults={
+                    "success": success,
+                    "attempts": attempts,
+                    "status_text": status_text or "",
+                    "sent_at": timezone.now() if success else None,
+                },
+            )
+
+            if success:
+                future_cache.notification_sent = True
+                future_cache.notification_sent_at = timezone.now()
+                future_cache.save(update_fields=["notification_sent", "notification_sent_at"])
 
     def _check_stable_update(self, library, component, prefs: set, stdout_writer=None) -> dict | None:
         """
@@ -287,6 +393,14 @@ class NotificationService:
                     response_text = None
                     error_text = "unknown"
 
+                self._record_future_delivery(
+                    project,
+                    updates,
+                    success=success,
+                    attempts=attempt,
+                    status_text=status_text,
+                )
+
                 # Record attempt as NotificationRecord
                 try:
                     nr = NotificationRecord.objects.create(
@@ -326,18 +440,6 @@ class NotificationService:
                                     "detection_method": upd.get("detection_method", "unknown"),
                                 },
                             )
-
-                            # If this update corresponds to a FutureUpdateCache entry, mark it as notified
-                            try:
-                                fud = FutureUpdateCache.objects.filter(
-                                    library=upd.get("library", ""), version=upd.get("version", "")
-                                ).first()
-                                if fud:
-                                    fud.notification_sent = True
-                                    fud.notification_sent_at = timezone.now()
-                                    fud.save(update_fields=["notification_sent", "notification_sent_at"])
-                            except Exception:
-                                logger.exception("Failed to mark FutureUpdateCache as notified")
 
                         except Exception as e:
                             logger.exception(f"Failed to create UpdateCache for {upd.get('library')}: {e}")

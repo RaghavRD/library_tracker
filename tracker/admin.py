@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import UpdateCache, Project, StackComponent, FutureUpdateCache, NotificationRecord, FutureUpdateHistory
+from .models import (
+    UpdateCache,
+    Project,
+    StackComponent,
+    FutureUpdateCache,
+    NotificationRecord,
+    FutureUpdateHistory,
+    ProjectFutureNotification,
+)
 
 class StackComponentInline(admin.TabularInline):
     model = StackComponent
@@ -9,12 +17,12 @@ class StackComponentInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("project_name", "developer_names", "notification_type", "notify_paused", "min_confidence_threshold", "updated_at")
-    search_fields = ("project_name", "developer_names", "developer_emails")
-    list_filter = ("notify_paused", "notification_type")
+    list_display = ("project_name", "owner", "developer_names", "notification_type", "notify_paused", "min_confidence_threshold", "updated_at")
+    search_fields = ("project_name", "developer_names", "developer_emails", "owner__username", "owner__email")
+    list_filter = ("notify_paused", "notification_type", "owner")
     fieldsets = (
         ("Project Information", {
-            "fields": ("project_name", "developer_names", "developer_emails", "notification_type")
+            "fields": ("owner", "project_name", "developer_names", "developer_emails", "notification_type")
         }),
         ("Notification Preferences", {
             "fields": ("notify_paused", "min_confidence_threshold"),
@@ -114,6 +122,30 @@ class FutureUpdateCacheAdmin(admin.ModelAdmin):
         }),
         ("Tracking", {
             "fields": ("promoted_to_release", "notification_sent", "notification_sent_at")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+
+@admin.register(ProjectFutureNotification)
+class ProjectFutureNotificationAdmin(admin.ModelAdmin):
+    list_display = ("project", "future_update", "success", "attempts", "sent_at", "updated_at")
+    search_fields = (
+        "project__project_name",
+        "future_update__library",
+        "future_update__version",
+    )
+    list_filter = ("success", "sent_at")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Notification", {
+            "fields": ("project", "future_update")
+        }),
+        ("Result", {
+            "fields": ("success", "attempts", "status_text", "sent_at")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),

@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 UPDATE_CATEGORY_CHOICES = [
@@ -17,6 +18,14 @@ class TimeStampedModel(models.Model):
 
 
 class Project(TimeStampedModel):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="tracked_projects",
+        help_text="User who owns and can manage this project",
+    )
     project_name = models.CharField(max_length=200)
     developer_names = models.CharField(max_length=255)
     developer_emails = models.TextField()
@@ -295,6 +304,38 @@ class NotificationRecord(TimeStampedModel):
         return f"{proj} :: {self.library} {self.version} -> {'OK' if self.success else 'FAIL'}"
 
 
+class ProjectFutureNotification(TimeStampedModel):
+    """Tracks future-update notification delivery per project."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="future_notifications",
+    )
+    future_update = models.ForeignKey(
+        FutureUpdateCache,
+        on_delete=models.CASCADE,
+        related_name="project_notifications",
+    )
+    success = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0)
+    status_text = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [["project", "future_update"]]
+        ordering = ["-updated_at"]
+        verbose_name = "Project Future Notification"
+        verbose_name_plural = "Project Future Notifications"
+
+    def __str__(self):
+        return (
+            f"{self.project.project_name} :: "
+            f"{self.future_update.library} {self.future_update.version} -> "
+            f"{'OK' if self.success else 'PENDING'}"
+        )
+
+
 class FutureUpdateHistory(TimeStampedModel):
     """Records confidence changes and detection updates for FutureUpdateCache."""
 
@@ -341,4 +382,3 @@ class FutureUpdateHistory(TimeStampedModel):
 
     def __str__(self):
         return f"{self.library} {self.version} @ {self.created_at.strftime('%Y-%m-%d %H:%M')}: {self.old_confidence}% → {self.new_confidence}%"
-

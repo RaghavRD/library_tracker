@@ -187,7 +187,12 @@ class ProjectService:
         return payload, None
 
     @staticmethod
-    def save_project_from_payload(payload: dict, *, instance: Project | None = None) -> Project:
+    def save_project_from_payload(
+        payload: dict,
+        *,
+        instance: Project | None = None,
+        owner=None,
+    ) -> Project:
         stack = ProjectService.parse_stack_payload(payload)
         if not stack:
             raise ValueError("Add at least one technology component to the stack.")
@@ -197,12 +202,15 @@ class ProjectService:
         with transaction.atomic():
             if instance is None:
                 instance = Project.objects.create(
+                    owner=owner,
                     project_name=payload["project_name"],
                     developer_names=payload["developer_names"],
                     developer_emails=payload["developer_emails"],
                     notification_type=notification_value,
                 )
             else:
+                if owner is not None and instance.owner_id is None:
+                    instance.owner = owner
                 instance.project_name = payload["project_name"]
                 instance.developer_names = payload["developer_names"]
                 instance.developer_emails = payload["developer_emails"]

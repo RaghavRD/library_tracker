@@ -24,7 +24,12 @@ class TestDashboardAnalytics:
     def test_analytics_dashboard_loads(self):
         """Test that new dashboard loads and contains analytics data"""
         # Create dummy data
-        p = Project.objects.create(project_name="Test Project", developer_names="Dev", developer_emails="test@test.com")
+        p = Project.objects.create(
+            owner=self.user,
+            project_name="Test Project",
+            developer_names="Dev",
+            developer_emails="test@test.com",
+        )
         StackComponent.objects.create(project=p, name="Django", version="5.0", category="Library", key="dependency")
         UpdateCache.objects.create(project=p, library="Django", version="5.1", category="minor")
         FutureUpdateCache.objects.create(library="Django", version="6.0", status="detected", confidence=80)

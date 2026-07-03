@@ -256,15 +256,12 @@ class FutureUpdateService:
             else:
                 return None
 
-        # Mark as notified (only for new detections)
         if created:
-            future_cache.notification_sent = True
-            future_cache.notification_sent_at = datetime.now()
-            future_cache.save()
             self.detected_count += 1
 
         # Return notification payload
         return {
+            "future_update_id": future_cache.id,
             "library": library_name,
             "version": version,
             "category": "future",
@@ -349,6 +346,7 @@ class FutureUpdateService:
         self.updated_count += 1
 
         return {
+            "future_update_id": future_cache.id,
             "library": future_cache.library,
             "version": future_cache.version,
             "category": "future",
