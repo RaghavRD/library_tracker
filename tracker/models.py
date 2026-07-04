@@ -159,6 +159,54 @@ class UpdateCache(TimeStampedModel):
         return f"{self.project.project_name} :: {self.library} -> {self.version} ({self.category})"
 
 
+class UpdateEvent(TimeStampedModel):
+    """Append-only project update history event."""
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="update_events",
+    )
+    update_cache = models.ForeignKey(
+        UpdateCache,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="events",
+    )
+    library = models.CharField(max_length=200, db_index=True)
+    from_version = models.CharField(max_length=100, blank=True)
+    version = models.CharField(max_length=100)
+    release_date = models.CharField(max_length=50, blank=True)
+    category = models.CharField(max_length=10, choices=UPDATE_CATEGORY_CHOICES)
+    summary = models.TextField(blank=True)
+    source = models.URLField(blank=True)
+    detection_method = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=[
+            ('registry_api', 'Registry API'),
+            ('serper_groq', 'Web Search (Serper+Groq)'),
+            ('github_release', 'GitHub Release'),
+            ('official_website', 'Official Website'),
+            ('unknown', 'Unknown'),
+        ],
+        default='unknown',
+        help_text="Method used to detect this version"
+    )
+    notification_success = models.BooleanField(null=True, blank=True)
+    notification_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [["project", "library", "version", "category"]]
+        ordering = ["-updated_at"]
+        verbose_name = "Update Event"
+        verbose_name_plural = "Update Events"
+
+    def __str__(self):
+        return f"{self.project.project_name} :: {self.library} {self.from_version} -> {self.version}"
+
+
 
 class FutureUpdateCache(TimeStampedModel):
     """Stores detected future/planned updates separately from released versions."""

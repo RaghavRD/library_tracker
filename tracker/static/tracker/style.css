@@ -287,6 +287,10 @@ hr { border-color: var(--lt-border); opacity: 1; }
   min-width: 180px;
   display: none;
 }
+.app-navbar .dropdown-menu-end {
+  left: auto;
+  right: 8px;
+}
 .app-navbar .dropdown-menu.show { display: block; }
 .app-navbar .dropdown-item {
   border-radius: 6px;

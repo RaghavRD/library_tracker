@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from tracker.models import UpdateCache, Project, StackComponent, FutureUpdateCache, NotificationRecord
+from tracker.models import UpdateCache, UpdateEvent, Project, StackComponent, FutureUpdateCache
 from tracker.forms import LoginForm, RegistrationForm
 from tracker.services.project_service import ProjectService
 
@@ -313,20 +313,15 @@ def updateHistory(request):
         project_lookup = {lib: sorted(list(names), key=str.casefold) for lib, names in map_temp.items()}
         project_names = sorted(projects_set, key=str.casefold)
 
-    cache_qs = UpdateCache.objects.filter(project__owner=request.user).order_by("-updated_at").all()
+    cache_qs = UpdateEvent.objects.filter(project__owner=request.user).select_related("project").order_by("-updated_at").all()
     cache = list(cache_qs)
     for entry in cache:
         lib_key = (entry.library or "").strip().lower()
-        entry.project_names = project_lookup.get(lib_key, [])
+        project_name = (entry.project.project_name or "").strip()
+        entry.project_names = [project_name] if project_name else project_lookup.get(lib_key, [])
         entry.release_date_formatted = ProjectService.format_release_date(entry.release_date)
-
-        # Fetch latest notification record to show status
-        latest_notification = NotificationRecord.objects.filter(
-            project=entry.project,
-            library=entry.library
-        ).order_by("-created_at").first()
-        entry.last_notification_success = latest_notification.success if latest_notification else None
-        entry.last_notification_sent_at = latest_notification.sent_at if latest_notification else None
+        entry.last_notification_success = entry.notification_success
+        entry.last_notification_sent_at = entry.notification_sent_at
 
     selected_project = (request.GET.get("project") or "").strip()
     if selected_project:

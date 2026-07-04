@@ -9,6 +9,8 @@ from tracker.models import (
     Project,
     ProjectFutureNotification,
     StackComponent,
+    UpdateCache,
+    UpdateEvent,
 )
 from tracker.services.future_update_service import FutureUpdateService
 from tracker.services.notification_service import NotificationService
@@ -65,6 +67,28 @@ def test_future_detection_does_not_mark_notification_sent_before_email():
 
 
 @pytest.mark.django_db
+def test_low_confidence_future_detection_is_stored_for_project_threshold_filtering():
+    service = FutureUpdateService()
+
+    payload = service._handle_future_update(
+        library_name="django",
+        version="6.0.0",
+        confidence=45,
+        expected_date="",
+        summary="Early roadmap signal",
+        source="https://example.com/roadmap",
+        prerelease_type="roadmap",
+        detection_method="official_website",
+    )
+
+    future_update = FutureUpdateCache.objects.get(library="django", version="6.0.0")
+    assert payload is not None
+    assert payload["confidence"] == 45
+    assert future_update.confidence == 45
+    assert future_update.notification_sent is False
+
+
+@pytest.mark.django_db
 def test_future_notification_success_is_tracked_per_project():
     user = User.objects.create_user(username="owner", password="pass12345")
     project = Project.objects.create(
@@ -111,8 +135,60 @@ def test_future_notification_success_is_tracked_per_project():
         assert project_delivery.success is True
         assert project_delivery.sent_at is not None
         assert future_update.notification_sent is True
+        assert UpdateEvent.objects.filter(
+            project=project,
+            library="pandas",
+            version="3.0.0",
+            category="future",
+            notification_success=True,
+        ).exists()
         assert send_mock.call_count == 1
 
         service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
         service.notify_all_projects()
         assert send_mock.call_count == 1
+
+
+@pytest.mark.django_db
+def test_update_events_preserve_multiple_versions_while_cache_tracks_latest():
+    user = User.objects.create_user(username="history-owner", password="pass12345")
+    project = Project.objects.create(
+        owner=user,
+        project_name="History Project",
+        developer_names="Dev",
+        developer_emails="dev@example.com",
+        notification_type="major",
+    )
+    library = Library.objects.create(
+        name="requests",
+        key="requests",
+        component_type="library",
+        latest_version="2.0.0",
+    )
+    StackComponent.objects.create(
+        project=project,
+        library_ref=library,
+        category="Library",
+        key="library",
+        name="requests",
+        version="1.0.0",
+    )
+
+    with patch(
+        "tracker.services.notification_service.send_update_email",
+        return_value={"success": True, "status_text": "sent", "http_status": 200},
+    ):
+        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service.notify_all_projects()
+
+        library.latest_version = "3.0.0"
+        library.save(update_fields=["latest_version"])
+        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service.notify_all_projects()
+
+    cache = UpdateCache.objects.get(project=project, library="requests")
+    events = UpdateEvent.objects.filter(project=project, library="requests").order_by("version")
+
+    assert cache.version == "3.0.0"
+    assert list(events.values_list("version", flat=True)) == ["2.0.0", "3.0.0"]
+    assert all(event.from_version == "1.0.0" for event in events)

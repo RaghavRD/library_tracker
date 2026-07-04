@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     UpdateCache,
+    UpdateEvent,
     Project,
     StackComponent,
     FutureUpdateCache,
@@ -52,6 +53,38 @@ class UpdateCacheAdmin(admin.ModelAdmin):
         }),
         ("Project Link", {
             "fields": ("project",)
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+
+@admin.register(UpdateEvent)
+class UpdateEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "project",
+        "library",
+        "from_version",
+        "version",
+        "category",
+        "detection_method",
+        "notification_success",
+        "updated_at",
+    )
+    search_fields = ("project__project_name", "library", "version", "from_version")
+    list_filter = ("category", "detection_method", "notification_success")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Event", {
+            "fields": ("project", "update_cache", "library", "from_version", "version", "category")
+        }),
+        ("Release Details", {
+            "fields": ("release_date", "summary", "source", "detection_method")
+        }),
+        ("Notification", {
+            "fields": ("notification_success", "notification_sent_at")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),

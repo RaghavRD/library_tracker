@@ -20,7 +20,14 @@ from packaging import version as pkg_version
 from packaging.version import InvalidVersion
 from django.conf import settings
 
-from tracker.models import Project, UpdateCache, FutureUpdateCache, NotificationRecord, ProjectFutureNotification
+from tracker.models import (
+    Project,
+    UpdateCache,
+    UpdateEvent,
+    FutureUpdateCache,
+    NotificationRecord,
+    ProjectFutureNotification,
+)
 from tracker.utils.send_mail import send_update_email
 
 logger = logging.getLogger(__name__)
@@ -126,6 +133,7 @@ class NotificationService:
             if "future" in prefs:
                 future_payload = self._check_future_update(project, lib, stdout_writer)
                 if future_payload:
+                    future_payload.setdefault("from_version", component.version)
                     future_key = (
                         future_payload.get("category"),
                         future_payload.get("library"),
@@ -253,6 +261,36 @@ class NotificationService:
                 future_cache.notification_sent_at = timezone.now()
                 future_cache.save(update_fields=["notification_sent", "notification_sent_at"])
 
+    def _record_update_event(
+        self,
+        project: Project,
+        update: dict,
+        *,
+        success: bool,
+        sent_at,
+        update_cache: UpdateCache | None = None,
+    ):
+        release_date = update.get("release_date", "")
+        if not release_date and update.get("category") == "future":
+            release_date = update.get("expected_date", "")
+
+        UpdateEvent.objects.update_or_create(
+            project=project,
+            library=update.get("library", ""),
+            version=update.get("version", ""),
+            category=update.get("category", ""),
+            defaults={
+                "update_cache": update_cache,
+                "from_version": update.get("from_version", ""),
+                "release_date": release_date,
+                "summary": update.get("summary", ""),
+                "source": update.get("source", ""),
+                "detection_method": update.get("detection_method", "unknown"),
+                "notification_success": success,
+                "notification_sent_at": sent_at if success else None,
+            },
+        )
+
     def _check_stable_update(self, library, component, prefs: set, stdout_writer=None) -> dict | None:
         """
         Check if a library has a stable release newer than the project's component version.
@@ -299,6 +337,7 @@ class NotificationService:
             # Return payload; persist to UpdateCache only after successful send
             return {
                 "library": library.name,
+                "from_version": component.version,
                 "version": library.latest_version,
                 "category": category,
                 "release_date": release_date,
@@ -400,6 +439,14 @@ class NotificationService:
                     attempts=attempt,
                     status_text=status_text,
                 )
+                sent_at = timezone.now() if success else None
+                for upd in updates:
+                    self._record_update_event(
+                        project,
+                        upd,
+                        success=success,
+                        sent_at=sent_at,
+                    )
 
                 # Record attempt as NotificationRecord
                 try:
@@ -439,6 +486,13 @@ class NotificationService:
                                     "source": upd.get("source", ""),
                                     "detection_method": upd.get("detection_method", "unknown"),
                                 },
+                            )
+                            self._record_update_event(
+                                project,
+                                upd,
+                                success=True,
+                                sent_at=timezone.now(),
+                                update_cache=uc,
                             )
 
                         except Exception as e:

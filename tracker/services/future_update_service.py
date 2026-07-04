@@ -30,9 +30,6 @@ class FutureUpdateService:
     Handles lifecycle from detection to release.
     """
 
-    # Configuration: minimum confidence to notify users about a future version
-    MIN_CONFIDENCE_THRESHOLD = 70
-
     # Configuration: minimum confidence increase to re-notify users
     MIN_CONFIDENCE_INCREASE = 15
 
@@ -185,7 +182,7 @@ class FutureUpdateService:
     ) -> dict | None:
         """
         Handle detection of a future version.
-        Saves to DB and returns notification payload if confidence is high enough.
+        Saves to DB and returns a notification payload for project-level filtering.
 
         Args:
             library_name: Name of the library
@@ -199,17 +196,8 @@ class FutureUpdateService:
             stdout_writer: Optional callable for logging
 
         Returns:
-            dict: Notification payload if confidence >= threshold, else None
+            dict: Notification payload, or None when an unchanged existing entry should not re-notify
         """
-        # Check confidence threshold
-        if confidence < self.MIN_CONFIDENCE_THRESHOLD:
-            self._log(
-                stdout_writer,
-                f"   ℹ️  Confidence too low ({confidence}% < {self.MIN_CONFIDENCE_THRESHOLD}%). "
-                f"Not notifying.",
-            )
-            return None
-
         # Parse expected date
         parsed_date = None
         if expected_date:
