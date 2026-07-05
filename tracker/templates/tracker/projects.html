@@ -56,9 +56,9 @@
                 </td>
                 <td>
                   {% if r.stack_components %}
-                  <div class="d-flex flex-wrap gap-2">
-                    {% for comp in r.stack_components %}
-                    <div class="border rounded-3 px-3 py-2 bg-primary-subtle shadow-sm" style="min-width: 150px;">
+                  <div class="stack-preview-list">
+                    {% for comp in r.stack_preview %}
+                    <div class="stack-preview-chip border rounded-3 bg-primary-subtle shadow-sm">
                       <div class="small text-uppercase text-muted">{{ comp.category|capfirst }}</div>
                       <div class="fw-semibold text-break">{{ comp.name }}</div>
                       <div class="text-muted small">
@@ -69,6 +69,29 @@
                       </div>
                     </div>
                     {% endfor %}
+                    {% if r.stack_overflow_count %}
+                    <div class="stack-overflow">
+                      <button type="button" class="stack-overflow-trigger" aria-expanded="false"
+                        aria-label="Show {{ r.stack_overflow_count }} more stack component{{ r.stack_overflow_count|pluralize }}">
+                        +{{ r.stack_overflow_count }} more
+                      </button>
+                      <div class="stack-overflow-panel" role="list">
+                        {% for comp in r.stack_overflow %}
+                        <div class="stack-overflow-item" role="listitem">
+                          <div>
+                            <div class="stack-overflow-name">{{ comp.name }}</div>
+                            <div class="stack-overflow-meta">
+                              {{ comp.category|capfirst }} · {{ comp.version|default:"—" }}
+                              {% if comp.scope %}
+                              · {{ comp.scope }}
+                              {% endif %}
+                            </div>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endif %}
                   </div>
                   {% else %}
                   <span class="text-muted small">No stack defined</span>
@@ -102,7 +125,7 @@
                           d="m13.498.795.149-.149a1.207 1.207 0 1 1 1.707 1.708l-.149.148a1.5 1.5 0 0 1-.059 2.059L4.854 14.854a.5.5 0 0 1-.233.131l-4 1a.5.5 0 0 1-.606-.606l1-4a.5.5 0 0 1 .131-.232l9.642-9.642a.5.5 0 0 0-.642.056L6.854 4.854a.5.5 0 1 1-.708-.708L9.44.854A1.5 1.5 0 0 1 11.5.796a1.5 1.5 0 0 1 1.998-.001" />
                       </svg>
                     </button>
-                    <button type="button" class="btn btn-outline-danger delete-project-btn" data-bs-toggle="modal"
+                    <button type="button" class="btn btn-outline-primary delete-project-btn" data-bs-toggle="modal"
                       data-bs-target="#deleteProjectModal" data-project-id="{{ r.project_id }}"
                       data-project="{{ r.project_name|default:''|escape }}">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
@@ -206,6 +229,35 @@
               placeholder="Comma separated" required></textarea>
           </div>
           <div class="col-12">
+            <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="add-stack">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <span class="form-label fw-semibold mb-0">Import Dependencies</span>
+                <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <select class="form-select form-select-sm manifest-type">
+                    <option value="package_json">package.json</option>
+                    <option value="requirements_txt">requirements.txt</option>
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in" />
+                </div>
+                <div class="col-12">
+                  <textarea class="form-control form-control-sm manifest-content" rows="4"
+                    placeholder="Paste manifest content here"></textarea>
+                </div>
+                <div class="col-12 d-flex flex-wrap align-items-center gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm manifest-import-btn">
+                    <i class="bi bi-upload me-1"></i>Import Stack
+                  </button>
+                  <small class="manifest-import-status text-muted"></small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
             <label class="form-label fw-semibold d-block">Technology Stack</label>
             <div class="stack-builder border rounded-3 p-3" data-builder-id="add-stack"
               data-datalist-id="dashboardStackTypes" data-initial-rows='[]' data-min-rows="1">
@@ -297,6 +349,35 @@
             <label for="edit_developer_emails" class="form-label fw-semibold">Developer Email(s)</label>
             <textarea class="form-control" id="edit_developer_emails" name="developer_emails" rows="2"
               required></textarea>
+          </div>
+          <div class="col-12">
+            <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="edit-stack">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <span class="form-label fw-semibold mb-0">Import Dependencies</span>
+                <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <select class="form-select form-select-sm manifest-type">
+                    <option value="package_json">package.json</option>
+                    <option value="requirements_txt">requirements.txt</option>
+                  </select>
+                </div>
+                <div class="col-md-8">
+                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in" />
+                </div>
+                <div class="col-12">
+                  <textarea class="form-control form-control-sm manifest-content" rows="4"
+                    placeholder="Paste manifest content here"></textarea>
+                </div>
+                <div class="col-12 d-flex flex-wrap align-items-center gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm manifest-import-btn">
+                    <i class="bi bi-upload me-1"></i>Import Stack
+                  </button>
+                  <small class="manifest-import-status text-muted"></small>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold d-block">Technology Stack</label>
@@ -394,6 +475,192 @@
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const defaultStackTemplate = [{}];
+    const parseManifestUrl = "{% url 'parse_manifest' %}";
+
+    const getCookie = (name) => {
+      const cookies = document.cookie ? document.cookie.split(";") : [];
+      for (const cookie of cookies) {
+        const trimmed = cookie.trim();
+        if (trimmed.startsWith(`${name}=`)) {
+          return decodeURIComponent(trimmed.slice(name.length + 1));
+        }
+      }
+      return "";
+    };
+
+    const readSelectedFile = (fileInput) => {
+      const file = fileInput && fileInput.files && fileInput.files[0];
+      if (!file) return Promise.resolve("");
+      return file.text();
+    };
+
+    const resetManifestImporter = (container) => {
+      container.querySelectorAll(".manifest-import").forEach((panel) => {
+        const content = panel.querySelector(".manifest-content");
+        const file = panel.querySelector(".manifest-file");
+        const status = panel.querySelector(".manifest-import-status");
+        if (content) content.value = "";
+        if (file) file.value = "";
+        if (status) {
+          status.textContent = "";
+          status.className = "manifest-import-status text-muted";
+        }
+      });
+    };
+
+    const setupStackOverflowPanels = () => {
+      let active = null;
+      let hideTimer = null;
+
+      const clearHideTimer = () => {
+        if (hideTimer) {
+          window.clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+      };
+
+      const closePanel = () => {
+        clearHideTimer();
+        if (!active) return;
+        active.trigger.setAttribute("aria-expanded", "false");
+        active.wrapper.classList.remove("is-open");
+        active.panel.remove();
+        active = null;
+      };
+
+      const positionPanel = (trigger, panel) => {
+        const gap = 8;
+        const rect = trigger.getBoundingClientRect();
+        const maxLeft = window.innerWidth - panel.offsetWidth - gap;
+        const left = Math.max(gap, Math.min(rect.left, maxLeft));
+        let top = rect.top - panel.offsetHeight - gap;
+
+        if (top < gap) {
+          top = rect.bottom + gap;
+        }
+        if (top + panel.offsetHeight > window.innerHeight - gap) {
+          top = Math.max(gap, window.innerHeight - panel.offsetHeight - gap);
+        }
+
+        panel.style.left = `${left}px`;
+        panel.style.top = `${top}px`;
+      };
+
+      const openPanel = (trigger, pinned = false) => {
+        const wrapper = trigger.closest(".stack-overflow");
+        const sourcePanel = wrapper ? wrapper.querySelector(".stack-overflow-panel") : null;
+        if (!wrapper || !sourcePanel) return;
+
+        if (active && active.trigger === trigger) {
+          active.pinned = active.pinned || pinned;
+          clearHideTimer();
+          positionPanel(active.trigger, active.panel);
+          return;
+        }
+
+        closePanel();
+
+        const floatingPanel = sourcePanel.cloneNode(true);
+        floatingPanel.classList.add("stack-overflow-panel-floating");
+        floatingPanel.setAttribute("aria-hidden", "false");
+        document.body.appendChild(floatingPanel);
+
+        wrapper.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+        active = { trigger, wrapper, panel: floatingPanel, pinned };
+        positionPanel(trigger, floatingPanel);
+
+        floatingPanel.addEventListener("mouseenter", clearHideTimer);
+        floatingPanel.addEventListener("mouseleave", scheduleClosePanel);
+      };
+
+      const scheduleClosePanel = () => {
+        if (active && active.pinned) return;
+        clearHideTimer();
+        hideTimer = window.setTimeout(closePanel, 140);
+      };
+
+      document.querySelectorAll(".stack-overflow-trigger").forEach((trigger) => {
+        trigger.addEventListener("mouseenter", () => openPanel(trigger));
+        trigger.addEventListener("focus", () => openPanel(trigger));
+        trigger.addEventListener("mouseleave", scheduleClosePanel);
+        trigger.addEventListener("blur", scheduleClosePanel);
+        trigger.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openPanel(trigger, true);
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!active) return;
+        if (active.trigger.contains(event.target) || active.panel.contains(event.target)) return;
+        closePanel();
+      });
+      window.addEventListener("scroll", () => {
+        if (active) positionPanel(active.trigger, active.panel);
+      }, true);
+      window.addEventListener("resize", closePanel);
+    };
+
+    setupStackOverflowPanels();
+
+    document.querySelectorAll(".manifest-import").forEach((panel) => {
+      const button = panel.querySelector(".manifest-import-btn");
+      if (!button) return;
+
+      button.addEventListener("click", async function () {
+        const typeInput = panel.querySelector(".manifest-type");
+        const contentInput = panel.querySelector(".manifest-content");
+        const fileInput = panel.querySelector(".manifest-file");
+        const status = panel.querySelector(".manifest-import-status");
+        const builderId = panel.dataset.targetBuilder;
+
+        if (status) {
+          status.textContent = "Parsing...";
+          status.className = "manifest-import-status text-muted";
+        }
+        button.disabled = true;
+
+        try {
+          const fileContent = await readSelectedFile(fileInput);
+          const manifestContent = fileContent || (contentInput ? contentInput.value : "");
+          const formData = new FormData();
+          formData.append("manifest_type", typeInput ? typeInput.value : "package_json");
+          formData.append("manifest_content", manifestContent);
+
+          const response = await fetch(parseManifestUrl, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": getCookie("csrftoken"),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: formData,
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || "Could not parse manifest.");
+          }
+
+          if (window.LibTrackStack) {
+            window.LibTrackStack.setRows(builderId, payload.components || []);
+          }
+
+          const warningCount = (payload.warnings || []).length;
+          if (status) {
+            status.textContent = `Imported ${(payload.components || []).length} dependencies${warningCount ? `, ${warningCount} skipped` : ""}.`;
+            status.className = "manifest-import-status text-success";
+          }
+        } catch (error) {
+          if (status) {
+            status.textContent = error.message || "Import failed.";
+            status.className = "manifest-import-status text-danger";
+          }
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
 
     const resetCheckboxes = (container, ids) => {
       ids.forEach((id) => {
@@ -413,6 +680,7 @@
         if (projectInput) projectInput.value = "";
         if (devInput) devInput.value = "";
         if (emails) emails.value = "";
+        resetManifestImporter(addModal);
 
         const builder = addModal.querySelector(".stack-builder");
         if (builder && window.LibTrackStack) {
@@ -443,6 +711,7 @@
         if (emailField) {
           emailField.value = dataset.emails || "";
         }
+        resetManifestImporter(editModal);
 
         const builder = editModal.querySelector(".stack-builder");
         if (builder && window.LibTrackStack) {

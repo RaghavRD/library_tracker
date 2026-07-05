@@ -248,6 +248,9 @@ class ProjectService:
             for component in project.components.all()
         ]
 
+        stack_preview_limit = 2
+        stack_preview = components[:stack_preview_limit]
+        stack_overflow = components[stack_preview_limit:]
         languages = [comp for comp in components if comp["key"] == "language"]
         notification_list = [item.strip() for item in (project.notification_type or "").split(",") if item.strip()]
         if not notification_list:
@@ -261,6 +264,9 @@ class ProjectService:
             "language_used": ", ".join([comp["name"] for comp in languages]),
             "language_version": ", ".join([comp["version"] for comp in languages]),
             "stack_components": components,
+            "stack_preview": stack_preview,
+            "stack_overflow": stack_overflow,
+            "stack_overflow_count": len(stack_overflow),
             "stack_json": json.dumps(components),
             "notification_type": project.notification_type,
             "notification_list": notification_list,

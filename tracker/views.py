@@ -1,6 +1,8 @@
 import logging
 from collections import defaultdict
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
@@ -10,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from tracker.models import UpdateCache, UpdateEvent, Project, StackComponent, FutureUpdateCache
 from tracker.forms import LoginForm, RegistrationForm
+from tracker.services.manifest_parser_service import ManifestParserService
 from tracker.services.project_service import ProjectService
 
 logger = logging.getLogger("libtrack")
@@ -285,6 +288,41 @@ def projects_view(request):
             "future_updates": future_updates,  # ===== NEW =====
         },
     )
+
+
+@login_required
+@require_POST
+def parse_manifest(request):
+    manifest_type = request.POST.get("manifest_type", "")
+    content = request.POST.get("manifest_content", "")
+
+    uploaded = request.FILES.get("manifest_file")
+    if uploaded:
+        try:
+            content = uploaded.read().decode("utf-8")
+        except UnicodeDecodeError:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "components": [],
+                    "warnings": [],
+                    "error": "Uploaded manifest must be UTF-8 text.",
+                },
+                status=400,
+            )
+
+    result = ManifestParserService.parse(manifest_type, content)
+    ok = not result.get("error")
+    return JsonResponse(
+        {
+            "ok": ok,
+            "components": result.get("components", []),
+            "warnings": result.get("warnings", []),
+            "error": result.get("error", ""),
+        },
+        status=200 if ok else 400,
+    )
+
 
 @login_required
 def updateHistory(request):
