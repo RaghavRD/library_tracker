@@ -235,6 +235,18 @@
                 <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
               </div>
               <div class="row g-2">
+                <div class="col-md-9">
+                  <input type="url" class="form-control form-control-sm github-repo-url"
+                    placeholder="https://github.com/owner/repo" />
+                </div>
+                <div class="col-md-3 d-grid">
+                  <button type="button" class="btn btn-outline-primary btn-sm github-import-btn">
+                    <i class="bi bi-github me-1"></i>Import Repo
+                  </button>
+                </div>
+                <div class="col-12">
+                  <small class="github-import-status text-muted"></small>
+                </div>
                 <div class="col-md-4">
                   <select class="form-select form-select-sm manifest-type">
                     <option value="package_json">package.json</option>
@@ -357,6 +369,18 @@
                 <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
               </div>
               <div class="row g-2">
+                <div class="col-md-9">
+                  <input type="url" class="form-control form-control-sm github-repo-url"
+                    placeholder="https://github.com/owner/repo" />
+                </div>
+                <div class="col-md-3 d-grid">
+                  <button type="button" class="btn btn-outline-primary btn-sm github-import-btn">
+                    <i class="bi bi-github me-1"></i>Import Repo
+                  </button>
+                </div>
+                <div class="col-12">
+                  <small class="github-import-status text-muted"></small>
+                </div>
                 <div class="col-md-4">
                   <select class="form-select form-select-sm manifest-type">
                     <option value="package_json">package.json</option>
@@ -476,6 +500,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     const defaultStackTemplate = [{}];
     const parseManifestUrl = "{% url 'parse_manifest' %}";
+    const importGithubUrl = "{% url 'import_github_repo' %}";
 
     const getCookie = (name) => {
       const cookies = document.cookie ? document.cookie.split(";") : [];
@@ -499,11 +524,18 @@
         const content = panel.querySelector(".manifest-content");
         const file = panel.querySelector(".manifest-file");
         const status = panel.querySelector(".manifest-import-status");
+        const githubUrl = panel.querySelector(".github-repo-url");
+        const githubStatus = panel.querySelector(".github-import-status");
         if (content) content.value = "";
         if (file) file.value = "";
+        if (githubUrl) githubUrl.value = "";
         if (status) {
           status.textContent = "";
           status.className = "manifest-import-status text-muted";
+        }
+        if (githubStatus) {
+          githubStatus.textContent = "";
+          githubStatus.className = "github-import-status text-muted";
         }
       });
     };
@@ -605,10 +637,65 @@
 
     setupStackOverflowPanels();
 
+    const applyImportedStack = (builderId, payload, status, prefix) => {
+      if (window.LibTrackStack) {
+        window.LibTrackStack.setRows(builderId, payload.components || []);
+      }
+
+      const warningCount = (payload.warnings || []).length;
+      const fileText = payload.files && payload.files.length ? ` from ${payload.files.join(", ")}` : "";
+      if (status) {
+        status.textContent = `${prefix} ${(payload.components || []).length} dependencies${fileText}${warningCount ? `, ${warningCount} skipped` : ""}.`;
+        status.className = status.className.replace("text-muted", "").replace("text-danger", "") + " text-success";
+      }
+    };
+
     document.querySelectorAll(".manifest-import").forEach((panel) => {
       const button = panel.querySelector(".manifest-import-btn");
-      if (!button) return;
+      const githubButton = panel.querySelector(".github-import-btn");
 
+      if (githubButton) {
+        githubButton.addEventListener("click", async function () {
+          const repoInput = panel.querySelector(".github-repo-url");
+          const status = panel.querySelector(".github-import-status");
+          const builderId = panel.dataset.targetBuilder;
+
+          if (status) {
+            status.textContent = "Importing repository...";
+            status.className = "github-import-status text-muted";
+          }
+          githubButton.disabled = true;
+
+          try {
+            const formData = new FormData();
+            formData.append("repo_url", repoInput ? repoInput.value : "");
+
+            const response = await fetch(importGithubUrl, {
+              method: "POST",
+              headers: {
+                "X-CSRFToken": getCookie("csrftoken"),
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              body: formData,
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              throw new Error(payload.error || "Could not import repository.");
+            }
+
+            applyImportedStack(builderId, payload, status, "Imported");
+          } catch (error) {
+            if (status) {
+              status.textContent = error.message || "Import failed.";
+              status.className = "github-import-status text-danger";
+            }
+          } finally {
+            githubButton.disabled = false;
+          }
+        });
+      }
+
+      if (!button) return;
       button.addEventListener("click", async function () {
         const typeInput = panel.querySelector(".manifest-type");
         const contentInput = panel.querySelector(".manifest-content");
@@ -642,15 +729,7 @@
             throw new Error(payload.error || "Could not parse manifest.");
           }
 
-          if (window.LibTrackStack) {
-            window.LibTrackStack.setRows(builderId, payload.components || []);
-          }
-
-          const warningCount = (payload.warnings || []).length;
-          if (status) {
-            status.textContent = `Imported ${(payload.components || []).length} dependencies${warningCount ? `, ${warningCount} skipped` : ""}.`;
-            status.className = "manifest-import-status text-success";
-          }
+          applyImportedStack(builderId, payload, status, "Imported");
         } catch (error) {
           if (status) {
             status.textContent = error.message || "Import failed.";

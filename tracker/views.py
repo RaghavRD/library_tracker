@@ -12,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from tracker.models import UpdateCache, UpdateEvent, Project, StackComponent, FutureUpdateCache
 from tracker.forms import LoginForm, RegistrationForm
+from tracker.services.github_repo_import_service import GitHubRepoImportService
 from tracker.services.manifest_parser_service import ManifestParserService
 from tracker.services.project_service import ProjectService
 
@@ -318,6 +319,26 @@ def parse_manifest(request):
             "ok": ok,
             "components": result.get("components", []),
             "warnings": result.get("warnings", []),
+            "error": result.get("error", ""),
+        },
+        status=200 if ok else 400,
+    )
+
+
+@login_required
+@require_POST
+def import_github_repo(request):
+    repo_url = request.POST.get("repo_url", "")
+    result = GitHubRepoImportService().import_repository(repo_url)
+    ok = not result.get("error")
+    return JsonResponse(
+        {
+            "ok": ok,
+            "components": result.get("components", []),
+            "warnings": result.get("warnings", []),
+            "files": result.get("files", []),
+            "repository": result.get("repository", ""),
+            "default_branch": result.get("default_branch", ""),
             "error": result.get("error", ""),
         },
         status=200 if ok else 400,

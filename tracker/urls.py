@@ -8,6 +8,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("projects/", views.projects_view, name="projects"),
     path("projects/parse-manifest/", views.parse_manifest, name="parse_manifest"),
+    path("projects/import-github/", views.import_github_repo, name="import_github_repo"),
     path("update-history/", views.updateHistory, name="updateHistory"),
     path("future-updates/", views.future_updates, name="future_updates"),
     path("profile/", views.profile_view, name="profile"),
