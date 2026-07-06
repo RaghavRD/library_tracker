@@ -34,7 +34,7 @@
       </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'security_alerts' %}'" style="cursor:pointer;">
       <div class="card stat-card h-100 card-gradient-success text-white">
         <div class="card-body p-4">
           <div class="d-flex justify-content-between align-items-start mb-3">
@@ -43,7 +43,7 @@
           </div>
           <div class="kpi-value">{{ health_score }}%</div>
           <p class="small mb-0 mt-3 opacity-75">
-            <i class="bi bi-check-circle-fill me-1"></i> {{ total_components }} tracked libraries
+            <i class="bi bi-shield-exclamation me-1"></i> {{ security_alerts_count }} security alerts
           </p>
         </div>
       </div>
@@ -111,6 +111,7 @@
   <div id="analytics-data" data-total-components="{{ total_components|default:0 }}"
     data-total-updates="{{ total_updates|default:0 }}" data-major-updates="{{ major_updates|default:0 }}"
     data-minor-updates="{{ minor_updates|default:0 }}" data-future-updates="{{ future_updates_count|default:0 }}"
+    data-security-alerts="{{ security_alerts_count|default:0 }}"
     data-languages-count="{{ languages_count|default:0 }}" data-libraries-count="{{ libraries_count|default:0 }}"
     data-tools-count="{{ tools_count|default:0 }}" data-modules-count="{{ modules_count|default:0 }}"
     style="display:none;"></div>
@@ -129,6 +130,7 @@
     const totalComponents = n('totalComponents');
     const totalUpdates = n('totalUpdates');
     const futureCount = n('futureUpdates');
+    const securityAlerts = n('securityAlerts');
     const upToDate = Math.max(0, totalComponents - totalUpdates);
 
     const stackParts = [
@@ -157,10 +159,10 @@
       charts.push(new Chart(document.getElementById('updatesChart'), {
         type: 'bar',
         data: {
-          labels: ['Up to Date', 'Updates Available', 'Future Predicted'],
+          labels: ['Up to Date', 'Updates Available', 'Future Predicted', 'Security Alerts'],
           datasets: [{
-            data: [upToDate, totalUpdates, futureCount],
-            backgroundColor: ['#10b981', '#ef4444', '#2563eb'],
+            data: [upToDate, totalUpdates, futureCount, securityAlerts],
+            backgroundColor: ['#10b981', '#ef4444', '#2563eb', '#f97316'],
             borderRadius: 8,
             barThickness: 46,
           }]

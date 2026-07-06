@@ -3,19 +3,21 @@ run_daily_check: Main orchestrator for LibTrack AI daily update checks.
 
 Purpose:
   Coordinates the daily workflow of syncing libraries, fetching updates,
-  checking for future versions, and notifying projects.
+  checking for future versions, scanning security alerts, and notifying projects.
 
 Flow:
   1. Sync: Link all components to central Library entities
   2. Fetch: Get latest versions from official registries/web
   3. Future: Detect upcoming releases
-  4. Notify: Send emails to projects with relevant updates
+  4. Security: Detect known vulnerabilities via OSV
+  5. Notify: Send emails to projects with relevant updates
 
 Services:
   This command uses modular service classes for each responsibility:
   - LibrarySyncService: Syncs StackComponents to Library
   - VersionFetchService: Fetches versions from registries
   - FutureUpdateService: Detects future versions
+  - SecurityVulnerabilityService: Detects OSV security findings
   - NotificationService: Sends notifications
 """
 
@@ -32,6 +34,7 @@ from tracker.services import (
     LibrarySyncService,
     VersionFetchService,
     FutureUpdateService,
+    SecurityVulnerabilityService,
     NotificationService,
 )
 
@@ -117,7 +120,8 @@ class Command(BaseCommand):
           1. Sync: Link all components to Library entities
           2. Fetch: Get latest versions from registries
           3. Future: Check for upcoming releases
-          4. Notify: Send emails to projects
+          4. Security: Scan known vulnerabilities
+          5. Notify: Send emails to projects
         """
         self.stdout.write(self.style.NOTICE("LibTrack AI: Daily check starting..."))
         start_time = datetime.now()
@@ -132,7 +136,10 @@ class Command(BaseCommand):
             # ===== STEP 3: Check Future Versions =====
             self._step_check_future_versions()
 
-            # ===== STEP 4: Notify Projects =====
+            # ===== STEP 4: Security Vulnerability Scan =====
+            self._step_scan_security_vulnerabilities()
+
+            # ===== STEP 5: Notify Projects =====
             self._step_notify_projects()
 
             # Summary
@@ -201,11 +208,19 @@ class Command(BaseCommand):
         # Share buffer with notification service (will use in step 4)
         self.fresh_future_updates = service.fresh_future_updates
 
-    # ===== STEP 4: Notification =====
+    # ===== STEP 4: Security Vulnerability Scan =====
+
+    def _step_scan_security_vulnerabilities(self):
+        """Step 4: Scan tracked dependencies for known vulnerabilities."""
+        self.stdout.write(self.style.MIGRATE_HEADING("4. Scanning Security Vulnerabilities..."))
+        service = SecurityVulnerabilityService()
+        service.scan_all_projects(stdout_writer=self.stdout.write)
+
+    # ===== STEP 5: Notification =====
 
     def _step_notify_projects(self):
-        """Step 4: Send notifications to projects about relevant updates."""
-        self.stdout.write(self.style.MIGRATE_HEADING("4. Notifying Projects..."))
+        """Step 5: Send notifications to projects about relevant updates."""
+        self.stdout.write(self.style.MIGRATE_HEADING("5. Notifying Projects..."))
         
         # Check for required Mailtrap credentials
         mailtrap_key = os.getenv("MAILTRAP_API_KEY")

@@ -31,7 +31,7 @@
 
   <!-- Custom design system (overrides Bootstrap visuals) -->
   <link rel="stylesheet" href="{% static 'tracker/style.css' %}?v=20260704" />
-  <link rel="icon" href="{% static 'tracker/images/favicon.png' %}" type="image/png">
+  <link rel="icon" href="{% static 'tracker/images/libtrack.png' %}" type="image/png">
 
   {% block extra_head %}{% endblock %}
 </head>
@@ -80,6 +80,10 @@
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'future_updates' %}active{% endif %}"
               href="{% url 'future_updates' %}">Future Updates</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'security_alerts' %}active{% endif %}"
+              href="{% url 'security_alerts' %}">Security</a>
           </li>
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'updateHistory' %}active{% endif %}"

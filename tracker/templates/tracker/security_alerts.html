@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI - Security Alerts{% endblock %}
+
+{% block content %}
+<div class="container-xl">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
+        <div>
+            <h1 class="section-title">Security Alerts</h1>
+            <p class="page-subtitle">Known vulnerability findings for your tracked dependencies.</p>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body border-bottom bg-body-tertiary">
+            <form method="get" id="securityFilterForm" class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
+                        Project Filter
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-funnel-fill text-primary"></i>
+                        </span>
+                        <select id="projectFilter" name="project" class="form-select">
+                            <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
+                            {% for project in project_names %}
+                            <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>{{ project }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label text-muted fw-semibold small text-uppercase">
+                        Status
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-shield-lock-fill text-primary"></i>
+                        </span>
+                        <select id="statusFilter" name="status" class="form-select">
+                            <option value="" {% if not selected_status %}selected{% endif %}>All Statuses</option>
+                            {% for status in status_choices %}
+                            <option value="{{ status }}" {% if status == selected_status %}selected{% endif %}>{{ status|capfirst }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3 text-md-end">
+                    <span class="badge bg-danger-subtle text-danger px-3 py-2">
+                        {{ alerts_total }} finding{{ alerts_total|pluralize }}
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            {% if alerts_total and alerts_page %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="text-center">
+                        <tr>
+                            <th width="1%">#</th>
+                            <th width="14%">Project</th>
+                            <th width="14%">Library</th>
+                            <th width="9%">Version</th>
+                            <th width="8%">Ecosystem</th>
+                            <th width="11%">OSV ID</th>
+                            <th width="11%">Severity</th>
+                            <th>Summary</th>
+                            <th width="12%">Fixed In</th>
+                            <th width="8%">Status</th>
+                            <th width="8%">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in alerts_page %}
+                        <tr class="text-center">
+                            <td class="fw-medium">{{ alerts_page.start_index|add:forloop.counter0 }}</td>
+                            <td>{{ alert.project.project_name }}</td>
+                            <td class="fw-semibold">{{ alert.library }}</td>
+                            <td><span class="badge bg-info text-dark">{{ alert.version }}</span></td>
+                            <td>{{ alert.ecosystem }}</td>
+                            <td><span class="badge bg-secondary">{{ alert.osv_id }}</span></td>
+                            <td>
+                                {% if alert.severity %}
+                                <span class="badge bg-warning text-dark">{{ alert.severity }}</span>
+                                {% else %}
+                                <span class="text-muted small">Unknown</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-start">
+                                {{ alert.summary|default:alert.details|truncatechars:120 }}
+                            </td>
+                            <td>
+                                {% if alert.fixed_versions %}
+                                <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                    {% for version in alert.fixed_versions %}
+                                    <span class="badge rounded-pill bg-success-subtle text-success">{{ version }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">Not listed</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ alert.status|capfirst }}</td>
+                            <td>
+                                {% if alert.source_url %}
+                                <a href="{{ alert.source_url }}" class="link-primary text-decoration-none" target="_blank" rel="noopener">View</a>
+                                {% else %}
+                                <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                No security alerts found for the selected filters.
+            </div>
+            {% endif %}
+        </div>
+
+        {% if alerts_total and alerts_page and alerts_page.paginator.num_pages > 1 %}
+        <div class="card-footer border-0">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+                <small class="text-muted mb-0">
+                    Showing {{ alerts_page.start_index }}-{{ alerts_page.end_index }} of {{ alerts_total }} finding{{ alerts_total|pluralize }}
+                </small>
+                <nav aria-label="Security alerts pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item {% if not alerts_page.has_previous %}disabled{% endif %}">
+                            {% if alerts_page.has_previous %}
+                            <a class="page-link" href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&amp;{% endif %}page={{ alerts_page.previous_page_number }}">Previous</a>
+                            {% else %}
+                            <span class="page-link">Previous</span>
+                            {% endif %}
+                        </li>
+                        {% for num in alerts_page.paginator.page_range %}
+                        <li class="page-item {% if alerts_page.number == num %}active{% endif %}">
+                            {% if alerts_page.number == num %}
+                            <span class="page-link">{{ num }}</span>
+                            {% else %}
+                            <a class="page-link" href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&amp;{% endif %}page={{ num }}">{{ num }}</a>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        <li class="page-item {% if not alerts_page.has_next %}disabled{% endif %}">
+                            {% if alerts_page.has_next %}
+                            <a class="page-link" href="?{% if selected_project %}project={{ selected_project|urlencode }}&amp;{% endif %}{% if selected_status %}status={{ selected_status|urlencode }}&amp;{% endif %}page={{ alerts_page.next_page_number }}">Next</a>
+                            {% else %}
+                            <span class="page-link">Next</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        ["projectFilter", "statusFilter"].forEach(function (id) {
+            const select = document.getElementById(id);
+            if (!select) return;
+            select.addEventListener("change", function () {
+                const form = select.closest("form");
+                if (form) form.submit();
+            });
+        });
+    });
+</script>
+{% endblock %}

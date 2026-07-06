@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     UpdateCache,
     UpdateEvent,
+    SecurityVulnerability,
     Project,
     StackComponent,
     FutureUpdateCache,
@@ -88,6 +89,35 @@ class UpdateEventAdmin(admin.ModelAdmin):
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+
+@admin.register(SecurityVulnerability)
+class SecurityVulnerabilityAdmin(admin.ModelAdmin):
+    list_display = (
+        "project",
+        "library",
+        "version",
+        "ecosystem",
+        "osv_id",
+        "severity",
+        "status",
+        "last_seen_at",
+    )
+    search_fields = ("project__project_name", "library", "version", "osv_id", "aliases")
+    list_filter = ("status", "ecosystem", "severity")
+    readonly_fields = ("created_at", "updated_at", "last_seen_at")
+    fieldsets = (
+        ("Finding", {
+            "fields": ("project", "component", "library", "version", "ecosystem", "osv_id", "status")
+        }),
+        ("Details", {
+            "fields": ("aliases", "severity", "summary", "details", "source_url", "fixed_versions")
+        }),
+        ("Timestamps", {
+            "fields": ("last_seen_at", "created_at", "updated_at"),
             "classes": ("collapse",)
         }),
     )

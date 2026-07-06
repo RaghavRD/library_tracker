@@ -10,7 +10,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from tracker.models import UpdateCache, UpdateEvent, Project, StackComponent, FutureUpdateCache
+from tracker.models import (
+    FutureUpdateCache,
+    Project,
+    SecurityVulnerability,
+    StackComponent,
+    UpdateCache,
+    UpdateEvent,
+)
 from tracker.forms import LoginForm, RegistrationForm
 from tracker.services.github_repo_import_service import GitHubRepoImportService
 from tracker.services.manifest_parser_service import ManifestParserService
@@ -162,6 +169,11 @@ def dashboard(request):
         for update in FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed'])
         if (update.library or "").strip().lower() in tracked_library_keys
     )
+
+    security_alerts_count = SecurityVulnerability.objects.filter(
+        project__owner=request.user,
+        status="active",
+    ).count()
     
     # Health Score Calculation
     # Simple logic: 100 - (updates / components * 100)
@@ -180,6 +192,7 @@ def dashboard(request):
         "major_updates": major_updates,
         "minor_updates": minor_updates,
         "future_updates_count": future_updates_count,
+        "security_alerts_count": security_alerts_count,
         "total_unique_stack_count": total_unique_stack_count,
         "health_score": health_score,
         # Category breakdown
@@ -472,6 +485,48 @@ def future_updates(request):
             "selected_status": selected_status,
             "project_names": project_names,
             "status_choices": status_choices,
+        },
+    )
+
+
+@login_required
+def security_alerts(request):
+    """
+    Displays OSV-backed security vulnerability alerts for the user's projects.
+    """
+    projects = _user_projects_queryset(request).order_by("project_name")
+    project_names = list(projects.values_list("project_name", flat=True))
+
+    selected_project = (request.GET.get("project") or "").strip()
+    selected_status = (request.GET.get("status") or "active").strip()
+
+    alerts_qs = SecurityVulnerability.objects.filter(
+        project__owner=request.user,
+    ).select_related("project", "component").order_by("status", "-updated_at")
+
+    if selected_project:
+        alerts_qs = alerts_qs.filter(project__project_name=selected_project)
+
+    if selected_status:
+        alerts_qs = alerts_qs.filter(status=selected_status)
+
+    alerts_total = alerts_qs.count()
+    alerts_page = None
+    if alerts_total:
+        paginator = Paginator(alerts_qs, 10)
+        alerts_page = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "tracker/security_alerts.html",
+        {
+            "alerts_page": alerts_page,
+            "alerts_total": alerts_total,
+            "alerts_per_page": 10,
+            "selected_project": selected_project,
+            "selected_status": selected_status,
+            "project_names": project_names,
+            "status_choices": ["active", "resolved", "ignored"],
         },
     )
 

@@ -11,6 +11,7 @@ urlpatterns = [
     path("projects/import-github/", views.import_github_repo, name="import_github_repo"),
     path("update-history/", views.updateHistory, name="updateHistory"),
     path("future-updates/", views.future_updates, name="future_updates"),
+    path("security-alerts/", views.security_alerts, name="security_alerts"),
     path("profile/", views.profile_view, name="profile"),
     path("settings/", views.settings_view, name="settings"),
 ]

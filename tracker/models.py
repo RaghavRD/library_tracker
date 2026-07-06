@@ -207,6 +207,50 @@ class UpdateEvent(TimeStampedModel):
         return f"{self.project.project_name} :: {self.library} {self.from_version} -> {self.version}"
 
 
+class SecurityVulnerability(TimeStampedModel):
+    """OSV-backed vulnerability finding for a project dependency."""
+
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("resolved", "Resolved"),
+        ("ignored", "Ignored"),
+    ]
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="security_vulnerabilities",
+    )
+    component = models.ForeignKey(
+        StackComponent,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="security_vulnerabilities",
+    )
+    library = models.CharField(max_length=200, db_index=True)
+    version = models.CharField(max_length=100)
+    ecosystem = models.CharField(max_length=50, db_index=True)
+    osv_id = models.CharField(max_length=100, db_index=True)
+    aliases = models.JSONField(default=list, blank=True)
+    summary = models.TextField(blank=True)
+    details = models.TextField(blank=True)
+    severity = models.CharField(max_length=50, blank=True)
+    source_url = models.URLField(max_length=500, blank=True)
+    fixed_versions = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [["project", "library", "version", "ecosystem", "osv_id"]]
+        ordering = ["status", "-severity", "-updated_at"]
+        verbose_name = "Security Vulnerability"
+        verbose_name_plural = "Security Vulnerabilities"
+
+    def __str__(self):
+        return f"{self.project.project_name} :: {self.library} {self.version} -> {self.osv_id}"
+
+
 
 class FutureUpdateCache(TimeStampedModel):
     """Stores detected future/planned updates separately from released versions."""
