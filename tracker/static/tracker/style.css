@@ -464,6 +464,65 @@ hr { border-color: var(--lt-border); opacity: 1; }
   border-bottom: none;
 }
 .chart-card .page-subtitle { margin-top: 2px; }
+.dashboard-chart-lg {
+  display: block;
+  width: 100% !important;
+  height: 340px !important;
+  max-height: 340px;
+}
+.dashboard-chart-sm-wrap {
+  height: 220px;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dashboard-chart-sm-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: 200px !important;
+  max-height: 200px;
+}
+.dashboard-insight-card .card-header {
+  padding-bottom: 8px;
+}
+.dashboard-list {
+  display: grid;
+  gap: 8px;
+}
+.dashboard-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 10px;
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-border);
+  border-radius: 8px;
+}
+.insight-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--lt-muted);
+}
+.insight-dot-danger { background: var(--lt-red); }
+.insight-dot-warning { background: var(--lt-orange); }
+.insight-dot-info { background: var(--lt-blue); }
+.insight-dot-primary { background: var(--lt-purple); }
+.insight-dot-success { background: var(--lt-green); }
+.scan-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.scan-health-grid > div {
+  padding: 12px;
+  background: var(--lt-surface-2);
+  border: 1px solid var(--lt-border);
+  border-radius: 8px;
+}
 
 /* ---- Tables --------------------------------------------------------- */
 .table {

@@ -40,14 +40,18 @@ class TestDashboardAnalytics:
         assert response.status_code == 200
         content = response.content.decode('utf-8')
         
-        # Check for KPI values
-        assert "Total Projects" in content
+        # Check for KPI values and insight sections
+        assert "Projects" in content
         assert "Health Score" in content
-        assert "Updates Available" in content
-        assert "Future Roadmap" in content
+        assert "Vulnerabilities" in content
+        assert "Updates" in content
+        assert "Future Risk" in content
+        assert "Action Needed" in content
+        assert "Top Risky Projects" in content
         
         # Check for Chart.js canvas
-        assert 'id="updatesChart"' in content
+        assert 'id="riskTrendChart"' in content
+        assert 'id="severityChart"' in content
         assert 'id="stackChart"' in content
 
     def test_navigation_links(self):

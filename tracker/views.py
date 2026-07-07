@@ -19,6 +19,7 @@ from tracker.models import (
     UpdateEvent,
 )
 from tracker.forms import LoginForm, RegistrationForm
+from tracker.services.dashboard_metrics_service import DashboardMetricsService
 from tracker.services.github_repo_import_service import GitHubRepoImportService
 from tracker.services.manifest_parser_service import ManifestParserService
 from tracker.services.project_service import ProjectService
@@ -102,105 +103,7 @@ def dashboard(request):
     New Analytics Dashboard.
     Displays high-level metrics and charts.
     """
-    projects_qs = _user_projects_queryset(request)
-    total_projects = projects_qs.count()
-    
-    # Count total libraries (using StackComponent or unique libraries)
-    # Using StackComponent gives us the libraries actually tracked in projects
-    total_components = StackComponent.objects.filter(project__owner=request.user).exclude(key='language').count()
-    
-    # Calculate unique category breakdown using optimized SQL
-    from django.db.models import Case, When, Value, CharField, Count
-
-    # Annotate components with normalized category buckets
-    # Logic mirrors previous python mapping: language -> languages, tool -> tools, module -> modules, else -> libraries
-    annotated_components = StackComponent.objects.filter(project__owner=request.user).annotate(
-        norm_cat=Case(
-            When(key__icontains='language', then=Value('languages')),
-            When(category__icontains='language', then=Value('languages')),
-            When(category__icontains='tool', then=Value('tools')),
-            When(category__icontains='module', then=Value('modules')),
-            default=Value('libraries'),
-            output_field=CharField(),
-        )
-    )
-
-    # Get unique counts per category bucket
-    # We want count of unique NAMES per bucket
-    category_aggs = annotated_components.values('norm_cat').annotate(
-        unique_count=Count('name', distinct=True)
-    )
-
-    # Convert to dictionary for context
-    category_counts = {
-        "languages": 0,
-        "libraries": 0, 
-        "tools": 0,
-        "modules": 0
-    }
-    
-    total_unique_items = 0
-    for entry in category_aggs:
-        cat = entry['norm_cat']
-        count = entry['unique_count']
-        if cat in category_counts:
-            category_counts[cat] = count
-        # For total unique, complex because same name could appear in diff buckets (rare but possible)
-        # We'll trust the sum of buckets or doing a separate distinct count
-    
-    # Total unique stack count (across all categories)
-    total_unique_stack_count = StackComponent.objects.filter(project__owner=request.user).values('name', 'category').distinct().count()
-
-    
-    # Calculate updates available
-    updates_qs = UpdateCache.objects.filter(project__owner=request.user)
-    total_updates = updates_qs.count()
-    
-    major_updates = updates_qs.filter(category='major').count()
-    minor_updates = updates_qs.filter(category='minor').count()
-    
-    # Future updates
-    tracked_libraries = StackComponent.objects.filter(
-        project__owner=request.user
-    ).exclude(key="language").values_list("name", flat=True)
-    tracked_library_keys = {name.strip().lower() for name in tracked_libraries if name and name.strip()}
-    future_updates_count = sum(
-        1
-        for update in FutureUpdateCache.objects.filter(status__in=['detected', 'confirmed'])
-        if (update.library or "").strip().lower() in tracked_library_keys
-    )
-
-    security_alerts_count = SecurityVulnerability.objects.filter(
-        project__owner=request.user,
-        status="active",
-    ).count()
-    
-    # Health Score Calculation
-    # Simple logic: 100 - (updates / components * 100)
-    # If components is 0, score is 100.
-    health_score = 100
-    if total_components > 0:
-        ratio = total_updates / total_components
-        # Cap at 100% impact (meaning 0 score) if ratio > 1
-        params = min(ratio, 1.0)
-        health_score = int((1.0 - params) * 100)
-    
-    context = {
-        "total_projects": total_projects,
-        "total_components": total_components,
-        "total_updates": total_updates,
-        "major_updates": major_updates,
-        "minor_updates": minor_updates,
-        "future_updates_count": future_updates_count,
-        "security_alerts_count": security_alerts_count,
-        "total_unique_stack_count": total_unique_stack_count,
-        "health_score": health_score,
-        # Category breakdown
-        "languages_count": category_counts["languages"],
-        "libraries_count": category_counts["libraries"],
-        "tools_count": category_counts["tools"],
-        "modules_count": category_counts["modules"],
-    }
+    context = DashboardMetricsService.build_for_owner(request.user)
     return render(request, "tracker/dashboard.html", context)
 
 

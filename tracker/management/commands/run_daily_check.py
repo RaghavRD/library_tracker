@@ -36,6 +36,7 @@ from tracker.services import (
     FutureUpdateService,
     SecurityVulnerabilityService,
     NotificationService,
+    DashboardMetricsService,
 )
 
 # Get logger
@@ -142,6 +143,9 @@ class Command(BaseCommand):
             # ===== STEP 5: Notify Projects =====
             self._step_notify_projects()
 
+            # ===== STEP 6: Record Dashboard Snapshots =====
+            self._step_record_dashboard_snapshots()
+
             # Summary
             duration = (datetime.now() - start_time).total_seconds()
             self.stdout.write(
@@ -241,6 +245,12 @@ class Command(BaseCommand):
         service.fresh_future_updates = getattr(self, 'fresh_future_updates', {})
         
         service.notify_all_projects(stdout_writer=self.stdout.write)
+
+    def _step_record_dashboard_snapshots(self):
+        """Step 6: Capture per-user dashboard metrics for trend charts."""
+        self.stdout.write(self.style.MIGRATE_HEADING("6. Recording Dashboard Snapshots..."))
+        count = DashboardMetricsService.record_all_owner_snapshots()
+        self.stdout.write(self.style.SUCCESS(f"📈 Recorded {count} dashboard snapshot(s)"))
 
     @staticmethod
     def _is_valid_time_format(value: str) -> bool:

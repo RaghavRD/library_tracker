@@ -1,40 +1,36 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}LibTrack AI – Dashboard{% endblock %}
+{% block title %}LibTrack AI - Dashboard{% endblock %}
 
 {% block content %}
 <div class="container-xl">
 
-  <!-- Header -->
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
     <div>
       <h1 class="section-title">Dashboard Overview</h1>
-      <p class="page-subtitle">Real-time insights for your tracked projects</p>
+      <p class="page-subtitle">Project risk, update health, and dependency insights in one view.</p>
     </div>
     <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
       <i class="bi bi-gear-fill me-1"></i> Manage Projects
     </a>
   </div>
 
-  <!-- KPI Cards -->
-  <div class="row g-3 g-md-4 mb-4">
-    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'projects' %}'" style="cursor:pointer;">
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
+    <div class="col" onclick="window.location.href='{% url 'projects' %}'" style="cursor:pointer;">
       <div class="card stat-card h-100 card-gradient-primary text-white">
         <div class="card-body p-4">
           <div class="d-flex justify-content-between align-items-start mb-3">
-            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Total Projects</h6>
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Projects</h6>
             <div class="kpi-icon"><i class="bi bi-folder2-open"></i></div>
           </div>
           <div class="kpi-value">{{ total_projects }}</div>
-          <p class="small mb-0 mt-3 opacity-75">
-            <i class="bi bi-layers-fill me-1"></i> {{ total_unique_stack_count }} unique stacks
-          </p>
+          <p class="small mb-0 mt-3 opacity-75">{{ total_unique_stack_count }} unique stack items</p>
         </div>
       </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'security_alerts' %}'" style="cursor:pointer;">
+    <div class="col">
       <div class="card stat-card h-100 card-gradient-success text-white">
         <div class="card-body p-4">
           <div class="d-flex justify-content-between align-items-start mb-3">
@@ -42,78 +38,242 @@
             <div class="kpi-icon"><i class="bi bi-shield-check"></i></div>
           </div>
           <div class="kpi-value">{{ health_score }}%</div>
-          <p class="small mb-0 mt-3 opacity-75">
-            <i class="bi bi-shield-exclamation me-1"></i> {{ security_alerts_count }} security alerts
-          </p>
+          <p class="small mb-0 mt-3 opacity-75">{{ up_to_date_count }} dependencies up to date</p>
         </div>
       </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'updateHistory' %}'" style="cursor:pointer;">
+    <div class="col" onclick="window.location.href='{% url 'security_alerts' %}'" style="cursor:pointer;">
       <div class="card stat-card h-100 card-gradient-dark text-white">
         <div class="card-body p-4">
           <div class="d-flex justify-content-between align-items-start mb-3">
-            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Updates Available</h6>
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Vulnerabilities</h6>
+            <div class="kpi-icon"><i class="bi bi-bug-fill"></i></div>
+          </div>
+          <div class="kpi-value">{{ vulnerabilities_count }}</div>
+          <p class="small mb-0 mt-3 opacity-75">{{ security_alerts_count }} active security alerts</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col" onclick="window.location.href='{% url 'updateHistory' %}'" style="cursor:pointer;">
+      <div class="card stat-card h-100 card-gradient-secondary text-white">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Updates</h6>
             <div class="kpi-icon"><i class="bi bi-lightning-fill"></i></div>
           </div>
           <div class="d-flex align-items-center gap-2">
             <span class="kpi-value">{{ total_updates }}</span>
-            <span class="badge badge-pill-custom bg-danger">{{ major_updates }} Major</span>
+            <span class="badge badge-pill-custom bg-danger">{{ major_updates }} major</span>
           </div>
-          <p class="small mb-0 mt-3 fw-medium opacity-75">{{ minor_updates }} Minor updates pending</p>
+          <p class="small mb-0 mt-3 opacity-75">{{ minor_updates }} minor updates pending</p>
         </div>
       </div>
     </div>
 
-    <div class="col-sm-6 col-xl-3" onclick="window.location.href='{% url 'future_updates' %}'" style="cursor:pointer;">
-      <div class="card stat-card h-100 card-gradient-secondary text-white">
+    <div class="col" onclick="window.location.href='{% url 'future_updates' %}'" style="cursor:pointer;">
+      <div class="card stat-card h-100 card-gradient-primary text-white">
         <div class="card-body p-4">
           <div class="d-flex justify-content-between align-items-start mb-3">
-            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Future Roadmap</h6>
+            <h6 class="text-uppercase small fw-bold opacity-75 mb-0">Future Risk</h6>
             <div class="kpi-icon"><i class="bi bi-rocket-takeoff"></i></div>
           </div>
           <div class="kpi-value">{{ future_updates_count }}</div>
-          <p class="small mb-0 mt-3 opacity-75">Predicted versions</p>
+          <p class="small mb-0 mt-3 opacity-75">Predicted versions to review</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Charts Row -->
-  <div class="row g-3 g-md-4">
-    <div class="col-lg-8">
+  <div class="row g-3 g-md-4 mb-4">
+    <div class="col-xl-8">
       <div class="card chart-card h-100">
-        <div class="card-header border-0 bg-transparent">
-          <h5 class="fw-bold mb-0">Update Status Distribution</h5>
-          <p class="page-subtitle">Status breakdown across all packages</p>
+        <div class="card-header border-0 bg-transparent d-flex flex-wrap justify-content-between align-items-start gap-2">
+          <div>
+            <h5 class="fw-bold mb-0">Risk & Update Trend</h5>
+            <p class="page-subtitle">Scan-wise movement across security, update, and future signals</p>
+          </div>
+          <span class="badge bg-secondary-subtle text-secondary">Last 14 days</span>
         </div>
         <div class="card-body">
-          <canvas id="updatesChart" style="min-height: 320px;"></canvas>
+          <canvas id="riskTrendChart" class="dashboard-chart-lg"></canvas>
+          {% if trend_points|length <= 1 %}
+          <p class="text-muted small mb-0 mt-3">
+            Trend will become richer after daily scans record more dashboard snapshots.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-4">
+      <div class="row g-3 h-100">
+        <div class="col-12">
+          <div class="card chart-card h-100">
+            <div class="card-header border-0 bg-transparent">
+              <h5 class="fw-bold mb-0">Severity Breakdown</h5>
+              <p class="page-subtitle">Active vulnerability severity</p>
+            </div>
+            <div class="card-body dashboard-chart-sm-wrap">
+              <canvas id="severityChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="card chart-card h-100">
+            <div class="card-header border-0 bg-transparent">
+              <h5 class="fw-bold mb-0">Stack Composition</h5>
+              <p class="page-subtitle">Technology breakdown</p>
+            </div>
+            <div class="card-body dashboard-chart-sm-wrap">
+              <canvas id="stackChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 g-md-4">
+    <div class="col-lg-4">
+      <div class="card h-100 dashboard-insight-card">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Action Needed</h5>
+          <p class="page-subtitle">What the user should fix first</p>
+        </div>
+        <div class="card-body pt-0">
+          <div class="dashboard-list">
+            {% for item in action_items %}
+            <div class="dashboard-list-row">
+              <span class="insight-dot insight-dot-{{ item.level }}"></span>
+              <span>{{ item.label }}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
       </div>
     </div>
 
     <div class="col-lg-4">
-      <div class="card chart-card h-100">
+      <div class="card h-100 dashboard-insight-card">
         <div class="card-header border-0 bg-transparent">
-          <h5 class="fw-bold mb-0">Stack Composition</h5>
-          <p class="page-subtitle">Technology breakdown</p>
+          <h5 class="fw-bold mb-0">Top Risky Projects</h5>
+          <p class="page-subtitle">Highest combined update and security risk</p>
         </div>
-        <div class="card-body d-flex align-items-center justify-content-center">
-          <div style="width: 100%; max-width: 280px;">
-            <canvas id="stackChart"></canvas>
+        <div class="card-body pt-0">
+          {% if top_risky_projects %}
+          <div class="dashboard-list">
+            {% for project in top_risky_projects %}
+            <div class="dashboard-list-row justify-content-between">
+              <div>
+                <div class="fw-semibold">{{ project.project_name }}</div>
+                <div class="text-muted small">
+                  {{ project.vulnerabilities }} vuln · {{ project.major_updates }} major · {{ project.future_predictions }} future
+                </div>
+              </div>
+              <span class="badge bg-danger">{{ project.risk_score }}</span>
+            </div>
+            {% endfor %}
           </div>
+          {% else %}
+          <p class="text-muted small mb-0">No risky project signals right now.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card h-100 dashboard-insight-card">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Scan Health</h5>
+          <p class="page-subtitle">Freshness and scan coverage</p>
+        </div>
+        <div class="card-body pt-0">
+          <div class="scan-health-grid">
+            <div>
+              <span class="text-muted small">Last snapshot</span>
+              <div class="fw-semibold">{{ scan_health.last_scan_label }}</div>
+            </div>
+            <div>
+              <span class="text-muted small">Scanned deps</span>
+              <div class="fw-semibold">{{ scan_health.scanned_components }}</div>
+            </div>
+            <div>
+              <span class="text-muted small">Trend points</span>
+              <div class="fw-semibold">{{ scan_health.history_points }}</div>
+            </div>
+            <div>
+              <span class="text-muted small">Status</span>
+              <div class="fw-semibold">{{ scan_health.status }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100 dashboard-insight-card">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Most Outdated Dependencies</h5>
+          <p class="page-subtitle">Packages creating upgrade work</p>
+        </div>
+        <div class="card-body pt-0">
+          {% if most_outdated_dependencies %}
+          <div class="dashboard-list">
+            {% for dep in most_outdated_dependencies %}
+            <div class="dashboard-list-row justify-content-between">
+              <div>
+                <div class="fw-semibold">{{ dep.library }}</div>
+                <div class="text-muted small">{{ dep.project_name }} · target {{ dep.target_version }}</div>
+              </div>
+              <span class="badge {% if dep.category == 'major' %}bg-danger{% else %}bg-warning{% endif %}">
+                {{ dep.category }}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0">No outdated dependency signals right now.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card h-100 dashboard-insight-card">
+        <div class="card-header border-0 bg-transparent">
+          <h5 class="fw-bold mb-0">Recent Security Alerts</h5>
+          <p class="page-subtitle">Latest active vulnerability findings</p>
+        </div>
+        <div class="card-body pt-0">
+          {% if recent_security_alerts %}
+          <div class="dashboard-list">
+            {% for alert in recent_security_alerts %}
+            <div class="dashboard-list-row justify-content-between">
+              <div>
+                <div class="fw-semibold">{{ alert.library }} {{ alert.version }}</div>
+                <div class="text-muted small">{{ alert.project_name }} · {{ alert.osv_id }}</div>
+              </div>
+              <span class="badge bg-danger">{{ alert.severity }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0">No active security alerts right now.</p>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
 
-  <div id="analytics-data" data-total-components="{{ total_components|default:0 }}"
-    data-total-updates="{{ total_updates|default:0 }}" data-major-updates="{{ major_updates|default:0 }}"
-    data-minor-updates="{{ minor_updates|default:0 }}" data-future-updates="{{ future_updates_count|default:0 }}"
-    data-security-alerts="{{ security_alerts_count|default:0 }}"
-    data-languages-count="{{ languages_count|default:0 }}" data-libraries-count="{{ libraries_count|default:0 }}"
-    data-tools-count="{{ tools_count|default:0 }}" data-modules-count="{{ modules_count|default:0 }}"
+  {{ trend_points|json_script:"trend-data" }}
+  {{ severity_counts|json_script:"severity-data" }}
+  <div id="analytics-data"
+    data-languages-count="{{ languages_count|default:0 }}"
+    data-libraries-count="{{ libraries_count|default:0 }}"
+    data-tools-count="{{ tools_count|default:0 }}"
+    data-modules-count="{{ modules_count|default:0 }}"
     style="display:none;"></div>
 
 </div>
@@ -126,18 +286,23 @@
     const dataEl = document.getElementById('analytics-data');
     if (!dataEl || typeof Chart === 'undefined') return;
 
+    const trendPoints = JSON.parse(document.getElementById('trend-data').textContent || '[]');
+    const severityCounts = JSON.parse(document.getElementById('severity-data').textContent || '{}');
     const n = (k) => parseInt(dataEl.dataset[k]) || 0;
-    const totalComponents = n('totalComponents');
-    const totalUpdates = n('totalUpdates');
-    const futureCount = n('futureUpdates');
-    const securityAlerts = n('securityAlerts');
-    const upToDate = Math.max(0, totalComponents - totalUpdates);
 
     const stackParts = [
       { label: 'Languages', value: n('languagesCount'), color: '#2563eb' },
       { label: 'Libraries', value: n('librariesCount'), color: '#10b981' },
       { label: 'Tools', value: n('toolsCount'), color: '#f59e0b' },
       { label: 'Modules', value: n('modulesCount'), color: '#06b6d4' },
+    ].filter(p => p.value > 0);
+
+    const severityParts = [
+      { label: 'Critical', value: severityCounts.critical || 0, color: '#dc2626' },
+      { label: 'High', value: severityCounts.high || 0, color: '#f97316' },
+      { label: 'Medium', value: severityCounts.medium || 0, color: '#f59e0b' },
+      { label: 'Low', value: severityCounts.low || 0, color: '#10b981' },
+      { label: 'Unknown', value: severityCounts.unknown || 0, color: '#64748b' },
     ].filter(p => p.value > 0);
 
     let charts = [];
@@ -151,45 +316,17 @@
       };
     }
 
-    function buildCharts() {
-      charts.forEach(c => c.destroy());
-      charts = [];
-      const c = themeColors();
-
-      charts.push(new Chart(document.getElementById('updatesChart'), {
-        type: 'bar',
-        data: {
-          labels: ['Up to Date', 'Updates Available', 'Future Predicted', 'Security Alerts'],
-          datasets: [{
-            data: [upToDate, totalUpdates, futureCount, securityAlerts],
-            backgroundColor: ['#10b981', '#ef4444', '#2563eb', '#f97316'],
-            borderRadius: 8,
-            barThickness: 46,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { padding: 12, backgroundColor: c.tooltipBg, cornerRadius: 8 }
-          },
-          scales: {
-            y: { beginAtZero: true, ticks: { stepSize: 1, color: c.tick }, grid: { color: c.grid } },
-            x: { grid: { display: false }, ticks: { color: c.tick, font: { weight: 'bold' } } }
-          }
-        }
-      }));
-
-      charts.push(new Chart(document.getElementById('stackChart'), {
+    function doughnutConfig(parts, emptyLabel) {
+      const data = parts.length ? parts : [{ label: emptyLabel, value: 1, color: '#334155' }];
+      return {
         type: 'doughnut',
         data: {
-          labels: stackParts.map(p => p.label),
+          labels: data.map(p => p.label),
           datasets: [{
-            data: stackParts.map(p => p.value),
-            backgroundColor: stackParts.map(p => p.color),
+            data: data.map(p => p.value),
+            backgroundColor: data.map(p => p.color),
             borderWidth: 0,
-            hoverOffset: 14,
+            hoverOffset: 12,
           }]
         },
         options: {
@@ -199,20 +336,58 @@
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { padding: 14, usePointStyle: true, color: c.tick, font: { size: 11, weight: 'bold' } }
+              labels: { padding: 12, usePointStyle: true, color: themeColors().tick, font: { size: 11, weight: 'bold' } }
             },
-            tooltip: {
-              padding: 12, cornerRadius: 8, backgroundColor: c.tooltipBg,
-              callbacks: {
-                label: function (ctx) {
-                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0) || 1;
-                  return `${ctx.label}: ${ctx.raw} (${Math.round((ctx.raw / total) * 100)}%)`;
-                }
-              }
-            }
+            tooltip: { padding: 12, cornerRadius: 8, backgroundColor: themeColors().tooltipBg }
+          }
+        }
+      };
+    }
+
+    function buildCharts() {
+      charts.forEach(c => c.destroy());
+      charts = [];
+      const c = themeColors();
+      const labels = trendPoints.map(point => point.date);
+
+      charts.push(new Chart(document.getElementById('riskTrendChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Vulnerabilities', data: trendPoints.map(p => p.vulnerabilities), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,.12)' },
+            { label: 'Security Alerts', data: trendPoints.map(p => p.securityAlerts), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.12)' },
+            { label: 'Updates Available', data: trendPoints.map(p => p.updatesAvailable), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.12)' },
+            { label: 'Up To Date', data: trendPoints.map(p => p.upToDate), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.12)' },
+            { label: 'Future Predicted', data: trendPoints.map(p => p.futurePredicted), borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.12)' },
+          ].map(dataset => ({
+            ...dataset,
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            borderWidth: 2,
+          }))
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: c.tick, usePointStyle: true, padding: 14, font: { size: 11, weight: 'bold' } }
+            },
+            tooltip: { padding: 12, backgroundColor: c.tooltipBg, cornerRadius: 8 }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, color: c.tick }, grid: { color: c.grid } },
+            x: { grid: { display: false }, ticks: { color: c.tick, font: { weight: 'bold' } } }
           }
         }
       }));
+
+      charts.push(new Chart(document.getElementById('severityChart'), doughnutConfig(severityParts, 'No Alerts')));
+      charts.push(new Chart(document.getElementById('stackChart'), doughnutConfig(stackParts, 'No Stack')));
     }
 
     buildCharts();

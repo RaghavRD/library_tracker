@@ -21,6 +21,7 @@ from .version_fetch_service import VersionFetchService
 from .future_update_service import FutureUpdateService
 from .security_vulnerability_service import SecurityVulnerabilityService
 from .notification_service import NotificationService
+from .dashboard_metrics_service import DashboardMetricsService
 
 __all__ = [
     "LibrarySyncService",
@@ -28,4 +29,5 @@ __all__ = [
     "FutureUpdateService",
     "SecurityVulnerabilityService",
     "NotificationService",
+    "DashboardMetricsService",
 ]

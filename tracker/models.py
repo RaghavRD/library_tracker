@@ -251,6 +251,33 @@ class SecurityVulnerability(TimeStampedModel):
         return f"{self.project.project_name} :: {self.library} {self.version} -> {self.osv_id}"
 
 
+class DashboardSnapshot(TimeStampedModel):
+    """Daily dashboard metrics captured after scan runs for trend charts."""
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="dashboard_snapshots",
+    )
+    scan_date = models.DateField(db_index=True)
+    total_components = models.PositiveIntegerField(default=0)
+    up_to_date_count = models.PositiveIntegerField(default=0)
+    updates_available_count = models.PositiveIntegerField(default=0)
+    future_predicted_count = models.PositiveIntegerField(default=0)
+    security_alerts_count = models.PositiveIntegerField(default=0)
+    vulnerabilities_count = models.PositiveIntegerField(default=0)
+    health_score = models.PositiveIntegerField(default=100)
+
+    class Meta:
+        unique_together = [["owner", "scan_date"]]
+        ordering = ["scan_date"]
+        verbose_name = "Dashboard Snapshot"
+        verbose_name_plural = "Dashboard Snapshots"
+
+    def __str__(self):
+        return f"{self.owner} dashboard snapshot for {self.scan_date}"
+
+
 
 class FutureUpdateCache(TimeStampedModel):
     """Stores detected future/planned updates separately from released versions."""
