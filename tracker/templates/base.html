@@ -38,7 +38,7 @@
 
 <body>
 
-  <!-- 🔹 Global Toast Container -->
+  <!--  Global Toast Container -->
   <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
     {% if messages %}
     {% for m in messages %}
@@ -54,13 +54,14 @@
     {% endif %}
   </div>
 
-  <!-- 🔹 Navbar -->
+  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg app-navbar sticky-top">
     <div class="container-fluid px-2 px-md-3">
       <a class="navbar-brand" href="/">
         <!-- <span class="brand-mark"><i class="bi bi-box-seam"></i></span>
         LibTrack<span class="text-primary">AI</span> -->
-        <img src="{% static 'tracker/images/libtrack_logo.png' %}" alt="LibTrack AI" height="28">
+        <!-- <img src="{% static 'tracker/images/libtrack_logo.png' %}" alt="LibTrack AI" height="28"> -->
+         <span class="ms-2" style="color: white; font-size: 25px;">Lib<span style="color: #006eff; font-size: 25px;">Track</span></span>
       </a>
       <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -126,12 +127,12 @@
     </div>
   </nav>
 
-  <!-- 🔹 Main content -->
+  <!-- Main content -->
   <main class="app-main">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- 🔹 Logout Confirmation Modal -->
+  <!-- Logout Confirmation Modal -->
   <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -148,7 +149,7 @@
     </div>
   </div>
 
-  <!-- 🔹 Footer -->
+  <!-- Footer -->
   <footer class="app-footer">
     © {% now "Y" %} LibTrack AI — Developed by Raghav Desai
   </footer>
