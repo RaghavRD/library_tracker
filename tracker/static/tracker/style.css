@@ -16,6 +16,8 @@
   --lt-text:    #c9d1d9;
   --lt-muted:   #8b949e;
   --lt-heading: #f0f6fc;
+  --lt-brand-lib: #ffffff;
+  --lt-nav-hover-bg: #21262d;
 
   --lt-blue:          #58a6ff;
   --lt-blue-hover:    #79c0ff;
@@ -81,6 +83,8 @@
   --lt-text:    #1f2328;
   --lt-muted:   #57606a;
   --lt-heading: #1f2328;
+  --lt-brand-lib: #0C1117;
+  --lt-nav-hover-bg: #eaeef2;
 
   --lt-blue:       #0969da;
   --lt-blue-hover: #0550ae;
@@ -189,6 +193,28 @@ hr { border-color: var(--lt-border); opacity: 1; }
   flex-shrink: 0;
 }
 
+.brand-name {
+  font-size: 25px;
+  line-height: 1;
+}
+
+.brand-lib {
+  color: var(--lt-brand-lib);
+}
+
+.brand-track {
+  color: #006eff;
+}
+
+.brand-ai {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 4px;
+  position: relative;
+  top: -0.45em;
+}
+
 .app-navbar .nav-link {
   color: var(--lt-muted);
   font-size: 13.5px;
@@ -204,11 +230,11 @@ hr { border-color: var(--lt-border); opacity: 1; }
 }
 .app-navbar .nav-link:hover {
   color: var(--lt-text);
-  background: var(--lt-surface-2);
+  background: var(--lt-nav-hover-bg);
 }
 .app-navbar .nav-link.active {
   color: var(--lt-heading);
-  background: var(--lt-surface-2);
+  background: var(--lt-nav-hover-bg);
   font-weight: 600;
 }
 .app-navbar .nav-link i { font-size: 13px; }

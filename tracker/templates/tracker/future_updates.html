@@ -17,21 +17,6 @@
 
     <!-- Future Updates Table -->
     <div class="card border-0 shadow-sm">
-        <!-- <div class="card-header bg-warning text-dark d-flex flex-column flex-md-row justify-content-between gap-2">
-            <div>
-                <h5 class="mb-1">Upcoming Releases</h5>
-            </div>
-            <div class="text-md-end">
-                <span class="badge bg-dark">
-                    {% if future_total and future_page %}
-                    Showing {{ future_page.start_index }}-{{ future_page.end_index }} of {{ future_total }} update{{ future_total|pluralize }}
-                    {% else %}
-                    No updates to display
-                    {% endif %}
-                </span>
-            </div>
-        </div> -->
-
         <div class="card-body border-bottom bg-body-tertiary">
             <div class="row g-3 align-items-end">
                 <div class="col-md-5">
@@ -44,7 +29,7 @@
                         {% endif %}
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="bi bi-funnel-fill text-warning"></i>
+                                <i class="bi bi-funnel-fill text-primary"></i>
                             </span>
                             <select id="projectFilter" name="project" class="form-select" {% if not project_names%}
                                 disabled{% endif %}>
@@ -71,7 +56,7 @@
                         {% endif %}
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="bi bi-filter-circle-fill text-warning"></i>
+                                <i class="bi bi-filter-circle-fill text-primary"></i>
                             </span>
                             <select id="statusFilter" name="status" class="form-select">
                                 <option value="" {% if not selected_status %}selected{% endif %}>All Statuses</option>

@@ -30,7 +30,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
   <!-- Custom design system (overrides Bootstrap visuals) -->
-  <link rel="stylesheet" href="{% static 'tracker/style.css' %}?v=20260704" />
+  <link rel="stylesheet" href="{% static 'tracker/style.css' %}?v=20260708" />
   <link rel="icon" href="{% static 'tracker/images/libtrack.png' %}" type="image/png">
 
   {% block extra_head %}{% endblock %}
@@ -58,10 +58,8 @@
   <nav class="navbar navbar-expand-lg app-navbar sticky-top">
     <div class="container-fluid px-2 px-md-3">
       <a class="navbar-brand" href="/">
-        <!-- <span class="brand-mark"><i class="bi bi-box-seam"></i></span>
-        LibTrack<span class="text-primary">AI</span> -->
-        <!-- <img src="{% static 'tracker/images/libtrack_logo.png' %}" alt="LibTrack AI" height="28"> -->
-         <span class="ms-2" style="color: white; font-size: 25px;">Lib<span style="color: #006eff; font-size: 25px;">Track</span></span>
+        <!-- <span class="brand-mark"><i class="bi bi-box-seam"></i></span> -->
+        <span class="brand-name ms-2"><span class="brand-lib">Lib</span><span class="brand-track">Track<span class="brand-ai">AI</span></span></span>
       </a>
       <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
