@@ -225,7 +225,7 @@
             <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="add-stack">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <span class="form-label fw-semibold mb-0">Import Dependencies</span>
-                <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
+                <span class="badge bg-secondary-subtle text-secondary">Node / Python / Go / Java / Rust / .NET / PHP</span>
               </div>
               <div class="row g-2">
                 <div class="col-md-9">
@@ -243,11 +243,23 @@
                 <div class="col-md-4">
                   <select class="form-select form-select-sm manifest-type">
                     <option value="package_json">package.json</option>
+                    <option value="package_lock_json">package-lock.json</option>
+                    <option value="yarn_lock">yarn.lock</option>
+                    <option value="pnpm_lock">pnpm-lock.yaml</option>
                     <option value="requirements_txt">requirements.txt</option>
+                    <option value="pyproject_toml">pyproject.toml</option>
+                    <option value="poetry_lock">poetry.lock</option>
+                    <option value="pipfile_lock">Pipfile.lock</option>
+                    <option value="go_mod">go.mod</option>
+                    <option value="pom_xml">pom.xml</option>
+                    <option value="build_gradle">build.gradle</option>
+                    <option value="cargo_toml">Cargo.toml</option>
+                    <option value="csproj">.csproj</option>
+                    <option value="composer_json">composer.json</option>
                   </select>
                 </div>
                 <div class="col-md-8">
-                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in" />
+                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in,.lock,.yaml,.yml,.toml,.mod,.xml,.gradle,.kts,.csproj" />
                 </div>
                 <div class="col-12">
                   <textarea class="form-control form-control-sm manifest-content" rows="4"
@@ -359,7 +371,7 @@
             <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="edit-stack">
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <span class="form-label fw-semibold mb-0">Import Dependencies</span>
-                <span class="badge bg-secondary-subtle text-secondary">package.json / requirements.txt</span>
+                <span class="badge bg-secondary-subtle text-secondary">Node / Python / Go / Java / Rust / .NET / PHP</span>
               </div>
               <div class="row g-2">
                 <div class="col-md-9">
@@ -377,11 +389,23 @@
                 <div class="col-md-4">
                   <select class="form-select form-select-sm manifest-type">
                     <option value="package_json">package.json</option>
+                    <option value="package_lock_json">package-lock.json</option>
+                    <option value="yarn_lock">yarn.lock</option>
+                    <option value="pnpm_lock">pnpm-lock.yaml</option>
                     <option value="requirements_txt">requirements.txt</option>
+                    <option value="pyproject_toml">pyproject.toml</option>
+                    <option value="poetry_lock">poetry.lock</option>
+                    <option value="pipfile_lock">Pipfile.lock</option>
+                    <option value="go_mod">go.mod</option>
+                    <option value="pom_xml">pom.xml</option>
+                    <option value="build_gradle">build.gradle</option>
+                    <option value="cargo_toml">Cargo.toml</option>
+                    <option value="csproj">.csproj</option>
+                    <option value="composer_json">composer.json</option>
                   </select>
                 </div>
                 <div class="col-md-8">
-                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in" />
+                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in,.lock,.yaml,.yml,.toml,.mod,.xml,.gradle,.kts,.csproj" />
                 </div>
                 <div class="col-12">
                   <textarea class="form-control form-control-sm manifest-content" rows="4"
@@ -494,6 +518,23 @@
     const defaultStackTemplate = [{}];
     const parseManifestUrl = "{% url 'parse_manifest' %}";
     const importGithubUrl = "{% url 'import_github_repo' %}";
+    const manifestTypeByFileName = {
+      "package.json": "package_json",
+      "package-lock.json": "package_lock_json",
+      "yarn.lock": "yarn_lock",
+      "pnpm-lock.yaml": "pnpm_lock",
+      "pnpm-lock.yml": "pnpm_lock",
+      "requirements.txt": "requirements_txt",
+      "pyproject.toml": "pyproject_toml",
+      "poetry.lock": "poetry_lock",
+      "pipfile.lock": "pipfile_lock",
+      "go.mod": "go_mod",
+      "pom.xml": "pom_xml",
+      "build.gradle": "build_gradle",
+      "build.gradle.kts": "build_gradle",
+      "cargo.toml": "cargo_toml",
+      "composer.json": "composer_json",
+    };
 
     const getCookie = (name) => {
       const cookies = document.cookie ? document.cookie.split(";") : [];
@@ -510,6 +551,12 @@
       const file = fileInput && fileInput.files && fileInput.files[0];
       if (!file) return Promise.resolve("");
       return file.text();
+    };
+
+    const detectManifestType = (fileName) => {
+      const normalized = (fileName || "").trim().toLowerCase();
+      if (normalized.endsWith(".csproj")) return "csproj";
+      return manifestTypeByFileName[normalized] || "";
     };
 
     const resetManifestImporter = (container) => {
@@ -646,6 +693,18 @@
     document.querySelectorAll(".manifest-import").forEach((panel) => {
       const button = panel.querySelector(".manifest-import-btn");
       const githubButton = panel.querySelector(".github-import-btn");
+      const uploadInput = panel.querySelector(".manifest-file");
+      const typeSelect = panel.querySelector(".manifest-type");
+
+      if (uploadInput && typeSelect) {
+        uploadInput.addEventListener("change", function () {
+          const file = uploadInput.files && uploadInput.files[0];
+          const detectedType = detectManifestType(file ? file.name : "");
+          if (detectedType) {
+            typeSelect.value = detectedType;
+          }
+        });
+      }
 
       if (githubButton) {
         githubButton.addEventListener("click", async function () {

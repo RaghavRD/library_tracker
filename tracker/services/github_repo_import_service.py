@@ -12,8 +12,20 @@ class GitHubRepoImportService:
 
     API_ROOT = "https://api.github.com"
     MANIFESTS = (
+        ("package-lock.json", "package_lock_json"),
+        ("yarn.lock", "yarn_lock"),
+        ("pnpm-lock.yaml", "pnpm_lock"),
         ("package.json", "package_json"),
+        ("poetry.lock", "poetry_lock"),
+        ("Pipfile.lock", "pipfile_lock"),
         ("requirements.txt", "requirements_txt"),
+        ("pyproject.toml", "pyproject_toml"),
+        ("go.mod", "go_mod"),
+        ("pom.xml", "pom_xml"),
+        ("build.gradle", "build_gradle"),
+        ("build.gradle.kts", "build_gradle"),
+        ("Cargo.toml", "cargo_toml"),
+        ("composer.json", "composer_json"),
     )
 
     def __init__(self, token: str | None = None, timeout: int = 15):

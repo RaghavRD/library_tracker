@@ -54,6 +54,30 @@ def test_import_repository_reads_supported_root_manifests():
     ]
 
 
+def test_import_repository_prefers_lockfile_versions():
+    package_lock = json.dumps({"packages": {"node_modules/react": {"version": "18.2.0"}}})
+    package_json = json.dumps({"dependencies": {"react": "^18.0.0", "vite": "^5.1.4"}})
+
+    def fake_get(url, headers=None, timeout=None):
+        if url.endswith("/repos/acme/app"):
+            return _github_response(payload={"default_branch": "main"})
+        if "contents/package-lock.json" in url:
+            return _github_response(payload={"encoding": "base64", "content": _encoded_content(package_lock)})
+        if "contents/package.json" in url:
+            return _github_response(payload={"encoding": "base64", "content": _encoded_content(package_json)})
+        return _github_response(status_code=404)
+
+    with patch("tracker.services.github_repo_import_service.requests.get", side_effect=fake_get):
+        result = GitHubRepoImportService().import_repository("https://github.com/acme/app")
+
+    assert result["error"] == ""
+    assert result["files"] == ["package-lock.json", "package.json"]
+    assert [(item["name"], item["version"], item["scope"]) for item in result["components"]] == [
+        ("react", "18.2.0", "npm/lockfile"),
+        ("vite", "5.1.4", "npm/runtime"),
+    ]
+
+
 def test_import_repository_reports_invalid_url():
     result = GitHubRepoImportService().import_repository("https://example.com/acme/app")
 
