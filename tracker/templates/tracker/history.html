@@ -13,44 +13,39 @@
         </div>
     </div>
 
-    <div>
     <!--  Update Cache Table -->
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-primary text-white d-flex flex-column flex-md-row justify-content-between gap-2">
         <div class="card-body border-bottom bg-body-tertiary">
-            <div class="row g-3 align-items-end">
+            <form method="get" id="historyFilterForm" class="row g-3 align-items-end">
                 <div class="col-md-6">
                     <label for="projectFilter" class="form-label text-muted fw-semibold small text-uppercase">
                         Project Filter
                     </label>
-                    <form method="get" id="historyFilterForm" class="w-100">
-                        <div class="input-group">
-                            <span class="input-group-text">
-                                <i class="bi bi-funnel-fill text-primary"></i>
-                            </span>
-                            <select id="projectFilter" name="project" class="form-select" {% if not project_names %}disabled{% endif %}>
-                                <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
-                                {% if project_names %}
-                                    {% for project in project_names %}
-                                    <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>{{ project }}</option>
-                                    {% endfor %}
-                                {% else %}
-                                    <option value="">Project list unavailable</option>
-                                {% endif %}
-                            </select>
-                        </div>
-                    </form>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-funnel-fill text-primary"></i>
+                        </span>
+                        <select id="projectFilter" name="project" class="form-select" {% if not project_names %}disabled{% endif %}>
+                            <option value="" {% if not selected_project %}selected{% endif %}>All Projects</option>
+                            {% if project_names %}
+                                {% for project in project_names %}
+                                <option value="{{ project }}" {% if project == selected_project %}selected{% endif %}>{{ project }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="">Project list unavailable</option>
+                            {% endif %}
+                        </select>
+                    </div>
                     {% if not project_names %}
                     <small class="text-muted d-block mt-1">Project data could not be loaded at this time.</small>
                     {% endif %}
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="mb-0 text-muted small">
-                        <i class="bi bi-info-circle me-1 text-primary"></i>
-                        Select a project to filter the update history table.
-                    </p>
+                    <span class="badge bg-primary-subtle text-primary px-3 py-2">
+                        {{ history_total }} record{{ history_total|pluralize }}
+                    </span>
                 </div>
-            </div>
+            </form>
         </div>
 
         <div class="card-body p-0">
@@ -169,7 +164,6 @@
             </div>
         </div>
         {% endif %}
-    </div>
     </div>
 </div>
 

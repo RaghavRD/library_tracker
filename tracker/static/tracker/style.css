@@ -505,9 +505,9 @@ hr { border-color: var(--lt-border); opacity: 1; }
 }
 .dashboard-chart-sm-wrap canvas {
   display: block;
-  width: 100% !important;
+  width: 200px !important;
   height: 200px !important;
-  max-height: 200px;
+  max-width: 100%;
 }
 .dashboard-insight-card .card-header {
   padding-bottom: 8px;
