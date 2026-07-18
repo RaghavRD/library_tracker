@@ -30,7 +30,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
   <!-- Custom design system (overrides Bootstrap visuals) -->
-  <link rel="stylesheet" href="{% static 'tracker/style.css' %}?v=20260710" />
+  <link rel="stylesheet" href="{% static 'tracker/style.css' %}?v=20260712a" />
   <link rel="icon" href="{% static 'tracker/images/libtrack_favicon.png' %}" type="image/png">
 
   {% block extra_head %}{% endblock %}
@@ -58,15 +58,16 @@
   <nav class="navbar navbar-expand-lg app-navbar sticky-top">
     <div class="container-fluid px-2 px-md-3">
       <a class="navbar-brand" href="/">
-        <!-- <span class="brand-mark"><i class="bi bi-box-seam"></i></span> -->
-        <!-- <span class="brand-mark"><img src="{% static 'tracker/images/libtrack.png' %}" alt="" srcset=""></span> -->
         <img src="{% static 'tracker/images/libtrack.png' %}" style="width: 35px; margin-right: -8px;" alt="" srcset="">
         <span class="brand-name ms-2"><span class="brand-lib">Lib</span><span class="brand-track">Track<span class="brand-ai">AI</span></span></span>
       </a>
-      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+      <div class="mobile-nav-actions d-lg-none">
+        <button type="button" class="icon-btn" id="themeToggleMobile" data-theme-toggle aria-label="Toggle theme"></button>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+          aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+      </div>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav me-auto mt-2 mt-lg-0">
           {% if user.is_authenticated %}
@@ -93,8 +94,8 @@
           {% endif %}
         </ul>
         <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
-          <li class="nav-item">
-            <button type="button" class="icon-btn" id="themeToggle" aria-label="Toggle theme"></button>
+          <li class="nav-item d-none d-lg-block">
+            <button type="button" class="icon-btn" id="themeToggle" data-theme-toggle aria-label="Toggle theme"></button>
           </li>
           {% if user.is_authenticated %}
           <li class="nav-item dropdown">
@@ -155,7 +156,7 @@
   </footer>
 
   <!-- App behaviours (custom — replaces Bootstrap JS) -->
-  <script src="{% static 'tracker/js/app.js' %}?v=20260516b"></script>
+  <script src="{% static 'tracker/js/app.js' %}?v=20260712a"></script>
   <script src="{% static 'tracker/js/stack_builder.js' %}?v=20260516b"></script>
   {% block extra_scripts %}{% endblock %}
 </body>

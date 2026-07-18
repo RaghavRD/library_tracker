@@ -12,22 +12,29 @@ Workflow:
   4. Send via Mailtrap/Sender
 """
 
+import hashlib
+import json
 import logging
 import time
+from collections import defaultdict
 from datetime import datetime
+from urllib.parse import urlparse
+
+from django.conf import settings
 from django.utils import timezone
 from packaging import version as pkg_version
 from packaging.version import InvalidVersion
-from django.conf import settings
 
 from tracker.models import (
-    Project,
-    UpdateCache,
-    UpdateEvent,
     FutureUpdateCache,
     NotificationRecord,
+    Project,
     ProjectFutureNotification,
+    SecurityVulnerability,
+    UpdateCache,
+    UpdateEvent,
 )
+from tracker.services.dashboard_metrics_service import DashboardMetricsService
 from tracker.utils.send_mail import send_update_email
 
 logger = logging.getLogger(__name__)
@@ -68,7 +75,8 @@ class NotificationService:
 
         # Get all projects with their components and linked libraries
         projects = Project.objects.prefetch_related(
-            "components__library_ref"
+            "components__library_ref__releases",
+            "security_vulnerabilities",
         ).all()
         count = projects.count()
         self._log(stdout_writer, f"Checking {count} projects...")
@@ -120,6 +128,16 @@ class NotificationService:
         # Parse notification preferences
         prefs = self._parse_preferences(project.notification_type or "major, minor")
 
+        active_findings = list(
+            project.security_vulnerabilities.filter(status="active").order_by("library", "osv_id")
+        )
+        pending_urgent_findings = [
+            finding
+            for finding in active_findings
+            if self._severity_bucket(finding.severity) in {"critical", "high"}
+            and finding.last_notified_signature != self._security_signature(finding)
+        ]
+
         # Collect all relevant updates for this project
         updates_to_send = []
         seen_updates = set()
@@ -155,12 +173,362 @@ class NotificationService:
                     seen_updates.add(stable_key)
                     updates_to_send.append(stable_update)
 
-        # Send email if there are updates
-        if updates_to_send:
-            self._send_email(project, emails, updates_to_send, stdout_writer)
+        # Security alerts are delivered by this scheduled cycle, never out-of-band.
+        if updates_to_send or pending_urgent_findings:
+            digest = self._build_project_digest(
+                project,
+                prefs=prefs,
+                updates=updates_to_send,
+                active_findings=active_findings,
+            )
+            self._send_email(
+                project,
+                emails,
+                updates_to_send,
+                digest=digest,
+                security_findings_to_mark=pending_urgent_findings,
+                stdout_writer=stdout_writer,
+            )
         else:
             self._log(stdout_writer, f"{project.project_name}: no new updates")
             self.skipped_count += 1
+
+    def _build_project_digest(
+        self,
+        project: Project,
+        *,
+        prefs: set,
+        updates: list[dict],
+        active_findings: list[SecurityVulnerability],
+    ) -> dict:
+        """Build the complete package and security state shown in one project email."""
+        components = list(project.components.all())
+        findings_by_library: dict[str, list[SecurityVulnerability]] = defaultdict(list)
+        for finding in active_findings:
+            findings_by_library[self._library_key(finding.library)].append(finding)
+
+        future_by_library = self._current_future_updates(project, components, prefs)
+        package_states = []
+        outdated_count = 0
+
+        for component in components:
+            library = component.library_ref
+            library_name = library.name if library else component.name
+            library_key = self._library_key(library_name)
+            latest_version = library.latest_version if library and library.latest_version else "-"
+            update_status, update_category = self._package_update_status(
+                component.version,
+                latest_version,
+            )
+            is_outdated = update_category in {"major", "minor", "update"}
+            if is_outdated:
+                outdated_count += 1
+
+            future_update = future_by_library.get(library_key)
+            package_findings = findings_by_library.get(library_key, [])
+            security_bucket = self._highest_severity(package_findings)
+            latest_release = None
+            if library:
+                latest_release = next(
+                    (release for release in library.releases.all() if release.version == latest_version),
+                    None,
+                )
+
+            detected_candidates = [library.last_checked_at if library else None]
+            if future_update:
+                detected_candidates.append(future_update.updated_at)
+            detected_candidates.extend(finding.last_seen_at for finding in package_findings)
+            detected_on = max((value for value in detected_candidates if value), default=None)
+
+            package_states.append(
+                {
+                    "library": library_name,
+                    "component_type": (library.component_type if library else component.category) or "library",
+                    "installed_version": component.version or "-",
+                    "latest_version": latest_version,
+                    "future_version": future_update.version if future_update else "-",
+                    "future_enabled": "future" in prefs,
+                    "status": update_status,
+                    "status_color": self._status_color(update_category),
+                    "security": self._severity_label(security_bucket) if package_findings else "Clear",
+                    "security_color": self._severity_color(security_bucket),
+                    "security_count": len(package_findings),
+                    "detected_on": self._format_date(detected_on),
+                    "release_summary": (
+                        latest_release.summary if latest_release and latest_release.summary else ""
+                    ),
+                    "release_date": (
+                        str(latest_release.release_date)
+                        if latest_release and latest_release.release_date
+                        else ""
+                    ),
+                    "release_source": self._safe_url(
+                        latest_release.source_url if latest_release else ""
+                    ),
+                    "future_summary": future_update.features if future_update else "",
+                    "future_source": self._safe_url(future_update.source if future_update else ""),
+                    "future_confidence": future_update.confidence if future_update else None,
+                    "future_expected_date": (
+                        str(future_update.expected_date)
+                        if future_update and future_update.expected_date
+                        else "TBD"
+                    ),
+                    "security_findings": [
+                        self._security_finding_payload(finding) for finding in package_findings[:3]
+                    ],
+                    "security_findings_hidden": max(0, len(package_findings) - 3),
+                    "is_actionable": bool(is_outdated or future_update or package_findings),
+                }
+            )
+
+        package_states.sort(
+            key=lambda item: (
+                not item["is_actionable"],
+                -self._severity_rank(item["security"]),
+                item["library"].casefold(),
+            )
+        )
+        package_limit = getattr(settings, "LIBTRACK_EMAIL_PACKAGE_LIMIT", 20)
+        visible_packages = package_states[:package_limit]
+        severity_counts = {key: 0 for key in ("critical", "high", "medium", "low", "unknown")}
+        for finding in active_findings:
+            severity_counts[self._severity_bucket(finding.severity)] += 1
+
+        total_packages = len(package_states)
+        active_security_count = len(active_findings)
+        health_score = DashboardMetricsService._health_score(
+            total_packages,
+            outdated_count,
+            active_security_count,
+        )
+
+        return {
+            "project_name": project.project_name,
+            "packages": visible_packages,
+            "package_details": [item for item in visible_packages if item["is_actionable"]],
+            "hidden_package_count": max(0, total_packages - len(visible_packages)),
+            "total_packages": total_packages,
+            "outdated_packages": outdated_count,
+            "up_to_date_packages": max(0, total_packages - outdated_count),
+            "future_enabled": "future" in prefs,
+            "future_packages": len(future_by_library),
+            "updates_count": len(updates),
+            "health_score": health_score,
+            "health_label": self._health_label(health_score),
+            "health_color": self._health_color(health_score),
+            "security_status": self._security_health_label(severity_counts),
+            "security_color": self._security_health_color(severity_counts),
+            "active_security_count": active_security_count,
+            "affected_packages": len(findings_by_library),
+            "fixes_available": sum(bool(finding.fixed_versions) for finding in active_findings),
+            "severity_counts": severity_counts,
+            "severity_segments": self._severity_segments(severity_counts),
+            "scan_date": timezone.localtime().strftime("%d %b %Y, %I:%M %p"),
+        }
+
+    def _current_future_updates(self, project: Project, components: list, prefs: set) -> dict:
+        if "future" not in prefs:
+            return {}
+
+        library_names = {
+            component.library_ref.name
+            for component in components
+            if component.library_ref and component.library_ref.name
+        }
+        candidates = FutureUpdateCache.objects.filter(
+            library__in=library_names,
+            status__in=["detected", "confirmed"],
+            confidence__gte=project.min_confidence_threshold,
+        ).order_by("library", "-confidence", "-updated_at")
+
+        future_by_library = {}
+        for candidate in candidates:
+            key = self._library_key(candidate.library)
+            future_by_library.setdefault(key, candidate)
+        return future_by_library
+
+    @staticmethod
+    def _package_update_status(installed: str, latest: str) -> tuple[str, str]:
+        if not latest or latest == "-":
+            return "Not checked", "unknown"
+        try:
+            parsed_installed = pkg_version.parse(installed)
+            parsed_latest = pkg_version.parse(latest)
+            if parsed_latest <= parsed_installed:
+                return "Up to date", "current"
+            if parsed_latest.major > parsed_installed.major:
+                return "Major update", "major"
+            return "Minor update", "minor"
+        except (InvalidVersion, TypeError):
+            if installed == latest:
+                return "Up to date", "current"
+            return "Update available", "update"
+
+    @classmethod
+    def _security_finding_payload(cls, finding: SecurityVulnerability) -> dict:
+        bucket = cls._severity_bucket(finding.severity)
+        return {
+            "osv_id": finding.osv_id,
+            "severity": cls._severity_label(bucket),
+            "severity_color": cls._severity_color(bucket),
+            "summary": finding.summary or finding.details or "Known vulnerability detected.",
+            "affected_version": finding.version or "-",
+            "fixed_versions": finding.fixed_versions or [],
+            "source_url": cls._safe_url(finding.source_url),
+        }
+
+    @staticmethod
+    def _security_signature(finding: SecurityVulnerability) -> str:
+        payload = {
+            "severity": finding.severity or "",
+            "summary": finding.summary or "",
+            "details": finding.details or "",
+            "fixed_versions": finding.fixed_versions or [],
+            "source_url": finding.source_url or "",
+            "status": finding.status,
+        }
+        serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _mark_security_findings_notified(cls, findings: list[SecurityVulnerability]):
+        notified_at = timezone.now()
+        for finding in findings:
+            finding.last_notified_signature = cls._security_signature(finding)
+            finding.last_notified_at = notified_at
+            finding.save(update_fields=["last_notified_signature", "last_notified_at", "updated_at"])
+
+    @staticmethod
+    def _library_key(value: str) -> str:
+        return (value or "").strip().casefold()
+
+    @staticmethod
+    def _safe_url(value: str) -> str:
+        value = (value or "").strip()
+        parsed = urlparse(value)
+        return value if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+
+    @staticmethod
+    def _format_date(value) -> str:
+        if not value:
+            return "-"
+        if timezone.is_aware(value):
+            value = timezone.localtime(value)
+        return value.strftime("%d %b %Y")
+
+    @staticmethod
+    def _severity_bucket(value: str) -> str:
+        normalized = (value or "").strip().lower()
+        for severity in ("critical", "high", "medium", "low"):
+            if severity in normalized:
+                return severity
+        try:
+            score = float(normalized)
+        except (TypeError, ValueError):
+            return "unknown"
+        if score >= 9:
+            return "critical"
+        if score >= 7:
+            return "high"
+        if score >= 4:
+            return "medium"
+        return "low"
+
+    @classmethod
+    def _highest_severity(cls, findings: list[SecurityVulnerability]) -> str:
+        return max(
+            (cls._severity_bucket(finding.severity) for finding in findings),
+            key=cls._severity_rank,
+            default="unknown",
+        )
+
+    @staticmethod
+    def _severity_rank(value: str) -> int:
+        normalized = (value or "").strip().lower()
+        return {"critical": 5, "high": 4, "medium": 3, "low": 2, "unknown": 1}.get(
+            normalized,
+            0,
+        )
+
+    @staticmethod
+    def _severity_label(bucket: str) -> str:
+        return (bucket or "unknown").title()
+
+    @staticmethod
+    def _severity_color(bucket: str) -> str:
+        return {
+            "critical": "#b42318",
+            "high": "#d92d20",
+            "medium": "#dc6803",
+            "low": "#175cd3",
+            "unknown": "#667085",
+        }.get((bucket or "unknown").lower(), "#667085")
+
+    @staticmethod
+    def _status_color(category: str) -> str:
+        return {
+            "major": "#b42318",
+            "minor": "#b54708",
+            "update": "#b54708",
+            "current": "#067647",
+            "unknown": "#667085",
+        }.get(category, "#667085")
+
+    @staticmethod
+    def _health_label(score: int) -> str:
+        if score >= 90:
+            return "Healthy"
+        if score >= 70:
+            return "Good"
+        if score >= 40:
+            return "Needs attention"
+        return "At risk"
+
+    @staticmethod
+    def _health_color(score: int) -> str:
+        if score >= 90:
+            return "#067647"
+        if score >= 70:
+            return "#175cd3"
+        if score >= 40:
+            return "#b54708"
+        return "#b42318"
+
+    @staticmethod
+    def _security_health_label(counts: dict[str, int]) -> str:
+        if counts["critical"]:
+            return "Critical action required"
+        if counts["high"]:
+            return "High risk findings"
+        if counts["medium"] or counts["low"] or counts["unknown"]:
+            return "Review recommended"
+        return "No active findings"
+
+    @staticmethod
+    def _security_health_color(counts: dict[str, int]) -> str:
+        if counts["critical"]:
+            return "#b42318"
+        if counts["high"]:
+            return "#d92d20"
+        if counts["medium"] or counts["low"] or counts["unknown"]:
+            return "#b54708"
+        return "#067647"
+
+    @classmethod
+    def _severity_segments(cls, counts: dict[str, int]) -> list[dict]:
+        total = sum(counts.values())
+        if total == 0:
+            return [{"label": "Clear", "count": 0, "width": 100, "color": "#12b76a"}]
+        return [
+            {
+                "label": cls._severity_label(bucket),
+                "count": counts[bucket],
+                "width": max(1, round((counts[bucket] / total) * 100)),
+                "color": cls._severity_color(bucket),
+            }
+            for bucket in ("critical", "high", "medium", "low", "unknown")
+            if counts[bucket]
+        ]
 
     def _check_future_update(self, project: Project, library, stdout_writer=None) -> dict | None:
         """
@@ -366,6 +734,9 @@ class NotificationService:
         project: Project,
         emails: list,
         updates: list,
+        *,
+        digest: dict,
+        security_findings_to_mark: list[SecurityVulnerability],
         stdout_writer=None,
     ):
         """
@@ -378,8 +749,10 @@ class NotificationService:
             stdout_writer: Optional callable for logging
         """
         try:
-            # Build subject line
-            first_update = updates[0]
+            first_update = updates[0] if updates else {
+                "library": "Security alerts",
+                "version": "",
+            }
             if len(updates) > 1:
                 subject_library = f"{first_update['library']} + {len(updates) - 1} others"
             else:
@@ -390,7 +763,7 @@ class NotificationService:
             if len(categories) > 1:
                 category = "mix"
             else:
-                category = categories.pop() if categories else "major"
+                category = categories.pop() if categories else "security"
 
             # Retry sending with exponential backoff
             max_retries = getattr(settings, "LIBTRACK_MAX_NOTIFICATION_RETRIES", 3)
@@ -410,6 +783,8 @@ class NotificationService:
                     release_date="",
                     updates=updates,
                     from_email=self.sender_email,
+                    future_opt_in=digest["future_enabled"],
+                    digest=digest,
                 )
 
                 # support legacy tuple return (bool, message)
@@ -472,6 +847,7 @@ class NotificationService:
                     logger.exception("Failed to write NotificationRecord")
 
                 if success:
+                    self._mark_security_findings_notified(security_findings_to_mark)
                     # Persist UpdateCache entries for each update upon success
                     for upd in updates:
                         try:
@@ -500,7 +876,9 @@ class NotificationService:
 
                     self._log(
                         stdout_writer,
-                        f"✅ Sent {len(updates)} update(s) to {project.project_name}",
+                        f"Sent project digest to {project.project_name}: "
+                        f"{len(updates)} update(s), "
+                        f"{digest['active_security_count']} active security finding(s)",
                     )
                     self.sent_count += 1
                     final_result = True

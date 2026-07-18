@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}LibTrack AI – Login{% endblock %}
 
@@ -7,7 +8,9 @@
   <div class="auth-card" style="max-width: 440px;">
     <div class="p-4 p-md-5">
       <div class="auth-header">
-        <div class="brand-mark"><i class="bi bi-box-seam"></i></div>
+        <div class="auth-logo-mark">
+          <img src="{% static 'tracker/images/libtrack.png' %}" alt="LibTrack AI">
+        </div>
         <h2>Welcome back</h2>
         <p>Log in to access your LibTrack AI dashboard</p>
       </div>

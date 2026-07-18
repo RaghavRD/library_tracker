@@ -1,16 +1,110 @@
-import os
-import requests
 import logging
+import os
 from typing import Iterable
-from dotenv import load_dotenv
+from urllib.parse import urlparse
+
+import requests
 from django.conf import settings
+from django.template.loader import render_to_string
+from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Mailtrap Transactional/Bulk API endpoint
 MAILTRAP_BASE = "https://bulk.api.mailtrap.io/api/send"
+
+
+def _empty_severity_counts() -> dict[str, int]:
+    return {"critical": 0, "high": 0, "medium": 0, "low": 0, "unknown": 0}
+
+
+def _safe_url(value: str) -> str:
+    value = (value or "").strip()
+    parsed = urlparse(value)
+    return value if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+
+
+def _legacy_digest(
+    project_name: str,
+    updates: list[dict],
+    *,
+    future_opt_in: bool,
+) -> dict:
+    """Keep direct callers compatible while using the project digest template."""
+    packages = []
+    for entry in updates:
+        is_future = entry.get("category") == "future"
+        packages.append(
+            {
+                "library": entry.get("library", "Unknown"),
+                "installed_version": entry.get("from_version") or "-",
+                "latest_version": "-" if is_future else entry.get("version", "-"),
+                "future_version": entry.get("version", "-") if is_future else "-",
+                "status": "Future update" if is_future else f"{entry.get('category', 'Update').title()} update",
+                "status_color": "#175cd3" if is_future else "#b54708",
+                "security": "Clear",
+                "security_color": "#067647",
+                "security_count": 0,
+                "detected_on": entry.get("release_date") or entry.get("expected_date") or "-",
+                "release_summary": "" if is_future else entry.get("summary", ""),
+                "release_date": entry.get("release_date", ""),
+                "release_source": "" if is_future else _safe_url(entry.get("source", "")),
+                "future_summary": entry.get("summary", "") if is_future else "",
+                "future_source": _safe_url(entry.get("source", "")) if is_future else "",
+                "future_confidence": entry.get("confidence") if is_future else None,
+                "future_expected_date": entry.get("expected_date") or entry.get("release_date") or "TBD",
+                "security_findings": [],
+                "security_findings_hidden": 0,
+                "is_actionable": True,
+            }
+        )
+
+    severity_counts = _empty_severity_counts()
+    return {
+        "project_name": project_name,
+        "packages": packages,
+        "package_details": packages,
+        "hidden_package_count": 0,
+        "total_packages": len(packages),
+        "outdated_packages": sum(entry.get("category") != "future" for entry in updates),
+        "up_to_date_packages": 0,
+        "future_enabled": future_opt_in or any(entry.get("category") == "future" for entry in updates),
+        "future_packages": sum(entry.get("category") == "future" for entry in updates),
+        "updates_count": len(updates),
+        "health_score": 100,
+        "health_label": "Current digest",
+        "health_color": "#175cd3",
+        "security_status": "No active findings",
+        "security_color": "#067647",
+        "active_security_count": 0,
+        "affected_packages": 0,
+        "fixes_available": 0,
+        "severity_counts": severity_counts,
+        "severity_segments": [
+            {"label": "Clear", "count": 0, "width": 100, "color": "#12b76a"}
+        ],
+        "scan_date": "Current notification cycle",
+    }
+
+
+def _email_subject(
+    project_name: str,
+    library: str,
+    version: str,
+    category: str,
+    digest: dict,
+) -> str:
+    security_count = digest.get("active_security_count", 0)
+    update_count = digest.get("updates_count", 0)
+    if category == "security":
+        return f"{project_name}: {security_count} security finding(s) need attention"
+    if update_count > 1:
+        suffix = f" and {security_count} security finding(s)" if security_count else ""
+        return f"{project_name}: {update_count} package updates{suffix}"
+    if category == "future":
+        return f"{library} {version} Planned - {project_name}"
+    return f"{library} {version} Released - {project_name}"
 
 
 def send_update_email(
@@ -25,272 +119,127 @@ def send_update_email(
     release_date: str | None = None,
     from_email: str | None = None,
     timeout: int = 15,
-    updates: list[dict[str, str]] | None = None,
+    updates: list[dict] | None = None,
     future_opt_in: bool = False,
+    digest: dict | None = None,
 ) -> dict:
-    """
-    Send an HTML email via Mailtrap's Bulk (Transactional) API.
-
-    Args:
-        mailtrap_api_key: Mailtrap API key (if None, uses MAILTRAP_API_KEY from .env)
-        project_name: Name of the project
-        recipients: Iterable of emails or comma-separated string of emails
-        library: Library name (e.g., 'numpy')
-        version: Version string (e.g., '2.2.3')
-        category: 'major', 'minor', or 'mix'
-        summary: Short release summary text
-        source: URL to official release notes
-        release_date: Release date string used when no update list is provided
-        from_email: Sender email (if None, uses MAILTRAP_FROM_EMAIL from .env)
-        timeout: HTTP request timeout in seconds
-        updates: Optional list of per-library update dicts for tabular formatting
-        future_opt_in: True when registration enabled future update notifications
-
-    Returns:
-        dict: {
-            'success': bool,
-            'status_text': str,
-            'http_status': int|None,
-            'response_text': str|None,
-            'error': str|None,
-            'request_id': str|None,
-        }
-    """
-
+    """Send one project update and security digest through Mailtrap."""
     api_key = mailtrap_api_key or os.getenv("MAILTRAP_API_KEY")
     from_addr = from_email or os.getenv("MAILTRAP_FROM_EMAIL")
 
     if not api_key or not from_addr:
         return {
             "success": False,
-            "status_text": "❌ Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
+            "status_text": "Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
             "http_status": None,
             "response_text": None,
             "error": "missing_credentials",
             "request_id": None,
         }
 
-    # Normalize recipients (support both list and comma-separated string)
     if isinstance(recipients, str):
-        recipients = [r.strip() for r in recipients.split(",") if r.strip()]
-
+        recipients = [item.strip() for item in recipients.split(",") if item.strip()]
     recipients = list(recipients or [])
     if not recipients:
         return {
             "success": False,
-            "status_text": "❌ No valid recipients provided",
+            "status_text": "No valid recipients provided",
             "http_status": None,
             "response_text": None,
             "error": "no_recipients",
             "request_id": None,
         }
-    
-    # ===== NEW: Different subject for future updates =====
-    if category == "future" or future_opt_in:
-        subject = f"🔮 Future Update Alert: {library} {version} Planned"
-    else:
-        subject = f"{library} {version} Released"
 
     updates_payload = updates or [
         {
             "library": library,
             "version": version,
             "category": category,
-            "category_label": "Future" if future_opt_in else (category.title() if category else "Update"),
             "release_date": release_date or "Unknown",
             "summary": summary or "No summary provided.",
             "source": source,
-            "component_type": "library",
         }
     ]
-
-    # ===== NEW: Check if we have any future updates with confidence =====
-    has_confidence = any("confidence" in u for u in updates_payload)
-    
-    table_rows_html = "".join(
-        f"""
-                <tr>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('library', 'Unknown')}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('component_type', 'library').title()}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('version', 'n/a')}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('category_label') or entry.get('category', 'n/a').title()}</td>
-                    <td style="padding:8px;border:1px solid #dfe3e7;">{entry.get('release_date', 'Unknown')}</td>
-                    {f'<td style="padding:8px;border:1px solid #dfe3e7;"><strong>{entry.get("confidence", "N/A")}%</strong></td>' if has_confidence else ''}
-                </tr>
-        """
-        for entry in updates_payload
+    digest = digest or _legacy_digest(
+        project_name,
+        updates_payload,
+        future_opt_in=future_opt_in,
     )
+    subject = _email_subject(project_name, library, version, category, digest)
+    context = {
+        "project_name": project_name,
+        "digest": digest,
+        "subject": subject,
+    }
+    html_content = render_to_string("tracker/emails/project_update.html", context)
+    text_content = render_to_string("tracker/emails/project_update.txt", context)
 
+    payload_category = "Security Alerts" if category == "security" else "Project Updates"
+    payload = {
+        "from": {"email": from_addr, "name": "LibTrack AI"},
+        "to": [{"email": recipient} for recipient in recipients],
+        "subject": subject,
+        "html": html_content,
+        "text": text_content,
+        "category": payload_category,
+    }
 
-    summary_sections: list[str] = []
-    for entry in updates_payload:
-        entry_source = entry.get("source") or ""
-        link_html = (
-            f"<a href='{entry_source}' target='_blank' rel='noopener'>Read release notes</a>"
-            if entry_source
-            else "<span style='color:#999'>Source link not provided.</span>"
-        )
-        summary_sections.append(
-            f"""
-            <div style="margin:0 0 16px;">
-                <p style="margin:0 0 6px;"><strong>{entry.get('library', 'Unknown')} {entry.get('version', '')}</strong></p>
-                <p style="margin:0 0 6px;">{entry.get('summary', 'No summary provided.')}</p>
-                {link_html}
-            </div>
-            """
-        )
-
-    summary_blocks = "".join(summary_sections) or "<p>No summary details were provided for these releases.</p>"
-    
-    # ===== ENHANCED: Better future update disclaimer =====
-    future_notice_html = ""
-    if future_opt_in or category == "future":
-        # Calculate average confidence if available
-        confidences = [u.get("confidence", 0) for u in updates_payload if "confidence" in u]
-        avg_confidence = sum(confidences) // len(confidences) if confidences else 0
-        
-        confidence_text = ""
-        if avg_confidence > 0:
-            confidence_text = f" (confidence: {avg_confidence}%)"
-        
-        future_notice_html = f"""
-        <div style="margin:16px 0;padding:16px;border:2px solid #f0ad4e;background:#fff8e5;border-radius:4px;">
-            <strong style="color:#856404;">Future Update Notice{confidence_text}</strong><br/>
-            <p style="margin:8px 0 0 0;color:#856404;">
-                This is a <strong>planned/upcoming</strong> release that has <strong>NOT been officially released yet</strong>. 
-                We detected this based on official announcements or roadmaps. 
-                You'll receive another notification when this version is officially released.
-            </p>
-        </div>
-        """
-
-    html_content = f"""
-    <div style="font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;color:#111;line-height:1.5">
-        <p style="margin:0 0 16px;">Hello Team,</p>
-        <p style="margin:0 0 16px;">
-            LibTrack AI detected {'upcoming planned' if future_opt_in or category == 'future' else 'recent'} update activity 
-            impacting the <strong>{project_name}</strong> project.
-            Please review the details below and plan follow-up actions as needed.
-        </p>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 16px;">
-            <thead>
-                <tr style="background:#f0f4f8;text-align:left;">
-                    <th style="padding:8px;border:1px solid #dfe3e7;">Library</th>
-                    <th style="padding:8px;border:1px solid #dfe3e7;">Type</th>
-                    <th style="padding:8px;border:1px solid #dfe3e7;">Version</th>
-                    <th style="padding:8px;border:1px solid #dfe3e7;">Category</th>
-                    <th style="padding:8px;border:1px solid #dfe3e7;">Release Date</th>
-                    {f'<th style="padding:8px;border:1px solid #dfe3e7;">Confidence</th>' if has_confidence else ''}
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows_html}
-            </tbody>
-        </table>
-        <p style="margin:0 0 12px;"><strong>Release Summary</strong></p>
-        {summary_blocks}
-        {future_notice_html}
-        <p style="margin:16px 0;">
-            Kindly schedule upgrades or mitigations as appropriate. as this is automated notification. Do not reply to this message.
-        </p>
-        <p style="margin:0;">Best regards,<br/><strong>LibTrack AI</strong></p>
-        <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;"/>
-        <p style="color:#666;font-size:12px;margin:0;">Automated notification powered by LibTrack AI.</p>
-    </div>
-    """
+    test_mode = os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"}
+    if test_mode:
+        logger.info("TEST_MODE: email would be sent with subject=%s", subject)
+        return {
+            "success": True,
+            "status_text": "Email would be sent in TEST_MODE",
+            "http_status": None,
+            "response_text": None,
+            "error": None,
+            "request_id": None,
+            "subject": subject,
+            "html_content": html_content,
+            "text_content": text_content,
+        }
 
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-
-    # Mailtrap Bulk API payload
-    payload_category = "Future Updates" if future_opt_in else "Library Updates"
-    payload = {
-        "from": {"email": "hello@demomailtrap.co", "name": "LibTrack AI"},
-        "to": [{"email": r} for r in recipients],
-        "subject": subject,
-        "html": html_content,
-        "category": payload_category,
-    }
-
-    # get global TEST_MODE from settings
-    TEST_MODE = os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"}
-    if TEST_MODE:
-        print("TEST_MODE: Email subject:", subject)
-        print("TEST_MODE: Email content:", html_content)
-        return {
-            "success": True,
-            "status_text": "🧪🧪 Email would be sent in TEST_MODE 🧪🧪",
-            "http_status": None,
-            "response_text": None,
-            "error": None,
-            "request_id": None,
-        }
     try:
-        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
-        ok = 200 <= resp.status_code < 300
-        status_text = f"Mailtrap: {resp.status_code}"
-        resp_text = resp.text
-        request_id = resp.headers.get("X-Request-Id") or resp.headers.get("X-Request-Id".lower())
-        
-        # Log structured information
-        log_http_status = getattr(settings, "LIBTRACK_LOG_HTTP_STATUS", True)
-        if log_http_status:
+        response = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
+        success = 200 <= response.status_code < 300
+        status_text = f"Mailtrap: {response.status_code}"
+        response_text = response.text
+        request_id = response.headers.get("X-Request-Id") or response.headers.get("x-request-id")
+
+        if getattr(settings, "LIBTRACK_LOG_HTTP_STATUS", True):
             logger.info(
-                f"Mailtrap email send: status={resp.status_code}, request_id={request_id}, "
-                f"recipients={len(recipients)}, library={library}"
+                "Mailtrap email send: status=%s request_id=%s recipients=%s project=%s",
+                response.status_code,
+                request_id,
+                len(recipients),
+                project_name,
             )
-        
-        if ok:
-            print(f"✅ Email sent successfully: {status_text}")
-            return {
-                "success": True,
-                "status_text": status_text,
-                "http_status": resp.status_code,
-                "response_text": resp_text,
-                "error": None,
-                "request_id": request_id,
-            }
-        else:
-            print(f"❌ Email failed to send: {status_text}")
+        if not success:
             logger.warning(
-                f"Mailtrap email failed: status={resp.status_code}, request_id={request_id}, "
-                f"library={library}, error_response={resp_text[:200]}"
+                "Mailtrap email failed: status=%s request_id=%s response=%s",
+                response.status_code,
+                request_id,
+                response_text[:200],
             )
-            return {
-                "success": False,
-                "status_text": status_text,
-                "http_status": resp.status_code,
-                "response_text": resp_text,
-                "error": "http_error",
-                "request_id": request_id,
-            }
-    except Exception as e:
-        logger.error(f"Mailtrap exception: {e}", exc_info=True)
+        return {
+            "success": success,
+            "status_text": status_text,
+            "http_status": response.status_code,
+            "response_text": response_text,
+            "error": None if success else "http_error",
+            "request_id": request_id,
+        }
+    except Exception as exc:
+        logger.error("Mailtrap exception: %s", exc, exc_info=True)
         return {
             "success": False,
             "status_text": "Mailtrap exception",
             "http_status": None,
             "response_text": None,
-            "error": str(e),
+            "error": str(exc),
             "request_id": None,
         }
-
-
-# from tracker.utils.send_mail import send_update_email  # adjust import path if different
-# Test mail works
-# ok, info = send_update_email(
-#     mailtrap_api_key=None,  # will use MAILTRAP_API_KEY from .env
-#     project_name="LibTrack AI Test Project",
-#     recipients="raghavdesai774@gmail.com",
-#     library="pandas",
-#     version="2.2.3",
-#     category="major",
-#     summary="Big performance & bug fixes release.",
-#     source="https://pandas.pydata.org/docs/whatsnew/index.html",
-#     from_email=None,  # will use MAILTRAP_FROM_EMAIL from .env
-# )
-
-# print("status:", ok)
-# print("INFO:", info)

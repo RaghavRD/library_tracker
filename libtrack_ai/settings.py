@@ -182,6 +182,12 @@ try:
 except (ValueError, TypeError):
     LIBTRACK_EMAIL_BATCH_SIZE = 5
 
+LIBTRACK_EMAIL_PACKAGE_LIMIT = os.getenv("LIBTRACK_EMAIL_PACKAGE_LIMIT", "20")
+try:
+    LIBTRACK_EMAIL_PACKAGE_LIMIT = max(1, int(LIBTRACK_EMAIL_PACKAGE_LIMIT))
+except (ValueError, TypeError):
+    LIBTRACK_EMAIL_PACKAGE_LIMIT = 20
+
 # Deduplication & Rate Limiting
 LIBTRACK_DEDUP_WINDOW_HOURS = os.getenv("LIBTRACK_DEDUP_WINDOW_HOURS", "24")
 try:

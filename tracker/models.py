@@ -240,6 +240,8 @@ class SecurityVulnerability(TimeStampedModel):
     fixed_versions = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
     last_seen_at = models.DateTimeField(null=True, blank=True)
+    last_notified_signature = models.CharField(max_length=64, blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = [["project", "library", "version", "ecosystem", "osv_id"]]

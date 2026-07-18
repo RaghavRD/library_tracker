@@ -57,40 +57,36 @@
         <div class="card-body p-0">
             {% if alerts_total and alerts_page %}
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table align-middle mb-0 security-alerts-table">
                     <thead class="text-center">
                         <tr>
                             <th width="1%">#</th>
-                            <th width="14%">Project</th>
-                            <th width="14%">Library</th>
-                            <th width="9%">Version</th>
-                            <th width="8%">Ecosystem</th>
-                            <th width="11%">OSV ID</th>
-                            <th width="11%">Severity</th>
-                            <th>Summary</th>
-                            <th width="12%">Fixed In</th>
-                            <th width="8%">Status</th>
-                            <th width="8%">Source</th>
+                            <th width="32%">Summary</th>
+                            <th width="12%">Project</th>
+                            <th width="13%">Library</th>
+                            <th width="8%">Version</th>
+                            <th width="10%">Severity</th>
+                            <th width="10%">Fixed In</th>
+                            <th width="6%">Status</th>
+                            <th width="8%">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for alert in alerts_page %}
-                        <tr class="text-center">
+                        <tr class="text-center security-alert-row">
                             <td class="fw-medium">{{ alerts_page.start_index|add:forloop.counter0 }}</td>
+                            <td class="text-start security-summary-cell">
+                                {{ alert.summary|default:alert.details|truncatechars:170 }}
+                            </td>
                             <td>{{ alert.project.project_name }}</td>
                             <td class="fw-semibold">{{ alert.library }}</td>
                             <td><span class="badge bg-info text-dark">{{ alert.version }}</span></td>
-                            <td>{{ alert.ecosystem }}</td>
-                            <td><span class="badge bg-secondary">{{ alert.osv_id }}</span></td>
                             <td>
                                 {% if alert.severity %}
-                                <span class="badge bg-warning text-dark">{{ alert.severity }}</span>
+                                <span class="badge security-severity-badge" data-severity="{{ alert.severity|lower }}">{{ alert.severity }}</span>
                                 {% else %}
                                 <span class="text-muted small">Unknown</span>
                                 {% endif %}
-                            </td>
-                            <td class="text-start">
-                                {{ alert.summary|default:alert.details|truncatechars:120 }}
                             </td>
                             <td>
                                 {% if alert.fixed_versions %}
@@ -105,11 +101,61 @@
                             </td>
                             <td>{{ alert.status|capfirst }}</td>
                             <td>
-                                {% if alert.source_url %}
-                                <a href="{{ alert.source_url }}" class="link-primary text-decoration-none" target="_blank" rel="noopener">View</a>
-                                {% else %}
-                                <span class="text-muted small">-</span>
-                                {% endif %}
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button type="button"
+                                            class="icon-btn security-details-toggle"
+                                            aria-label="Show vulnerability details for {{ alert.library }}"
+                                            aria-expanded="false">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                    {% if alert.source_url %}
+                                    <a href="{{ alert.source_url }}"
+                                       class="icon-btn"
+                                       target="_blank"
+                                       rel="noopener"
+                                       aria-label="Open advisory source for {{ alert.osv_id }}">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="security-detail-row">
+                            <td colspan="9">
+                                <div class="security-row-details">
+                                    <div class="security-detail-grid">
+                                        <div>
+                                            <span class="security-detail-label">OSV ID</span>
+                                            <span class="badge bg-secondary">{{ alert.osv_id }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="security-detail-label">Ecosystem</span>
+                                            <span>{{ alert.ecosystem }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="security-detail-label">Last Seen</span>
+                                            <span>{{ alert.last_seen_at|date:"M d, Y H:i"|default:"Not recorded" }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="security-detail-label">Updated</span>
+                                            <span>{{ alert.updated_at|date:"M d, Y H:i" }}</span>
+                                        </div>
+                                    </div>
+                                    {% if alert.aliases %}
+                                    <div>
+                                        <span class="security-detail-label">Aliases</span>
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            {% for alias in alert.aliases %}
+                                            <span class="badge bg-secondary-subtle text-secondary">{{ alias }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <span class="security-detail-label">Full Details</span>
+                                        <p class="mb-0">{{ alert.details|default:alert.summary|default:"No additional details provided." }}</p>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -172,6 +218,20 @@
             select.addEventListener("change", function () {
                 const form = select.closest("form");
                 if (form) form.submit();
+            });
+        });
+
+        document.querySelectorAll(".security-details-toggle").forEach(function (button) {
+            button.addEventListener("click", function () {
+                const row = button.closest(".security-alert-row");
+                const detailRow = row ? row.nextElementSibling : null;
+                if (!detailRow || !detailRow.classList.contains("security-detail-row")) return;
+
+                const isOpen = detailRow.classList.toggle("is-open");
+                button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+                button.innerHTML = isOpen
+                    ? '<i class="bi bi-x-circle"></i>'
+                    : '<i class="bi bi-info-circle"></i>';
             });
         });
     });

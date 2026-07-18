@@ -1,0 +1,53 @@
+LibTrack AI - Scheduled project digest
+
+{{ project_name }}
+Project health: {{ digest.health_score }}% ({{ digest.health_label }})
+Security health: {{ digest.security_status }}
+Last cycle: {{ digest.scan_date }}
+
+SUMMARY
+Packages: {{ digest.total_packages }}
+Outdated: {{ digest.outdated_packages }}
+Active security findings: {{ digest.active_security_count }}
+Affected packages: {{ digest.affected_packages }}
+Fixes available: {{ digest.fixes_available }}
+Future tracking: {% if digest.future_enabled %}Enabled{% else %}Disabled{% endif %}
+
+CURRENT PACKAGE STATE
+{% for package in digest.packages %}
+{{ package.library }}
+  Installed: {{ package.installed_version }}
+  Latest: {{ package.latest_version }}
+  Future: {{ package.future_version }}
+  Status: {{ package.status }}
+  Security: {{ package.security }}{% if package.security_count %} ({{ package.security_count }}){% endif %}
+  Detected: {{ package.detected_on }}
+{% endfor %}
+{% if digest.hidden_package_count %}
+{{ digest.hidden_package_count }} additional package(s) are included in the health totals.
+{% endif %}
+
+PACKAGE DETAILS
+{% for package in digest.package_details %}
+{{ package.library }} ({{ package.installed_version }} installed)
+{% if package.release_summary %}Release summary: {{ package.release_summary }}
+{% if package.release_source %}Release notes: {{ package.release_source }}
+{% endif %}{% endif %}{% if digest.future_enabled and package.future_summary %}Future update summary ({{ package.future_version }}): {{ package.future_summary }}
+Expected: {{ package.future_expected_date }}{% if package.future_confidence != None %}; confidence: {{ package.future_confidence }}%{% endif %}
+{% if package.future_source %}Future source: {{ package.future_source }}
+{% endif %}{% endif %}{% for finding in package.security_findings %}{{ finding.severity }} security finding - {{ finding.osv_id }}
+{{ finding.summary|truncatechars:320 }}
+Affected: {{ finding.affected_version }}{% if finding.fixed_versions %}; fixed in: {{ finding.fixed_versions|join:", " }}{% endif %}
+{% if finding.source_url %}Security details: {{ finding.source_url }}
+{% endif %}{% endfor %}
+{% endfor %}
+{% if digest.future_enabled %}
+Future Update Notice: Future versions are planned or pre-release signals and may change before official release.
+{% endif %}
+
+Review the affected packages and schedule upgrades or mitigations as appropriate.
+
+Best regards,
+LibTrack AI
+
+Automated notification from the scheduled LibTrack AI cron cycle. Do not reply.

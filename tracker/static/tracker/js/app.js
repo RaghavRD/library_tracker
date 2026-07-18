@@ -185,11 +185,13 @@
   /* ---------- Theme toggle ----------------------------------------- */
   function initTheme() {
     var root = document.documentElement;
-    var btn = document.getElementById("themeToggle");
+    var buttons = Array.prototype.slice.call(
+      document.querySelectorAll("[data-theme-toggle]")
+    );
 
     function syncIcon() {
       var dark = root.getAttribute("data-bs-theme") === "dark";
-      if (btn) {
+      buttons.forEach(function (btn) {
         btn.innerHTML = dark
           ? '<i class="bi bi-sun-fill"></i>'
           : '<i class="bi bi-moon-stars-fill"></i>';
@@ -197,11 +199,11 @@
           "aria-label",
           dark ? "Switch to light mode" : "Switch to dark mode"
         );
-      }
+      });
     }
     syncIcon();
 
-    if (btn) {
+    buttons.forEach(function (btn) {
       btn.addEventListener("click", function () {
         var next =
           root.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
@@ -212,7 +214,7 @@
           new CustomEvent("lt-theme-change", { detail: next })
         );
       });
-    }
+    });
   }
 
   /* ---------- Init -------------------------------------------------- */
