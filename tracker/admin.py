@@ -9,6 +9,7 @@ from .models import (
     NotificationRecord,
     FutureUpdateHistory,
     ProjectFutureNotification,
+    DailyCheckRun,
 )
 
 class StackComponentInline(admin.TabularInline):
@@ -125,13 +126,13 @@ class SecurityVulnerabilityAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationRecord)
 class NotificationRecordAdmin(admin.ModelAdmin):
-    list_display = ("library", "version", "success", "attempts", "http_status", "sent_at", "created_at")
+    list_display = ("library", "version", "project", "daily_check_run", "success", "attempts", "http_status", "sent_at", "created_at")
     search_fields = ("library", "version", "project__project_name")
-    list_filter = ("success", "http_status")
+    list_filter = ("success", "http_status", "daily_check_run")
     readonly_fields = ("created_at", "updated_at")
     fieldsets = (
         ("Notification", {
-            "fields": ("project", "library", "version")
+            "fields": ("daily_check_run", "project", "library", "version")
         }),
         ("Result", {
             "fields": ("success", "attempts", "sent_at")
@@ -209,6 +210,53 @@ class ProjectFutureNotificationAdmin(admin.ModelAdmin):
         }),
         ("Result", {
             "fields": ("success", "attempts", "status_text", "sent_at")
+        }),
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at"),
+            "classes": ("collapse",)
+        }),
+    )
+
+
+@admin.register(DailyCheckRun)
+class DailyCheckRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "status",
+        "scope",
+        "scope_owner",
+        "triggered_by",
+        "projects_scanned",
+        "libraries_checked",
+        "emails_sent",
+        "emails_failed",
+        "started_at",
+        "finished_at",
+    )
+    search_fields = ("triggered_by__username", "scope_owner__username", "error_message")
+    list_filter = ("status", "scope", "started_at")
+    readonly_fields = ("created_at", "updated_at")
+    fieldsets = (
+        ("Run", {
+            "fields": ("triggered_by", "scope", "scope_owner", "status")
+        }),
+        ("Timing", {
+            "fields": ("started_at", "finished_at", "duration_seconds")
+        }),
+        ("Counters", {
+            "fields": (
+                "projects_scanned",
+                "libraries_checked",
+                "future_updates_found",
+                "security_findings_found",
+                "emails_attempted",
+                "emails_sent",
+                "emails_failed",
+                "emails_skipped",
+            )
+        }),
+        ("Details", {
+            "fields": ("summary", "error_message")
         }),
         ("Timestamps", {
             "fields": ("created_at", "updated_at"),

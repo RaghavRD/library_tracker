@@ -125,7 +125,11 @@ class DashboardMetricsService:
         return snapshot
 
     @classmethod
-    def record_all_owner_snapshots(cls) -> int:
+    def record_all_owner_snapshots(cls, owner=None) -> int:
+        if owner is not None:
+            cls.record_snapshot_for_owner(owner)
+            return 1
+
         owner_ids = (
             Project.objects.exclude(owner__isnull=True)
             .values_list("owner_id", flat=True)

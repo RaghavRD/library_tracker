@@ -28,7 +28,7 @@ class LibrarySyncService:
         self.synced_count = 0
         self.created_count = 0
 
-    def sync_all_libraries(self, stdout_writer=None):
+    def sync_all_libraries(self, stdout_writer=None, owner=None):
         """
         Link all unlinked StackComponents to Library records.
 
@@ -42,6 +42,8 @@ class LibrarySyncService:
 
         # Find components not yet linked to a Library
         unlinked_components = StackComponent.objects.filter(library_ref__isnull=True)
+        if owner is not None:
+            unlinked_components = unlinked_components.filter(project__owner=owner)
         count = unlinked_components.count()
         self._log(stdout_writer, f"Found {count} unlinked components.")
 

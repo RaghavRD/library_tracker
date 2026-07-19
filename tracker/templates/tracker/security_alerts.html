@@ -76,7 +76,8 @@
                         <tr class="text-center security-alert-row">
                             <td class="fw-medium">{{ alerts_page.start_index|add:forloop.counter0 }}</td>
                             <td class="text-start security-summary-cell">
-                                {{ alert.summary|default:alert.details|truncatechars:170 }}
+                                <div>{{ alert.summary|default:alert.details|truncatechars:170 }}</div>
+                                <span class="badge bg-secondary-subtle text-secondary mt-2">{{ alert.osv_id }}</span>
                             </td>
                             <td>{{ alert.project.project_name }}</td>
                             <td class="fw-semibold">{{ alert.library }}</td>

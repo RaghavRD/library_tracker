@@ -1,9 +1,11 @@
 import pytest
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.urls import reverse
 
 from tracker.models import (
+    DailyCheckRun,
     FutureUpdateCache,
     Library,
     Project,
@@ -43,6 +45,130 @@ def test_projects_page_only_shows_current_users_projects(client):
     assert response.status_code == 200
     assert "Visible Project" in content
     assert "Hidden Project" not in content
+
+
+@pytest.mark.django_db
+def test_manual_daily_check_button_creates_owner_scoped_run(client):
+    user = User.objects.create_user(username="manual-owner", password="pass12345")
+    other = User.objects.create_user(username="other-owner", password="pass12345")
+    Project.objects.create(
+        owner=user,
+        project_name="Visible Manual Project",
+        developer_names="Dev",
+        developer_emails="dev@example.com",
+    )
+    Project.objects.create(
+        owner=other,
+        project_name="Other Project",
+        developer_names="Dev",
+        developer_emails="other@example.com",
+    )
+
+    class FakeThread:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def start(self):
+            return None
+
+    client.force_login(user)
+    with patch("tracker.views.threading.Thread", FakeThread):
+        response = client.post(reverse("run_daily_check_now"), {"scope": "owner"})
+
+    run = DailyCheckRun.objects.get()
+    assert response.status_code == 302
+    assert run.triggered_by == user
+    assert run.scope_owner == user
+    assert run.scope == "owner"
+    assert run.status == "queued"
+
+
+@pytest.mark.django_db
+def test_manual_daily_check_blocks_active_run(client):
+    user = User.objects.create_user(username="active-owner", password="pass12345")
+    DailyCheckRun.objects.create(
+        triggered_by=user,
+        scope_owner=user,
+        scope="owner",
+        status="running",
+    )
+
+    client.force_login(user)
+    response = client.post(reverse("run_daily_check_now"), {"scope": "owner"})
+
+    assert response.status_code == 302
+    assert DailyCheckRun.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_manual_daily_check_status_endpoint_returns_formatted_duration(client):
+    user = User.objects.create_user(username="status-owner", password="pass12345")
+    run = DailyCheckRun.objects.create(
+        triggered_by=user,
+        scope_owner=user,
+        scope="owner",
+        status="success",
+        duration_seconds=392.2,
+        projects_scanned=3,
+        libraries_checked=54,
+        emails_sent=2,
+    )
+
+    client.force_login(user)
+    response = client.get(reverse("run_daily_check_status"), {"run_id": run.id})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["duration"] == "6m 32s"
+    assert payload["projects_scanned"] == 3
+    assert payload["libraries_checked"] == 54
+
+
+@pytest.mark.django_db
+def test_owner_scoped_daily_check_command_passes_owner_to_services():
+    user = User.objects.create_user(username="command-owner", password="pass12345")
+    project = Project.objects.create(
+        owner=user,
+        project_name="Command Project",
+        developer_names="Dev",
+        developer_emails="dev@example.com",
+    )
+    library = Library.objects.create(name="requests", key="requests", component_type="library")
+    StackComponent.objects.create(
+        project=project,
+        library_ref=library,
+        category="Library",
+        key="library",
+        name="requests",
+        version="1.0.0",
+    )
+    run = DailyCheckRun.objects.create(
+        triggered_by=user,
+        scope_owner=user,
+        scope="owner",
+        status="queued",
+    )
+
+    with patch.dict("os.environ", {"MAILTRAP_API_KEY": "key", "MAILTRAP_FROM_EMAIL": "noreply@example.com"}), \
+        patch("tracker.services.library_sync_service.LibrarySyncService.sync_all_libraries", return_value={"synced_count": 0, "created_count": 0}) as sync_mock, \
+        patch("tracker.services.version_fetch_service.VersionFetchService.fetch_all_libraries", return_value={"checked_count": 1, "updated_count": 0, "skipped_count": 1, "error_count": 0}) as fetch_mock, \
+        patch("tracker.services.future_update_service.FutureUpdateService.check_future_versions", return_value=None), \
+        patch("tracker.services.security_vulnerability_service.SecurityVulnerabilityService.scan_all_projects", return_value={"projects_scanned": 1, "scanned_count": 1, "finding_count": 0, "resolved_count": 0, "error_count": 0}) as security_mock, \
+        patch("tracker.services.notification_service.NotificationService.notify_all_projects", return_value={"projects_checked": 1, "sent_count": 0, "skipped_count": 1, "error_count": 0}) as notify_mock, \
+        patch("tracker.services.dashboard_metrics_service.DashboardMetricsService.record_all_owner_snapshots", return_value=1) as snapshot_mock:
+        call_command("run_daily_check", owner_id=user.id, manual_run_id=run.id)
+
+    run.refresh_from_db()
+    assert sync_mock.call_args.kwargs["owner"] == user
+    assert fetch_mock.call_args.kwargs["owner"] == user
+    assert security_mock.call_args.kwargs["owner"] == user
+    assert notify_mock.call_args.kwargs["owner"] == user
+    assert snapshot_mock.call_args.kwargs["owner"] == user
+    assert run.status == "success"
+    assert run.projects_scanned == 1
+    assert run.libraries_checked == 1
 
 
 @pytest.mark.django_db

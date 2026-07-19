@@ -57,7 +57,7 @@ class VersionFetchService:
             self.groq = GroqAnalyzer()
             self.serper = SerperFetcher()
 
-    def fetch_all_libraries(self, stdout_writer=None):
+    def fetch_all_libraries(self, stdout_writer=None, owner=None):
         """
         Fetch updates for all unique libraries.
 
@@ -70,7 +70,10 @@ class VersionFetchService:
         self._log(stdout_writer, "Starting version fetch for all libraries...")
 
         # Get all libraries that are actively used (linked to at least one component)
-        libraries = Library.objects.filter(linked_components__isnull=False).distinct()
+        libraries = Library.objects.filter(linked_components__isnull=False)
+        if owner is not None:
+            libraries = libraries.filter(linked_components__project__owner=owner)
+        libraries = libraries.distinct()
         count = libraries.count()
         self._log(stdout_writer, f"Fetching {count} unique libraries...")
 
@@ -81,6 +84,7 @@ class VersionFetchService:
             time.sleep(rate_limit)
 
         summary = {
+            "checked_count": count,
             "updated_count": self.updated_count,
             "skipped_count": self.skipped_count,
             "error_count": self.error_count,

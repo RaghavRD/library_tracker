@@ -11,10 +11,54 @@
       <h1 class="section-title">Dashboard Overview</h1>
       <p class="page-subtitle">Project risk, update health, and dependency insights in one view.</p>
     </div>
-    <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
-      <i class="bi bi-gear-fill me-1"></i> Manage Projects
-    </a>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <form method="post" action="{% url 'run_daily_check_now' %}" class="m-0">
+        {% csrf_token %}
+        <input type="hidden" name="scope" value="owner">
+        <button type="submit" class="btn btn-primary btn-sm" {% if active_manual_run or manual_run_cooldown_active %}disabled{% endif %}>
+          <i class="bi bi-play-circle me-1"></i>
+          {% if email_test_mode %}Run Check in Test Mode{% else %}Run Check & Send Notifications{% endif %}
+        </button>
+      </form>
+      {% if user.is_staff or user.is_superuser %}
+      <form method="post" action="{% url 'run_daily_check_now' %}" class="m-0">
+        {% csrf_token %}
+        <input type="hidden" name="scope" value="global">
+        <button type="submit" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-globe2 me-1"></i>Admin Global Run
+        </button>
+      </form>
+      {% endif %}
+      <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-gear-fill me-1"></i> Manage Projects
+      </a>
+    </div>
   </div>
+
+  {% if active_manual_run or latest_manual_run %}
+  <div
+    id="manualRunStatus"
+    class="alert {% if active_manual_run %}alert-warning{% elif latest_manual_run.status == 'success' %}alert-success{% elif latest_manual_run.status == 'failed' %}alert-danger{% else %}alert-warning{% endif %} d-flex align-items-center gap-2 mb-4"
+    role="alert"
+    {% if active_manual_run %}data-run-id="{{ active_manual_run.id }}" data-status-url="{% url 'run_daily_check_status' %}"{% else %}data-auto-hide="true"{% endif %}>
+    <i class="bi {% if active_manual_run %}bi-info-circle{% elif latest_manual_run.status == 'success' %}bi-check-circle{% elif latest_manual_run.status == 'failed' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %}"></i>
+    <span>
+      {% if active_manual_run %}
+      A manual check is {{ active_manual_run.status }}. Start time: {{ active_manual_run.started_at|date:"M d, Y H:i"|default:"queued" }}.
+      This page will update automatically when it completes.
+      {% elif latest_manual_run.status == "success" %}
+      Manual check completed in {{ latest_manual_run.duration_label }}. {{ latest_manual_run.projects_scanned }} project{{ latest_manual_run.projects_scanned|pluralize }} scanned, {{ latest_manual_run.emails_sent }} email{{ latest_manual_run.emails_sent|pluralize }} sent.
+      {% elif latest_manual_run.status == "failed" %}
+      Manual check failed{% if latest_manual_run.error_message %}: {{ latest_manual_run.error_message|truncatechars:120 }}{% endif %}.
+      {% else %}
+      Latest manual check status: {{ latest_manual_run.status|title }}.
+      {% endif %}
+      {% if manual_run_cooldown_active and not active_manual_run %}
+      Next run is available after the {{ manual_run_cooldown_minutes }} minute cooldown.
+      {% endif %}
+    </span>
+  </div>
+  {% endif %}
 
   <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
     <div class="col" onclick="window.location.href='{% url 'projects' %}'" style="cursor:pointer;">
@@ -83,6 +127,64 @@
           <p class="small mb-0 mt-3 opacity-75">Predicted versions to review</p>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="card dashboard-insight-card mb-4">
+    <div class="card-header border-0 bg-transparent d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <h5 class="fw-bold mb-0">Recent Runs</h5>
+        <p class="page-subtitle">Manual check status, delivery totals, and audit trail</p>
+      </div>
+      <span class="badge bg-secondary-subtle text-secondary">Latest 5</span>
+    </div>
+    <div class="card-body pt-0">
+      {% if recent_daily_check_runs %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="text-center">
+            <tr>
+              <th>Run</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th>Projects</th>
+              <th>Libraries</th>
+              <th>Emails</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in recent_daily_check_runs %}
+            <tr class="text-center">
+              <td class="fw-semibold">#{{ run.id }}</td>
+              <td>
+                <span class="badge {% if run.status == 'success' %}bg-success{% elif run.status == 'failed' %}bg-danger{% elif run.status == 'running' or run.status == 'queued' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                  {{ run.status|title }}
+                </span>
+              </td>
+              <td>
+                {% if run.started_at %}{{ run.started_at|date:"M d, H:i" }}{% else %}{{ run.created_at|date:"M d, H:i" }}{% endif %}
+                <div class="text-muted small">by {{ run.triggered_by|default:"system" }}</div>
+              </td>
+              <td>{{ run.duration_label }}</td>
+              <td>{{ run.projects_scanned }}</td>
+              <td>{{ run.libraries_checked }}</td>
+              <td>
+                <span class="text-success">{{ run.emails_sent }}</span>
+                <span class="text-muted">/</span>
+                <span class="text-danger">{{ run.emails_failed }}</span>
+                <div class="text-muted small">{{ run.emails_skipped }} no email needed</div>
+              </td>
+              <td class="text-start text-danger small">{{ run.error_message|truncatechars:80|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">No manual check runs yet.</p>
+      {% endif %}
     </div>
   </div>
 
@@ -280,6 +382,70 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const statusEl = document.getElementById("manualRunStatus");
+    if (!statusEl) return;
+    if (statusEl.dataset.autoHide === "true") {
+      window.setTimeout(function () {
+        statusEl.style.transition = "opacity 220ms ease, transform 220ms ease";
+        statusEl.style.opacity = "0";
+        statusEl.style.transform = "translateY(-4px)";
+        window.setTimeout(function () {
+          statusEl.remove();
+        }, 260);
+      }, 8000);
+      return;
+    }
+    if (!statusEl.dataset.runId || !statusEl.dataset.statusUrl) return;
+
+    const textEl = statusEl.querySelector("span");
+    const iconEl = statusEl.querySelector("i");
+    const url = `${statusEl.dataset.statusUrl}?run_id=${encodeURIComponent(statusEl.dataset.runId)}`;
+
+    const setCompletedState = (data) => {
+      statusEl.classList.remove("alert-warning", "alert-success", "alert-danger");
+      if (data.status === "success") {
+        statusEl.classList.add("alert-success");
+        if (iconEl) iconEl.className = "bi bi-check-circle";
+        if (textEl) {
+          textEl.textContent = `Manual check completed in ${data.duration}. ${data.projects_scanned} project(s) scanned, ${data.emails_sent} email(s) sent.`;
+        }
+      } else {
+        statusEl.classList.add("alert-danger");
+        if (iconEl) iconEl.className = "bi bi-exclamation-triangle";
+        if (textEl) {
+          textEl.textContent = `Manual check failed${data.error_message ? `: ${data.error_message}` : "."}`;
+        }
+      }
+      window.setTimeout(function () {
+        window.location.reload();
+      }, 1400);
+    };
+
+    const pollRunStatus = () => {
+      fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => {
+          if (!data || !data.ok) return;
+          if (!data.is_active) {
+            setCompletedState(data);
+            return;
+          }
+          if (textEl) {
+            const started = data.started_at || "queued";
+            textEl.textContent = `A manual check is ${data.status_label}. Start time: ${started}. This page will update automatically when it completes.`;
+          }
+          window.setTimeout(pollRunStatus, 5000);
+        })
+        .catch(function () {
+          window.setTimeout(pollRunStatus, 8000);
+        });
+    };
+
+    window.setTimeout(pollRunStatus, 5000);
+  });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {

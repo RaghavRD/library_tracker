@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+from datetime import timedelta
 from collections import defaultdict
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
@@ -8,9 +11,13 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.core.management import call_command
+from django.db import close_old_connections
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from tracker.models import (
+    DailyCheckRun,
     FutureUpdateCache,
     Project,
     SecurityVulnerability,
@@ -104,7 +111,133 @@ def dashboard(request):
     Displays high-level metrics and charts.
     """
     context = DashboardMetricsService.build_for_owner(request.user)
+    active_statuses = ["queued", "running"]
+    recent_runs_qs = DailyCheckRun.objects.select_related("triggered_by", "scope_owner")
+    if request.user.is_staff or request.user.is_superuser:
+        recent_runs = recent_runs_qs.order_by("-created_at")[:5]
+    else:
+        recent_runs = recent_runs_qs.filter(scope_owner=request.user).order_by("-created_at")[:5]
+
+    active_manual_run = DailyCheckRun.objects.filter(
+        scope_owner=request.user,
+        status__in=active_statuses,
+    ).order_by("-created_at").first()
+    latest_manual_run = DailyCheckRun.objects.filter(scope_owner=request.user).order_by("-created_at").first()
+    cooldown_since = timezone.now() - timedelta(minutes=15)
+    cooldown_run = DailyCheckRun.objects.filter(
+        scope_owner=request.user,
+        created_at__gte=cooldown_since,
+    ).exclude(status__in=active_statuses).order_by("-created_at").first()
+    context.update(
+        {
+            "recent_daily_check_runs": recent_runs,
+            "active_manual_run": active_manual_run,
+            "latest_manual_run": latest_manual_run,
+            "manual_run_cooldown_active": bool(cooldown_run),
+            "manual_run_cooldown_minutes": 15,
+            "email_test_mode": os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"},
+        }
+    )
     return render(request, "tracker/dashboard.html", context)
+
+
+@login_required
+@require_POST
+def run_daily_check_now(request):
+    """
+    Trigger an owner-scoped manual daily check from the dashboard.
+    Admin users may explicitly request a global run.
+    """
+    active_statuses = ["queued", "running"]
+    requested_scope = request.POST.get("scope", "owner")
+    is_admin = request.user.is_staff or request.user.is_superuser
+    is_global = requested_scope == "global" and is_admin
+    scope_owner = None if is_global else request.user
+
+    active_qs = DailyCheckRun.objects.filter(status__in=active_statuses)
+    if is_global:
+        active_qs = active_qs.filter(scope="global")
+    else:
+        active_qs = active_qs.filter(scope_owner=request.user)
+    if active_qs.exists():
+        messages.warning(request, "A check is already running. Wait for it to finish before starting another one.")
+        return redirect("dashboard")
+
+    cooldown_since = timezone.now() - timedelta(minutes=15)
+    cooldown_qs = DailyCheckRun.objects.filter(created_at__gte=cooldown_since).exclude(status__in=active_statuses)
+    if is_global:
+        cooldown_qs = cooldown_qs.filter(scope="global", triggered_by=request.user)
+    else:
+        cooldown_qs = cooldown_qs.filter(scope_owner=request.user)
+    if cooldown_qs.exists():
+        messages.warning(request, "Manual checks are limited to one run every 15 minutes.")
+        return redirect("dashboard")
+
+    run = DailyCheckRun.objects.create(
+        triggered_by=request.user,
+        scope="global" if is_global else "owner",
+        scope_owner=scope_owner,
+        status="queued",
+    )
+    thread = threading.Thread(
+        target=_run_daily_check_background,
+        args=(run.id, request.user.id if not is_global else None, is_global),
+        daemon=True,
+    )
+    thread.start()
+
+    if is_global:
+        messages.success(request, "Global check started. Status will update in Recent Runs.")
+    else:
+        messages.success(request, "Check started for your projects. Status will update in Recent Runs.")
+    return redirect("dashboard")
+
+
+@login_required
+def run_daily_check_status(request):
+    """Return current user's latest manual check status for dashboard polling."""
+    run_id = request.GET.get("run_id")
+    runs = DailyCheckRun.objects.select_related("triggered_by", "scope_owner")
+    if run_id:
+        runs = runs.filter(pk=run_id)
+    if request.user.is_staff or request.user.is_superuser:
+        run = runs.order_by("-created_at").first()
+    else:
+        run = runs.filter(scope_owner=request.user).order_by("-created_at").first()
+    if not run:
+        return JsonResponse({"ok": False, "error": "run_not_found"}, status=404)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": run.id,
+            "status": run.status,
+            "status_label": run.status.title(),
+            "is_active": run.status in {"queued", "running"},
+            "started_at": timezone.localtime(run.started_at).strftime("%b %d, %Y %H:%M") if run.started_at else "",
+            "finished_at": timezone.localtime(run.finished_at).strftime("%b %d, %Y %H:%M") if run.finished_at else "",
+            "duration": run.duration_label,
+            "projects_scanned": run.projects_scanned,
+            "libraries_checked": run.libraries_checked,
+            "emails_sent": run.emails_sent,
+            "emails_failed": run.emails_failed,
+            "emails_skipped": run.emails_skipped,
+            "error_message": run.error_message,
+        }
+    )
+
+
+def _run_daily_check_background(run_id: int, owner_id: int | None, is_global: bool):
+    close_old_connections()
+    try:
+        command_kwargs = {"manual_run_id": run_id}
+        if is_global:
+            command_kwargs["global_run"] = True
+        else:
+            command_kwargs["owner_id"] = owner_id
+        call_command("run_daily_check", **command_kwargs)
+    finally:
+        close_old_connections()
 
 
 @login_required

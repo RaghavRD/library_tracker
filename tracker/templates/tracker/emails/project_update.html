@@ -30,7 +30,18 @@
                         <td class="email-pad" style="padding:28px 32px;background:#0b1f3a;color:#ffffff;">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                    <td style="font-size:24px;font-weight:700;line-height:1.2;">LibTrack <span style="color:#53a2ff;">AI</span></td>
+                                    <td>
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td valign="middle" style="padding:0 8px 0 0;">
+                                                    <img src="{{ brand_logo_url }}" width="35" height="35" alt="LibTrack AI" style="display:block;width:35px;height:35px;border:0;outline:none;text-decoration:none;">
+                                                </td>
+                                                <td valign="middle" style="font-size:25px;font-weight:700;line-height:1;color:#ffffff;white-space:nowrap;">
+                                                    <span style="color:#ffffff;">Lib</span><span style="color:#006eff;">Track<span style="display:inline-block;font-size:14px;line-height:1;margin-left:4px;vertical-align:super;color:#006eff;">AI</span></span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
                                     <td align="right" style="font-size:12px;color:#b9c7d8;">Scheduled project digest</td>
                                 </tr>
                             </table>
@@ -169,7 +180,7 @@
                                 {% if package.release_summary %}
                                 <p style="margin:0 0 6px;font-size:13px;line-height:1.55;"><strong>Release summary:</strong> {{ package.release_summary }}</p>
                                 {% if package.release_date %}<p style="margin:0 0 6px;color:#667085;font-size:12px;">Released {{ package.release_date }}</p>{% endif %}
-                                {% if package.release_source %}<p style="margin:0 0 12px;"><a href="{{ package.release_source }}" style="color:#175cd3;font-size:13px;">Read release notes</a></p>{% endif %}
+                                {% if package.release_source %}<p style="margin:0 0 12px;"><a href="{{ package.release_source }}" target="_blank" rel="noopener noreferrer" style="color:#175cd3;font-size:13px;">Read release notes</a></p>{% endif %}
                                 {% endif %}
 
                                 {% if digest.future_enabled and package.future_summary %}
@@ -178,7 +189,7 @@
                                         <strong>Future update summary: {{ package.future_version }}</strong><br>
                                         {{ package.future_summary }}<br>
                                         <span style="font-size:12px;">Expected: {{ package.future_expected_date }}{% if package.future_confidence != None %} &nbsp; Confidence: {{ package.future_confidence }}%{% endif %}</span>
-                                        {% if package.future_source %}<br><a href="{{ package.future_source }}" style="color:#175cd3;">View announcement or roadmap</a>{% endif %}
+                                        {% if package.future_source %}<br><a href="{{ package.future_source }}" target="_blank" rel="noopener noreferrer" style="color:#175cd3;">View announcement or roadmap</a>{% endif %}
                                     </td></tr>
                                 </table>
                                 {% endif %}
@@ -190,7 +201,7 @@
                                         <span style="color:#667085;"> &nbsp; {{ finding.osv_id }}</span><br>
                                         {{ finding.summary|truncatechars:320 }}<br>
                                         <span style="font-size:12px;color:#667085;">Affected: {{ finding.affected_version }}{% if finding.fixed_versions %} &nbsp; Fixed in: {{ finding.fixed_versions|join:", " }}{% endif %}</span>
-                                        {% if finding.source_url %}<br><a href="{{ finding.source_url }}" style="color:#175cd3;">View security details</a>{% endif %}
+                                        {% if finding.source_url %}<br><a href="{{ finding.source_url }}" target="_blank" rel="noopener noreferrer" style="color:#175cd3;">View security details</a>{% endif %}
                                     </td></tr>
                                 </table>
                                 {% endfor %}

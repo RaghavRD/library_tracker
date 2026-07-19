@@ -60,8 +60,9 @@ class NotificationService:
         self.error_count = 0
         # Buffer for future updates to include in notifications
         self.fresh_future_updates = {}
+        self.daily_check_run = None
 
-    def notify_all_projects(self, stdout_writer=None):
+    def notify_all_projects(self, stdout_writer=None, owner=None, daily_check_run=None):
         """
         Check all projects and send notifications for relevant updates.
 
@@ -74,10 +75,13 @@ class NotificationService:
         self._log(stdout_writer, "Starting project notifications...")
 
         # Get all projects with their components and linked libraries
+        self.daily_check_run = daily_check_run
         projects = Project.objects.prefetch_related(
             "components__library_ref__releases",
             "security_vulnerabilities",
         ).all()
+        if owner is not None:
+            projects = projects.filter(owner=owner)
         count = projects.count()
         self._log(stdout_writer, f"Checking {count} projects...")
 
@@ -85,6 +89,7 @@ class NotificationService:
             self._notify_project(project, stdout_writer)
 
         summary = {
+            "projects_checked": count,
             "sent_count": self.sent_count,
             "skipped_count": self.skipped_count,
             "error_count": self.error_count,
@@ -826,6 +831,7 @@ class NotificationService:
                 # Record attempt as NotificationRecord
                 try:
                     nr = NotificationRecord.objects.create(
+                        daily_check_run=self.daily_check_run,
                         project=project,
                         library=first_update.get("library", ""),
                         version=first_update.get("version", ""),

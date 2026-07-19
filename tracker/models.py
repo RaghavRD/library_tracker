@@ -280,6 +280,77 @@ class DashboardSnapshot(TimeStampedModel):
         return f"{self.owner} dashboard snapshot for {self.scan_date}"
 
 
+class DailyCheckRun(TimeStampedModel):
+    """Audit trail for scheduled and manual dependency check runs."""
+
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("running", "Running"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("partial", "Partial"),
+    ]
+    SCOPE_CHOICES = [
+        ("owner", "Current user"),
+        ("global", "All users"),
+    ]
+
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="daily_check_runs",
+    )
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default="owner")
+    scope_owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="scoped_daily_check_runs",
+        help_text="Owner whose projects were checked for owner-scoped runs",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="queued", db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
+
+    projects_scanned = models.PositiveIntegerField(default=0)
+    libraries_checked = models.PositiveIntegerField(default=0)
+    future_updates_found = models.PositiveIntegerField(default=0)
+    security_findings_found = models.PositiveIntegerField(default=0)
+    emails_attempted = models.PositiveIntegerField(default=0)
+    emails_sent = models.PositiveIntegerField(default=0)
+    emails_failed = models.PositiveIntegerField(default=0)
+    emails_skipped = models.PositiveIntegerField(default=0)
+
+    summary = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["scope_owner", "status"]),
+            models.Index(fields=["triggered_by", "-created_at"]),
+        ]
+        verbose_name = "Daily Check Run"
+        verbose_name_plural = "Daily Check Runs"
+
+    def __str__(self):
+        owner = self.scope_owner or self.triggered_by or "system"
+        return f"{self.get_scope_display()} check for {owner} ({self.status})"
+
+    @property
+    def duration_label(self) -> str:
+        if self.duration_seconds is None:
+            return "-"
+        total_seconds = max(0, int(round(self.duration_seconds)))
+        minutes, seconds = divmod(total_seconds, 60)
+        if minutes:
+            return f"{minutes}m {seconds}s"
+        return f"{seconds}s"
+
 
 class FutureUpdateCache(TimeStampedModel):
     """Stores detected future/planned updates separately from released versions."""
@@ -388,6 +459,14 @@ class FutureUpdateCache(TimeStampedModel):
 class NotificationRecord(TimeStampedModel):
     """Records notification delivery attempts and results."""
 
+    daily_check_run = models.ForeignKey(
+        DailyCheckRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="notification_records",
+        help_text="Manual or scheduled run that produced this notification attempt",
+    )
     project = models.ForeignKey(
         Project,
         null=True,

@@ -1,11 +1,12 @@
 import logging
 import os
 from typing import Iterable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 from django.conf import settings
 from django.template.loader import render_to_string
+from django.templatetags.static import static
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,6 +24,18 @@ def _safe_url(value: str) -> str:
     value = (value or "").strip()
     parsed = urlparse(value)
     return value if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+
+
+def _email_logo_url() -> str:
+    configured_url = os.getenv("LIBTRACK_EMAIL_LOGO_URL", "").strip()
+    if configured_url:
+        return configured_url
+
+    logo_path = static("tracker/images/libtrack.png")
+    public_base_url = os.getenv("LIBTRACK_PUBLIC_BASE_URL", "").strip()
+    if public_base_url:
+        return urljoin(public_base_url.rstrip("/") + "/", logo_path.lstrip("/"))
+    return logo_path
 
 
 def _legacy_digest(
@@ -170,6 +183,7 @@ def send_update_email(
         "project_name": project_name,
         "digest": digest,
         "subject": subject,
+        "brand_logo_url": _email_logo_url(),
     }
     html_content = render_to_string("tracker/emails/project_update.html", context)
     text_content = render_to_string("tracker/emails/project_update.txt", context)
@@ -187,6 +201,9 @@ def send_update_email(
     test_mode = os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"}
     if test_mode:
         logger.info("TEST_MODE: email would be sent with subject=%s", subject)
+        print(f"\n--- EMAIL HTML START: {project_name} | {subject} ---")
+        print(html_content)
+        print(f"--- EMAIL HTML END: {project_name} | {subject} ---\n")
         return {
             "success": True,
             "status_text": "Email would be sent in TEST_MODE",
