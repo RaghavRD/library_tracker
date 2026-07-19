@@ -148,8 +148,12 @@
                             </td>
                             <td>
                                 {% if entry.source %}
-                                <a href="{{ entry.source }}" class="link-primary text-decoration-none" target="_blank"
-                                    rel="noopener">View</a>
+                                <a href="{{ entry.source }}"
+                                       class="icon-btn"
+                                       target="_blank"
+                                       rel="noopener">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
                                 {% else %}
                                 <span class="text-muted">—</span>
                                 {% endif %}

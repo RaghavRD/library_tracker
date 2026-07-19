@@ -61,9 +61,9 @@
                             <th width="10%">Category</th>
                             <th width="12%">Detection Method</th>
                             <th width="12%">Release Date</th>
-                            <th width="10%">Source</th>
                             <th width="10%">Notification Status</th>
                             <th width="10%">Updated At</th>
+                            <th width="10%">Source</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -95,19 +95,23 @@
                             </td>
                             <td>{{ record.release_date_formatted|default:"—" }}</td>
                             <td>
-                                <a href="{{ record.source }}" class="link-primary text-decoration-none" target="_blank"
-                                    rel="noopener">View</a>
-                            </td>
-                            <td>
                                 {% if record.last_notification_success %}
-                                    <span class="badge bg-success" title="Notification sent successfully">✓</span>
+                                <span class="badge bg-success" title="Notification sent successfully">✓</span>
                                 {% elif record.last_notification_success is False %}
-                                    <span class="badge bg-danger" title="Notification failed">✗</span>
+                                <span class="badge bg-danger" title="Notification failed">✗</span>
                                 {% else %}
-                                    <span class="text-muted small">—</span>
+                                <span class="text-muted small">—</span>
                                 {% endif %}
                             </td>
                             <td>{{ record.updated_at|date:"Y-m-d" }}, <small class="text-muted">{{ record.updated_at|date:"H:i" }}</small></td>
+                            <td>
+                                <a href="{{ record.source }}"
+                                       class="icon-btn"
+                                       target="_blank"
+                                       rel="noopener">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>

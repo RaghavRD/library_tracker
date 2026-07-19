@@ -191,7 +191,7 @@ def projects_view(request):
     registrations_total = len(regs)
     registrations_page = None
     if registrations_total:
-        paginator = Paginator(regs, 5)
+        paginator = Paginator(regs, 10)
         registrations_page = paginator.get_page(request.GET.get("page"))
 
     return render(
@@ -200,7 +200,7 @@ def projects_view(request):
         {
             "registrations_page": registrations_page,
             "registrations_total": registrations_total,
-            "registrations_per_page": 5,
+            "registrations_per_page": 10,
             "cache": cache,
             "future_updates": future_updates,  # ===== NEW =====
         },

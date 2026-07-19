@@ -68,7 +68,7 @@
                             <th width="10%">Severity</th>
                             <th width="10%">Fixed In</th>
                             <th width="6%">Status</th>
-                            <th width="8%">Actions</th>
+                            <th width="8%">Source</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -102,12 +102,6 @@
                             <td>{{ alert.status|capfirst }}</td>
                             <td>
                                 <div class="d-flex justify-content-center gap-2">
-                                    <button type="button"
-                                            class="icon-btn security-details-toggle"
-                                            aria-label="Show vulnerability details for {{ alert.library }}"
-                                            aria-expanded="false">
-                                        <i class="bi bi-info-circle"></i>
-                                    </button>
                                     {% if alert.source_url %}
                                     <a href="{{ alert.source_url }}"
                                        class="icon-btn"
@@ -117,44 +111,6 @@
                                         <i class="bi bi-box-arrow-up-right"></i>
                                     </a>
                                     {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        <tr class="security-detail-row">
-                            <td colspan="9">
-                                <div class="security-row-details">
-                                    <div class="security-detail-grid">
-                                        <div>
-                                            <span class="security-detail-label">OSV ID</span>
-                                            <span class="badge bg-secondary">{{ alert.osv_id }}</span>
-                                        </div>
-                                        <div>
-                                            <span class="security-detail-label">Ecosystem</span>
-                                            <span>{{ alert.ecosystem }}</span>
-                                        </div>
-                                        <div>
-                                            <span class="security-detail-label">Last Seen</span>
-                                            <span>{{ alert.last_seen_at|date:"M d, Y H:i"|default:"Not recorded" }}</span>
-                                        </div>
-                                        <div>
-                                            <span class="security-detail-label">Updated</span>
-                                            <span>{{ alert.updated_at|date:"M d, Y H:i" }}</span>
-                                        </div>
-                                    </div>
-                                    {% if alert.aliases %}
-                                    <div>
-                                        <span class="security-detail-label">Aliases</span>
-                                        <div class="d-flex flex-wrap gap-1 mt-1">
-                                            {% for alias in alert.aliases %}
-                                            <span class="badge bg-secondary-subtle text-secondary">{{ alias }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    </div>
-                                    {% endif %}
-                                    <div>
-                                        <span class="security-detail-label">Full Details</span>
-                                        <p class="mb-0">{{ alert.details|default:alert.summary|default:"No additional details provided." }}</p>
-                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -221,19 +177,6 @@
             });
         });
 
-        document.querySelectorAll(".security-details-toggle").forEach(function (button) {
-            button.addEventListener("click", function () {
-                const row = button.closest(".security-alert-row");
-                const detailRow = row ? row.nextElementSibling : null;
-                if (!detailRow || !detailRow.classList.contains("security-detail-row")) return;
-
-                const isOpen = detailRow.classList.toggle("is-open");
-                button.setAttribute("aria-expanded", isOpen ? "true" : "false");
-                button.innerHTML = isOpen
-                    ? '<i class="bi bi-x-circle"></i>'
-                    : '<i class="bi bi-info-circle"></i>';
-            });
-        });
     });
 </script>
 {% endblock %}
