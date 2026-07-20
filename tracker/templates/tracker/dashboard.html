@@ -491,8 +491,12 @@
           datasets: [{
             data: data.map(p => p.value),
             backgroundColor: data.map(p => p.color),
-            borderWidth: 0,
-            hoverOffset: 12,
+            borderColor: 'transparent',
+            borderRadius: 4,
+            borderWidth: 2,
+            hoverBorderWidth: 2,
+            hoverOffset: 8,
+            spacing: 2,
           }]
         },
         options: {
@@ -500,6 +504,7 @@
           maintainAspectRatio: true,
           aspectRatio: 1,
           cutout: '66%',
+          layout: { padding: 8 },
           plugins: {
             legend: {
               position: 'bottom',
