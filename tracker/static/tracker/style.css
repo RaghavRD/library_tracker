@@ -482,6 +482,49 @@ hr { border-color: var(--lt-border); opacity: 1; }
   color: var(--lt-muted);
   margin: 0;
 }
+.btn-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-color: var(--lt-border);
+  background: #f0f6fc;
+  color: #0d1117;
+  font-weight: 600;
+}
+.btn-github:hover,
+.btn-github:focus {
+  border-color: #8b949e;
+  background: #ffffff;
+  color: #0d1117;
+}
+.btn-github:disabled {
+  border-color: var(--lt-border);
+  background: var(--lt-surface-3);
+  color: var(--lt-muted);
+  opacity: 0.8;
+}
+.auth-social-note {
+  color: var(--lt-muted);
+  font-size: 12px;
+  margin: 8px 0 0;
+  text-align: center;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--lt-muted);
+  font-size: 12px;
+  margin-top: 18px;
+  text-transform: uppercase;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--lt-border);
+}
 
 /* ---- Cards ---------------------------------------------------------- */
 .card {

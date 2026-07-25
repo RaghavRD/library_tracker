@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static socialaccount %}
 
 {% block title %}LibTrack AI – Login{% endblock %}
 
@@ -13,6 +13,25 @@
         </div>
         <h2>Welcome back</h2>
         <p>Log in to access your LibTrack AI dashboard</p>
+      </div>
+
+      <div class="auth-social mb-4">
+        {% if github_login_enabled %}
+        <form method="post" action="{% provider_login_url 'github' process='login' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-github btn-lg w-100">
+            <i class="bi bi-github"></i>
+            <span>Continue with GitHub</span>
+          </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-github btn-lg w-100" disabled>
+          <i class="bi bi-github"></i>
+          <span>Continue with GitHub</span>
+        </button>
+        <p class="auth-social-note">GitHub login needs OAuth credentials.</p>
+        {% endif %}
+        <div class="auth-divider"><span>or</span></div>
       </div>
 
       <form method="post" novalidate>

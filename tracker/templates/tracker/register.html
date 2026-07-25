@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static socialaccount %}
 
 {% block title %}LibTrack AI – Register{% endblock %}
 
@@ -7,9 +8,30 @@
   <div class="auth-card" style="max-width: 480px;">
     <div class="p-4 p-md-5">
       <div class="auth-header">
-        <div class="brand-mark"><i class="bi bi-box-seam"></i></div>
+        <div class="auth-logo-mark">
+          <img src="{% static 'tracker/images/libtrack.png' %}" alt="LibTrack AI">
+        </div>
         <h2>Create your account</h2>
         <p>Join LibTrack AI and start tracking your projects</p>
+      </div>
+
+      <div class="auth-social mb-4">
+        {% if github_login_enabled %}
+        <form method="post" action="{% provider_login_url 'github' process='signup' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-github btn-lg w-100">
+            <i class="bi bi-github"></i>
+            <span>Continue with GitHub</span>
+          </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-github btn-lg w-100" disabled>
+          <i class="bi bi-github"></i>
+          <span>Continue with GitHub</span>
+        </button>
+        <p class="auth-social-note">GitHub login needs OAuth credentials.</p>
+        {% endif %}
+        <div class="auth-divider"><span>or</span></div>
       </div>
 
       <form method="post" novalidate>

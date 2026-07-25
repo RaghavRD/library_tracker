@@ -3,6 +3,7 @@ import os
 import threading
 from datetime import timedelta
 from collections import defaultdict
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -68,7 +69,11 @@ def login_view(request):
     else:
         form = LoginForm()
     
-    return render(request, 'tracker/login.html', {'form': form})
+    return render(
+        request,
+        'tracker/login.html',
+        {'form': form, 'github_login_enabled': settings.GITHUB_LOGIN_ENABLED},
+    )
 
 
 def logout_view(request):
@@ -101,7 +106,11 @@ def register_view(request):
     else:
         form = RegistrationForm()
     
-    return render(request, 'tracker/register.html', {'form': form})
+    return render(
+        request,
+        'tracker/register.html',
+        {'form': form, 'github_login_enabled': settings.GITHUB_LOGIN_ENABLED},
+    )
 
 
 @login_required

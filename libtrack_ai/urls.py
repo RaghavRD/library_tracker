@@ -5,6 +5,7 @@ from django.conf import settings
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("accounts/", include("allauth.urls")),
     path("", RedirectView.as_view(url="/libtracker/login/", permanent=False)),
     path("libtracker/", include("tracker.urls")),
 ]
