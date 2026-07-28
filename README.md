@@ -88,6 +88,12 @@ when `DATABASE_URL` is absent.
 DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:6543/postgres
 ```
 
+## Logging on Vercel
+
+Vercel deployments write logs to standard output and error, which are available
+in the Vercel dashboard. Local file logging is enabled by default; set
+`ENABLE_FILE_LOGGING=False` to disable local `libtrack.log` files.
+
 ---
 
 ## Author

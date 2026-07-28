@@ -134,6 +134,13 @@ if GITHUB_LOGIN_ENABLED:
         }
     ]
 
+# Vercel's filesystem is ephemeral, so production logs must go to stdout/stderr.
+IS_VERCEL = os.getenv("VERCEL") == "1"
+ENABLE_FILE_LOGGING = (
+    not IS_VERCEL
+    and os.getenv("ENABLE_FILE_LOGGING", "True").strip().lower() == "true"
+)
+
 # Logging configuration
 LOGGING = {
     'version': 1,
@@ -159,6 +166,34 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+    },
+    'loggers': {
+        'libtrack': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Reduce verbosity of external libraries
+        'httpx': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'httpcore': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
+
+if ENABLE_FILE_LOGGING:
+    LOGGING['handlers'].update({
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
@@ -171,31 +206,10 @@ LOGGING = {
             'filename': BASE_DIR / 'libtrack_errors.log',
             'formatter': 'verbose',
         },
-    },
-    'loggers': {
-        'libtrack': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        # Reduce verbosity of external libraries
-        'httpx': {
-            'handlers': ['error_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'httpcore': {
-            'handlers': ['error_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-    },
-}
+    })
+    LOGGING['loggers']['libtrack']['handlers'].extend(['file', 'error_file'])
+    LOGGING['loggers']['httpx']['handlers'].append('error_file')
+    LOGGING['loggers']['httpcore']['handlers'].append('error_file')
 
 # ============================================================================
 # LibTrack AI Configuration Settings
