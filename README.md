@@ -37,7 +37,7 @@ Most teams find out about dependency updates too late — during a security audi
 **Backend**
 - [Django 5.2](https://www.djangoproject.com/) — web framework
 - Python 3.14
-- SQLite — default database (drop-in replaceable with PostgreSQL)
+- PostgreSQL via Supabase in production; SQLite fallback for local development
 
 **AI / Data**
 - [Groq API](https://console.groq.com/) — LLM inference for version analysis and future release prediction
@@ -75,6 +75,19 @@ python manage.py run_daily_check
 4. NotificationService    — send emails to project teams via Mailtrap
                             respects per-project type filter + confidence threshold
 ```
+---
+
+## Database Configuration
+
+For production, set `DATABASE_URL` to the Supabase **Transaction pooler** URI
+(port `6543`). Keep this value in `.env` locally and in Vercel environment
+variables; never commit it to Git. The application falls back to local SQLite
+when `DATABASE_URL` is absent.
+
+```env
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.supabase.com:6543/postgres
+```
+
 ---
 
 ## Author

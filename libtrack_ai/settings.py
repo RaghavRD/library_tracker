@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import dj_database_url
 from dotenv import load_dotenv
 from django.urls import reverse_lazy
 
@@ -57,12 +58,28 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = "libtrack_ai.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "libtracker_db.sqlite3",
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+if DATABASE_URL:
+    # Vercel uses short-lived functions, so use Supabase's transaction pooler
+    # without persistent Django connections or server-side cursors.
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=0,
+            conn_health_checks=True,
+            ssl_require=True,
+        )
     }
-}
+    DISABLE_SERVER_SIDE_CURSORS = True
+else:
+    # Keep local development usable before a PostgreSQL URL is configured.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "libtracker_db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
