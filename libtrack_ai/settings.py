@@ -3,7 +3,6 @@ from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
-from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -138,10 +137,10 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Authentication settings (resolved against the current URLConf)
-LOGIN_URL = reverse_lazy("login")
-LOGIN_REDIRECT_URL = reverse_lazy("dashboard")
-LOGOUT_REDIRECT_URL = reverse_lazy("login")
+# Authentication settings. Keep these JSON-serializable for Vercel's Django detector.
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "dashboard"
+LOGOUT_REDIRECT_URL = "login"
 SITE_ID = int(os.getenv("DJANGO_SITE_ID", "1"))
 
 AUTHENTICATION_BACKENDS = [
