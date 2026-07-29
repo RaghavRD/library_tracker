@@ -2,17 +2,54 @@ import os
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
+IS_VERCEL = os.getenv("VERCEL") == "1"
+IS_PRODUCTION = IS_VERCEL or os.getenv("DJANGO_ENV", "").strip().lower() == "production"
+
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me").strip()
 DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
-if DEBUG and not ALLOWED_HOSTS:
+VERCEL_URL = os.getenv("VERCEL_URL", "").strip()
+if IS_PRODUCTION and VERCEL_URL and VERCEL_URL not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(VERCEL_URL)
+
+if IS_PRODUCTION:
+    if SECRET_KEY == "dev-only-change-me" or not SECRET_KEY:
+        raise ImproperlyConfigured("SECRET_KEY must be set to a secure value in production.")
+    if DEBUG:
+        raise ImproperlyConfigured("DEBUG must be False in production.")
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured("ALLOWED_HOSTS must include the production domain.")
+elif DEBUG and not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if IS_PRODUCTION:
+    for host in ALLOWED_HOSTS:
+        origin = f"https://{host}"
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -136,7 +173,6 @@ if GITHUB_LOGIN_ENABLED:
     ]
 
 # Vercel's filesystem is ephemeral, so production logs must go to stdout/stderr.
-IS_VERCEL = os.getenv("VERCEL") == "1"
 ENABLE_FILE_LOGGING = (
     not IS_VERCEL
     and os.getenv("ENABLE_FILE_LOGGING", "True").strip().lower() == "true"

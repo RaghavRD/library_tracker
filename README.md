@@ -101,6 +101,31 @@ Vercel Cron invokes `/libtracker/internal/cron/daily-check/` daily at 03:30 UTC
 the same value only for local cron-route testing. The endpoint rejects requests
 without `Authorization: Bearer <CRON_SECRET>`.
 
+## Vercel Environment Variables
+
+Set these values in Vercel Project Settings before the first production deploy:
+
+```env
+DJANGO_ENV=production
+SECRET_KEY=<generate-a-new-random-value>
+DEBUG=False
+DATABASE_URL=<Supabase-transaction-pooler-URI>
+ALLOWED_HOSTS=<your-vercel-or-custom-domain>
+CSRF_TRUSTED_ORIGINS=https://<your-vercel-or-custom-domain>
+CRON_SECRET=<generate-a-separate-random-value>
+```
+
+Add the Groq, Serper, Mailtrap, and GitHub OAuth variables from your local
+`.env` before enabling the production daily check. Never commit any secret.
+
+## Deploying on Vercel
+
+Vercel automatically detects this Django application from `manage.py`; no
+separate Python entrypoint or custom build command is required. Keep the Vercel
+project root directory at the repository root and deploy the
+`vercel-ready-libtrack` branch as the production branch. Static files are served
+by Vercel's CDN and the Supabase schema must be migrated before deployment.
+
 ---
 
 ## Author
