@@ -12,6 +12,7 @@
       <p class="page-subtitle">Project risk, update health, and dependency insights in one view.</p>
     </div>
     <div class="d-flex flex-wrap align-items-center gap-2">
+      {% if manual_daily_check_enabled %}
       <form method="post" action="{% url 'run_daily_check_now' %}" class="m-0">
         {% csrf_token %}
         <input type="hidden" name="scope" value="owner">
@@ -28,6 +29,11 @@
           <i class="bi bi-globe2 me-1"></i>Admin Global Run
         </button>
       </form>
+      {% endif %}
+      {% else %}
+      <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Production checks run through the daily schedule.">
+        <i class="bi bi-clock-history me-1"></i>Daily Check Scheduled
+      </button>
       {% endif %}
       <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-gear-fill me-1"></i> Manage Projects

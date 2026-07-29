@@ -8,6 +8,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("dashboard/run-check/", views.run_daily_check_now, name="run_daily_check_now"),
     path("dashboard/run-check/status/", views.run_daily_check_status, name="run_daily_check_status"),
+    path("internal/cron/daily-check/", views.run_scheduled_daily_check, name="run_scheduled_daily_check"),
     path("projects/", views.projects_view, name="projects"),
     path("projects/parse-manifest/", views.parse_manifest, name="parse_manifest"),
     path("projects/import-github/", views.import_github_repo, name="import_github_repo"),

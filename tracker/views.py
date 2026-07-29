@@ -1,12 +1,13 @@
 import logging
 import os
 import threading
+import hmac
 from datetime import timedelta
 from collections import defaultdict
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
@@ -144,6 +145,7 @@ def dashboard(request):
             "latest_manual_run": latest_manual_run,
             "manual_run_cooldown_active": bool(cooldown_run),
             "manual_run_cooldown_minutes": 15,
+            "manual_daily_check_enabled": not getattr(settings, "IS_VERCEL", False),
             "email_test_mode": os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"},
         }
     )
@@ -157,6 +159,10 @@ def run_daily_check_now(request):
     Trigger an owner-scoped manual daily check from the dashboard.
     Admin users may explicitly request a global run.
     """
+    if getattr(settings, "IS_VERCEL", False):
+        messages.info(request, "Manual checks are unavailable in production. The scheduled daily check runs automatically.")
+        return redirect("dashboard")
+
     active_statuses = ["queued", "running"]
     requested_scope = request.POST.get("scope", "owner")
     is_admin = request.user.is_staff or request.user.is_superuser
@@ -247,6 +253,53 @@ def _run_daily_check_background(run_id: int, owner_id: int | None, is_global: bo
         call_command("run_daily_check", **command_kwargs)
     finally:
         close_old_connections()
+
+
+@require_GET
+def run_scheduled_daily_check(request):
+    """Run the global daily check when invoked by Vercel Cron."""
+    cron_secret = getattr(settings, "CRON_SECRET", "")
+    if not cron_secret:
+        logger.error("Cron invocation rejected because CRON_SECRET is not configured")
+        return JsonResponse({"ok": False, "error": "cron_not_configured"}, status=503)
+
+    authorization = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(authorization, f"Bearer {cron_secret}"):
+        logger.warning("Unauthorized daily-check cron invocation")
+        return JsonResponse({"ok": False, "error": "unauthorized"}, status=401)
+
+    active_run = DailyCheckRun.objects.filter(
+        scope="global",
+        status__in=["queued", "running"],
+    ).order_by("-created_at").first()
+    if active_run:
+        return JsonResponse(
+            {"ok": True, "status": "already_running", "run_id": active_run.id},
+            status=202,
+        )
+
+    run = DailyCheckRun.objects.create(scope="global", status="queued")
+    try:
+        call_command("run_daily_check", global_run=True, manual_run_id=run.id)
+    except Exception as exc:
+        logger.exception("Scheduled daily check crashed")
+        run.status = "failed"
+        run.finished_at = timezone.now()
+        run.error_message = str(exc)
+        run.save(update_fields=["status", "finished_at", "error_message", "updated_at"])
+        return JsonResponse({"ok": False, "run_id": run.id, "status": "failed"}, status=500)
+
+    run.refresh_from_db()
+    status_code = 200 if run.status == "success" else 500
+    return JsonResponse(
+        {
+            "ok": run.status == "success",
+            "run_id": run.id,
+            "status": run.status,
+            "duration_seconds": run.duration_seconds,
+        },
+        status=status_code,
+    )
 
 
 @login_required

@@ -53,7 +53,7 @@ Most teams find out about dependency updates too late — during a security audi
 - [Bootstrap Icons](https://icons.getbootstrap.com/)
 
 **Scheduler**
-- `schedule` library — powers the daily check loop inside the `run_daily_check` management command
+- Vercel Cron — invokes a protected Django endpoint for the daily global check
 
 ---
 
@@ -93,6 +93,13 @@ DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.
 Vercel deployments write logs to standard output and error, which are available
 in the Vercel dashboard. Local file logging is enabled by default; set
 `ENABLE_FILE_LOGGING=False` to disable local `libtrack.log` files.
+
+## Daily Check Schedule
+
+Vercel Cron invokes `/libtracker/internal/cron/daily-check/` daily at 03:30 UTC
+(approximately 09:00 India time). Set a random `CRON_SECRET` in Vercel and use
+the same value only for local cron-route testing. The endpoint rejects requests
+without `Authorization: Bearer <CRON_SECRET>`.
 
 ---
 

@@ -22,9 +22,7 @@ Services:
 """
 
 import os
-import time
 import logging
-import schedule
 from pathlib import Path
 from dotenv import load_dotenv
 from django.contrib.auth import get_user_model
@@ -55,17 +53,13 @@ else:
 
 load_dotenv()
 
-DEFAULT_AUTO_RUN_TIME = "09:00"
-
-
 class Command(BaseCommand):
     """
     Django management command for daily library update checks.
     
     Usage:
       python manage.py run_daily_check              # Run once immediately
-      python manage.py run_daily_check --auto       # Schedule daily at 09:00
-      python manage.py run_daily_check --auto --time 14:30  # Schedule at custom time
+      python manage.py run_daily_check --global-run # Run once for every project
     
     Configuration:
       - USE_OFFICIAL_APIS (env): If "true", use official registries; else Serper+Groq
@@ -75,18 +69,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         """Add command-line arguments."""
-        parser.add_argument(
-            "--auto",
-            action="store_true",
-            help=f"Run in auto-schedule mode (defaults to daily at {DEFAULT_AUTO_RUN_TIME}).",
-        )
-        parser.add_argument(
-            "--time",
-            dest="run_time",
-            metavar="HH:MM",
-            default=DEFAULT_AUTO_RUN_TIME,
-            help=f"Time of day (24h) to execute when --auto is used. Defaults to {DEFAULT_AUTO_RUN_TIME}.",
-        )
         parser.add_argument(
             "--owner-id",
             dest="owner_id",
@@ -106,33 +88,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        """
-        Main entry point for the command.
-        
-        Args:
-            auto: If True, schedule daily runs instead of running once
-            run_time: Time of day to run (HH:MM format, 24-hour)
-        """
-        run_time = options.get("run_time") or DEFAULT_AUTO_RUN_TIME
-        if run_time and not self._is_valid_time_format(run_time):
-            raise CommandError("Invalid value for --time. Use HH:MM in 24-hour format, e.g. 09:00.")
-
-        if options.get("auto"):
-            # Schedule to run daily at the specified time
-            self.stdout.write(
-                self.style.MIGRATE_HEADING(f"⏰ Auto mode: will run every day at {run_time}")
-            )
-            schedule.every().day.at(run_time).do(self.run_daily_check)
-            
-            # Keep scheduler running
-            while True:
-                schedule.run_pending()
-                time.sleep(30)
-        else:
-            # Run once immediately
-            owner = self._resolve_scope_owner(options)
-            self.daily_check_run = self._resolve_daily_check_run(options.get("manual_run_id"))
-            self.run_daily_check(owner=owner)
+        """Run one complete daily check for the requested scope."""
+        owner = self._resolve_scope_owner(options)
+        self.daily_check_run = self._resolve_daily_check_run(options.get("manual_run_id"))
+        self.run_daily_check(owner=owner)
 
     def run_daily_check(self, owner=None):
         """
@@ -371,20 +330,3 @@ class Command(BaseCommand):
             "error_message",
             "updated_at",
         ])
-
-    @staticmethod
-    def _is_valid_time_format(value: str) -> bool:
-        """
-        Validate time format (HH:MM in 24-hour format).
-        
-        Args:
-            value: Time string to validate
-            
-        Returns:
-            bool: True if valid, False otherwise
-        """
-        try:
-            time.strptime(value, "%H:%M")
-            return True
-        except (TypeError, ValueError):
-            return False

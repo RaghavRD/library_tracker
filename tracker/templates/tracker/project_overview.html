@@ -85,7 +85,7 @@
   <h2>Configuration & running</h2>
   <ul>
     <li>Set environment in <code>.env</code> (Mailtrap keys, USE_OFFICIAL_APIS, SERPER url, Groq keys etc.).</li>
-    <li>Run once with: <code>python manage.py run_daily_check</code>. Use <code>--auto --time HH:MM</code> to schedule daily runs.</li>
+    <li>Run once with: <code>python manage.py run_daily_check</code>. Production schedules use Vercel Cron.</li>
   </ul>
 
   <h2>Testing</h2>
@@ -108,7 +108,7 @@
     <li><strong>Observability:</strong> Add structured logging and Sentry integration; persist raw fetch payloads for debug.</li>
     <li><strong>Admin actions:</strong> Add bulk actions in admin to confirm/cancel/promote future updates.</li>
     <li><strong>Authorization for webhooks:</strong> Provide webhook endpoints to push official release events (GitHub webhooks) to auto-promote.</li>
-    <li><strong>Scheduler:</strong> Replace long-running script + schedule with a job runner (Django-Q or cron via OS) for reliability.</li>
+    <li><strong>Scheduler:</strong> Vercel Cron invokes the protected daily-check endpoint in production.</li>
     <li><strong>UI:</strong> Add an Overview / Diagnostics page (this file) inside the app sidebar and link it from the admin/dashboard.</li>
     <li><strong>Testing:</strong> Add unit tests for <code>groq_analyzer</code> with recorded example Groq outputs and for <code>serper_fetcher</code> using VCR or responses.</li>
     <li><strong>User controls:</strong> Per-project sensitivity settings (confidence threshold override, pause notifications).</li>

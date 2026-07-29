@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/libtracker/internal/cron/daily-check/",
+      "schedule": "30 3 * * *"
+    }
+  ]
+}

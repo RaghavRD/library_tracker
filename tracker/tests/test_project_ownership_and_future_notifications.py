@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.test import override_settings
 from django.urls import reverse
 
 from tracker.models import (
@@ -99,6 +100,70 @@ def test_manual_daily_check_blocks_active_run(client):
 
     assert response.status_code == 302
     assert DailyCheckRun.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_manual_daily_check_is_disabled_on_vercel(client):
+    user = User.objects.create_user(username="vercel-owner", password="pass12345")
+    client.force_login(user)
+
+    with override_settings(IS_VERCEL=True):
+        response = client.post(reverse("run_daily_check_now"), {"scope": "owner"})
+
+    assert response.status_code == 302
+    assert DailyCheckRun.objects.count() == 0
+
+
+@pytest.mark.django_db
+@override_settings(CRON_SECRET="cron-test-secret")
+def test_scheduled_daily_check_rejects_invalid_secret(client):
+    response = client.get(
+        reverse("run_scheduled_daily_check"),
+        HTTP_AUTHORIZATION="Bearer invalid-secret",
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"] == "unauthorized"
+    assert DailyCheckRun.objects.count() == 0
+
+
+@pytest.mark.django_db
+@override_settings(CRON_SECRET="cron-test-secret")
+def test_scheduled_daily_check_skips_when_global_run_is_active(client):
+    active_run = DailyCheckRun.objects.create(scope="global", status="running")
+
+    response = client.get(
+        reverse("run_scheduled_daily_check"),
+        HTTP_AUTHORIZATION="Bearer cron-test-secret",
+    )
+
+    assert response.status_code == 202
+    assert response.json()["run_id"] == active_run.id
+    assert DailyCheckRun.objects.count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(CRON_SECRET="cron-test-secret")
+def test_scheduled_daily_check_runs_global_command(client):
+    def mark_run_success(*args, **kwargs):
+        run = DailyCheckRun.objects.get(pk=kwargs["manual_run_id"])
+        run.status = "success"
+        run.duration_seconds = 1.25
+        run.save(update_fields=["status", "duration_seconds", "updated_at"])
+
+    with patch("tracker.views.call_command", side_effect=mark_run_success) as command_mock:
+        response = client.get(
+            reverse("run_scheduled_daily_check"),
+            HTTP_AUTHORIZATION="Bearer cron-test-secret",
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    command_mock.assert_called_once_with(
+        "run_daily_check",
+        global_run=True,
+        manual_run_id=DailyCheckRun.objects.get().id,
+    )
 
 
 @pytest.mark.django_db
