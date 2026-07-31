@@ -28,6 +28,7 @@ from tracker.models import (
     UpdateEvent,
 )
 from tracker.forms import LoginForm, RegistrationForm
+from tracker.services.github_account_service import GitHubAccountService
 from tracker.services.dashboard_metrics_service import DashboardMetricsService
 from tracker.services.github_repo_import_service import GitHubRepoImportService
 from tracker.services.manifest_parser_service import ManifestParserService
@@ -439,8 +440,26 @@ def parse_manifest(request):
 @login_required
 @require_POST
 def import_github_repo(request):
-    repo_url = request.POST.get("repo_url", "")
-    result = GitHubRepoImportService().import_repository(repo_url)
+    repo_id = request.POST.get("repo_id", "")
+    account_service = GitHubAccountService()
+    repo_result = account_service.get_repository_for_user(request.user, repo_id)
+    repository = repo_result.get("repository")
+    if repo_result.get("error") or not repository:
+        return JsonResponse(
+            {
+                "ok": False,
+                "components": [],
+                "warnings": [],
+                "files": [],
+                "repository": "",
+                "default_branch": "",
+                "error": repo_result.get("error", "Select a repository from your connected GitHub account."),
+            },
+            status=400,
+        )
+
+    token = account_service.get_access_token(request.user)
+    result = GitHubRepoImportService(token=token).import_repository(repository.get("html_url", ""))
     ok = not result.get("error")
     return JsonResponse(
         {
@@ -453,6 +472,21 @@ def import_github_repo(request):
             "error": result.get("error", ""),
         },
         status=200 if ok else 400,
+    )
+
+
+@login_required
+@require_GET
+def github_repositories(request):
+    result = GitHubAccountService().list_repositories(request.user)
+    ok = not result.get("error")
+    return JsonResponse(
+        {
+            "ok": ok,
+            "repositories": result.get("repositories", []),
+            "error": result.get("error", ""),
+        },
+        status=200 if ok else 403,
     )
 
 

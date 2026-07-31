@@ -29,7 +29,7 @@ class GitHubRepoImportService:
     )
 
     def __init__(self, token: str | None = None, timeout: int = 15):
-        self.token = token or os.getenv("GITHUB_TOKEN", "")
+        self.token = os.getenv("GITHUB_TOKEN", "") if token is None else token
         self.timeout = timeout
 
     def import_repository(self, repo_url: str) -> dict:

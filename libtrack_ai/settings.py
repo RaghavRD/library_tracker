@@ -1,8 +1,12 @@
 import os
 from pathlib import Path
-import dj_database_url
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
+
+try:
+    import dj_database_url
+except ImportError:  # pragma: no cover - local fallback when dependency is unavailable
+    dj_database_url = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -97,17 +101,27 @@ WSGI_APPLICATION = "libtrack_ai.wsgi.application"
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
 if DATABASE_URL:
-    # Vercel uses short-lived functions, so use Supabase's transaction pooler
-    # without persistent Django connections or server-side cursors.
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=0,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    }
-    DISABLE_SERVER_SIDE_CURSORS = True
+    if dj_database_url is not None:
+        # Vercel uses short-lived functions, so use Supabase's transaction pooler
+        # without persistent Django connections or server-side cursors.
+        DATABASES = {
+            "default": dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=0,
+                conn_health_checks=True,
+                ssl_require=True,
+            )
+        }
+        DISABLE_SERVER_SIDE_CURSORS = True
+    else:
+        # Local test environments can still run with SQLite when the optional
+        # database URL helper is unavailable.
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "libtracker_db.sqlite3",
+            }
+        }
 else:
     # Keep local development usable before a PostgreSQL URL is configured.
     DATABASES = {
@@ -155,10 +169,10 @@ CRON_SECRET = os.getenv("CRON_SECRET", "").strip()
 
 ACCOUNT_EMAIL_VERIFICATION = os.getenv("ACCOUNT_EMAIL_VERIFICATION", "none")
 SOCIALACCOUNT_AUTO_SIGNUP = True
-SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
-        "SCOPE": ["read:user", "user:email"],
+        "SCOPE": ["read:user", "user:email", "repo"],
     }
 }
 

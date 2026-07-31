@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
+from tracker.services.github_account_service import GitHubAccountService
 from tracker.services.github_repo_import_service import GitHubRepoImportService
 
 
@@ -87,7 +88,7 @@ def test_import_repository_reports_invalid_url():
 
 @pytest.mark.django_db
 def test_import_github_repo_endpoint_requires_login(client):
-    response = client.post(reverse("import_github_repo"), {"repo_url": "https://github.com/acme/app"})
+    response = client.post(reverse("import_github_repo"), {"repo_id": "123"})
 
     assert response.status_code == 302
 
@@ -98,6 +99,21 @@ def test_import_github_repo_endpoint_returns_components(client):
     client.force_login(user)
 
     with patch.object(
+        GitHubAccountService,
+        "get_repository_for_user",
+        return_value={
+            "repository": {
+                "id": 123,
+                "html_url": "https://github.com/acme/app",
+                "full_name": "acme/app",
+            },
+            "error": "",
+        },
+    ), patch.object(
+        GitHubAccountService,
+        "get_access_token",
+        return_value="github-token",
+    ), patch.object(
         GitHubRepoImportService,
         "import_repository",
         return_value={
@@ -109,10 +125,78 @@ def test_import_github_repo_endpoint_returns_components(client):
             "error": "",
         },
     ):
-        response = client.post(reverse("import_github_repo"), {"repo_url": "https://github.com/acme/app"})
+        response = client.post(reverse("import_github_repo"), {"repo_id": "123"})
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["ok"] is True
     assert payload["repository"] == "acme/app"
     assert payload["components"][0]["name"] == "react"
+
+
+@pytest.mark.django_db
+def test_github_repositories_endpoint_returns_connected_repositories(client):
+    user = User.objects.create_user(username="repo-user", password="pass12345")
+    client.force_login(user)
+
+    with patch.object(
+        GitHubAccountService,
+        "list_repositories",
+        return_value={
+            "repositories": [
+                {
+                    "id": 11,
+                    "name": "public-repo",
+                    "full_name": "acme/public-repo",
+                    "html_url": "https://github.com/acme/public-repo",
+                    "private": False,
+                    "fork": False,
+                    "archived": False,
+                    "default_branch": "main",
+                    "description": "",
+                    "updated_at": "2026-07-31T00:00:00Z",
+                },
+                {
+                    "id": 12,
+                    "name": "private-repo",
+                    "full_name": "acme/private-repo",
+                    "html_url": "https://github.com/acme/private-repo",
+                    "private": True,
+                    "fork": False,
+                    "archived": False,
+                    "default_branch": "main",
+                    "description": "",
+                    "updated_at": "2026-07-31T00:00:00Z",
+                },
+            ],
+            "error": "",
+        },
+    ):
+        response = client.get(reverse("github_repositories"))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert len(payload["repositories"]) == 2
+    assert payload["repositories"][1]["private"] is True
+
+
+@pytest.mark.django_db
+def test_import_github_repo_endpoint_rejects_unlinked_repository(client):
+    user = User.objects.create_user(username="github-user-2", password="pass12345")
+    client.force_login(user)
+
+    with patch.object(
+        GitHubAccountService,
+        "get_repository_for_user",
+        return_value={
+            "repository": None,
+            "error": "Select a repository from your connected GitHub account.",
+        },
+    ):
+        response = client.post(reverse("import_github_repo"), {"repo_id": "999"})
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["ok"] is False
+    assert "connected GitHub account" in payload["error"]
