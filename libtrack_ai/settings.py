@@ -316,6 +316,15 @@ try:
 except (ValueError, TypeError):
     LIBTRACK_API_RATE_LIMIT_SECONDS = 1.5
 
+# Wall-clock budget for a single run_daily_check run; 0 disables it.
+# Vercel Functions are killed at 300s (Hobby cannot raise this), and a killed
+# process records nothing, so leave headroom to finish as "partial" instead.
+LIBTRACK_RUN_BUDGET_SECONDS = os.getenv("LIBTRACK_RUN_BUDGET_SECONDS", "240" if IS_VERCEL else "0")
+try:
+    LIBTRACK_RUN_BUDGET_SECONDS = float(LIBTRACK_RUN_BUDGET_SECONDS)
+except (ValueError, TypeError):
+    LIBTRACK_RUN_BUDGET_SECONDS = 240.0 if IS_VERCEL else 0.0
+
 # Logging Configuration
 LIBTRACK_LOG_DETECTION_METHOD = os.getenv("LIBTRACK_LOG_DETECTION_METHOD", "True") == "True"
 LIBTRACK_LOG_HTTP_STATUS = os.getenv("LIBTRACK_LOG_HTTP_STATUS", "True") == "True"

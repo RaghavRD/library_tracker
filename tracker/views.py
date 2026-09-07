@@ -121,7 +121,8 @@ def dashboard(request):
     Displays high-level metrics and charts.
     """
     context = DashboardMetricsService.build_for_owner(request.user)
-    active_statuses = ["queued", "running"]
+    DailyCheckRun.reap_stale()
+    active_statuses = DailyCheckRun.ACTIVE_STATUSES
     recent_runs_qs = DailyCheckRun.objects.select_related("triggered_by", "scope_owner")
     if request.user.is_staff or request.user.is_superuser:
         recent_runs = recent_runs_qs.order_by("-created_at")[:5]
@@ -163,7 +164,8 @@ def run_daily_check_now(request):
         messages.info(request, "Manual checks are unavailable in production. The scheduled daily check runs automatically.")
         return redirect("dashboard")
 
-    active_statuses = ["queued", "running"]
+    DailyCheckRun.reap_stale()
+    active_statuses = DailyCheckRun.ACTIVE_STATUSES
     requested_scope = request.POST.get("scope", "owner")
     is_admin = request.user.is_staff or request.user.is_superuser
     is_global = requested_scope == "global" and is_admin
@@ -268,9 +270,13 @@ def run_scheduled_daily_check(request):
         logger.warning("Unauthorized daily-check cron invocation")
         return JsonResponse({"ok": False, "error": "unauthorized"}, status=401)
 
+    reaped = DailyCheckRun.reap_stale()
+    if reaped:
+        logger.warning("Reaped %s abandoned daily check run(s) before scheduled run", reaped)
+
     active_run = DailyCheckRun.objects.filter(
         scope="global",
-        status__in=["queued", "running"],
+        status__in=DailyCheckRun.ACTIVE_STATUSES,
     ).order_by("-created_at").first()
     if active_run:
         return JsonResponse(
@@ -290,15 +296,20 @@ def run_scheduled_daily_check(request):
         return JsonResponse({"ok": False, "run_id": run.id, "status": "failed"}, status=500)
 
     run.refresh_from_db()
-    status_code = 200 if run.status == "success" else 500
+    # A partial run stopped itself at the time budget having saved its progress.
+    # That is the designed outcome under a function duration cap, not an error,
+    # so it must not be reported as a failure to the scheduler.
+    ok = run.status in {"success", "partial"}
     return JsonResponse(
         {
-            "ok": run.status == "success",
+            "ok": ok,
             "run_id": run.id,
             "status": run.status,
             "duration_seconds": run.duration_seconds,
+            "stopped_before": (run.summary or {}).get("stopped_before"),
+            "timings": (run.summary or {}).get("timings", {}),
         },
-        status=status_code,
+        status=200 if ok else 500,
     )
 
 

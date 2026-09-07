@@ -1,6 +1,9 @@
+from datetime import timedelta
+
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 UPDATE_CATEGORY_CHOICES = [
     ("major", "major"),
@@ -295,6 +298,12 @@ class DailyCheckRun(TimeStampedModel):
         ("global", "All users"),
     ]
 
+    # A run in one of these statuses blocks new runs of the same scope.
+    ACTIVE_STATUSES = ["queued", "running"]
+    # A serverless host kills the function without running our cleanup, so an
+    # active run older than this is assumed abandoned rather than in progress.
+    STALE_AFTER_MINUTES = 15
+
     triggered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -340,6 +349,32 @@ class DailyCheckRun(TimeStampedModel):
     def __str__(self):
         owner = self.scope_owner or self.triggered_by or "system"
         return f"{self.get_scope_display()} check for {owner} ({self.status})"
+
+    @classmethod
+    def reap_stale(cls, older_than_minutes: int | None = None) -> int:
+        """
+        Fail runs that are still marked active long after they should have finished.
+
+        A run only leaves ``running`` when the command marks it finished, so a
+        process killed mid-run (a Vercel function hitting its duration limit, a
+        crashed worker) leaves the row active forever and every later run of the
+        same scope is refused as "already running". Call this before any check
+        that treats an active run as a reason not to start.
+
+        Returns the number of runs reaped.
+        """
+        minutes = cls.STALE_AFTER_MINUTES if older_than_minutes is None else older_than_minutes
+        now = timezone.now()
+        return cls.objects.filter(
+            status__in=cls.ACTIVE_STATUSES,
+            created_at__lt=now - timedelta(minutes=minutes),
+        ).update(
+            status="failed",
+            finished_at=now,
+            error_message=f"Run abandoned: still active {minutes} minutes after it was created.",
+            # .update() bypasses auto_now, so keep updated_at honest by hand.
+            updated_at=now,
+        )
 
     @property
     def duration_label(self) -> str:

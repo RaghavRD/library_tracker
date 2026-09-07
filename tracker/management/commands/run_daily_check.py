@@ -23,8 +23,10 @@ Services:
 
 import os
 import logging
+import time
 from pathlib import Path
 from dotenv import load_dotenv
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -86,12 +88,48 @@ class Command(BaseCommand):
             type=int,
             help="DailyCheckRun id to update while this command executes.",
         )
+        parser.add_argument(
+            "--budget-seconds",
+            dest="budget_seconds",
+            type=float,
+            default=None,
+            help=(
+                "Stop starting new steps once this many seconds have elapsed and finish "
+                "as 'partial'. Defaults to settings.LIBTRACK_RUN_BUDGET_SECONDS. "
+                "Use 0 for no budget."
+            ),
+        )
 
     def handle(self, *args, **options):
         """Run one complete daily check for the requested scope."""
         owner = self._resolve_scope_owner(options)
         self.daily_check_run = self._resolve_daily_check_run(options.get("manual_run_id"))
+        self._start_budget(options.get("budget_seconds"))
         self.run_daily_check(owner=owner)
+
+    # ===== Time budget =====
+
+    def _start_budget(self, budget_seconds):
+        """
+        Arm the wall-clock budget for this run.
+
+        Hosts that cap execution time (Vercel Functions cap at 300s) kill the
+        process outright when the cap is hit, which loses all progress and leaves
+        the DailyCheckRun stuck as active. Stopping ourselves a little early lets
+        us record what did complete and exit as 'partial' instead.
+        """
+        if budget_seconds is None:
+            budget_seconds = getattr(settings, "LIBTRACK_RUN_BUDGET_SECONDS", 0)
+        self.budget_seconds = float(budget_seconds or 0)
+        self.deadline = time.monotonic() + self.budget_seconds if self.budget_seconds > 0 else None
+
+    def _budget_exhausted(self) -> bool:
+        return self.deadline is not None and time.monotonic() >= self.deadline
+
+    def _budget_remaining(self):
+        if self.deadline is None:
+            return None
+        return max(0.0, self.deadline - time.monotonic())
 
     def run_daily_check(self, owner=None):
         """
@@ -106,38 +144,60 @@ class Command(BaseCommand):
         """
         self.scope_owner = owner
         self.run_summary = {}
+        self.step_timings = {}
         scope_label = f"owner={owner.username}" if owner is not None else "global"
         self.stdout.write(self.style.NOTICE(f"LibTrack AI: Daily check starting ({scope_label})..."))
+        if self.deadline is not None:
+            self.stdout.write(self.style.NOTICE(f"Time budget: {self.budget_seconds:.0f}s"))
         start_time = timezone.now()
         self._mark_run_started(start_time)
 
+        steps = (
+            ("sync", self._step_sync_libraries),
+            ("fetch", self._step_fetch_versions),
+            ("future", self._step_check_future_versions),
+            ("security", self._step_scan_security_vulnerabilities),
+            ("notifications", self._step_notify_projects),
+            ("snapshots", self._step_record_dashboard_snapshots),
+        )
+
+        stopped_before = None
         try:
-            # ===== STEP 1: Sync Libraries =====
-            self.run_summary["sync"] = self._step_sync_libraries()
+            for name, step in steps:
+                if self._budget_exhausted():
+                    stopped_before = name
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"⏱️  Time budget exhausted; stopping before step '{name}'."
+                        )
+                    )
+                    logger.warning("Daily check stopped before step '%s': time budget exhausted", name)
+                    break
+                step_started = time.monotonic()
+                self.run_summary[name] = step()
+                self.step_timings[name] = round(time.monotonic() - step_started, 2)
 
-            # ===== STEP 2: Fetch Updates =====
-            self.run_summary["fetch"] = self._step_fetch_versions()
-
-            # ===== STEP 3: Check Future Versions =====
-            self.run_summary["future"] = self._step_check_future_versions()
-
-            # ===== STEP 4: Security Vulnerability Scan =====
-            self.run_summary["security"] = self._step_scan_security_vulnerabilities()
-
-            # ===== STEP 5: Notify Projects =====
-            self.run_summary["notifications"] = self._step_notify_projects()
-
-            # ===== STEP 6: Record Dashboard Snapshots =====
-            self.run_summary["snapshots"] = self._step_record_dashboard_snapshots()
-
-            # Summary
             duration = (timezone.now() - start_time).total_seconds()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"✅ Daily check completed in {duration:.1f}s"
+            if stopped_before:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"⚠️  Daily check partially completed in {duration:.1f}s "
+                        f"(stopped before '{stopped_before}')"
+                    )
                 )
-            )
-            self._mark_run_finished(status="success", duration=duration)
+                self._mark_run_finished(
+                    status="partial",
+                    duration=duration,
+                    error=f"Time budget exhausted before step '{stopped_before}'.",
+                    stopped_before=stopped_before,
+                )
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"✅ Daily check completed in {duration:.1f}s"
+                    )
+                )
+                self._mark_run_finished(status="success", duration=duration)
             return self.run_summary
 
         except Exception as e:
@@ -288,11 +348,15 @@ class Command(BaseCommand):
         run.error_message = ""
         run.save(update_fields=["status", "started_at", "scope_owner", "error_message", "updated_at"])
 
-    def _mark_run_finished(self, *, status, duration, error=""):
+    def _mark_run_finished(self, *, status, duration, error="", stopped_before=None):
         run = getattr(self, "daily_check_run", None)
         if not run:
             return
-        summary = getattr(self, "run_summary", {}) or {}
+        summary = dict(getattr(self, "run_summary", {}) or {})
+        # Per-step timings are what tell you which step is eating the budget.
+        summary["timings"] = getattr(self, "step_timings", {})
+        if stopped_before:
+            summary["stopped_before"] = stopped_before
         fetch = summary.get("fetch") or {}
         future = summary.get("future") or {}
         security = summary.get("security") or {}
