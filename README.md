@@ -77,6 +77,77 @@ python manage.py run_daily_check
 ```
 ---
 
+---
+
+## Running Locally
+
+The same codebase runs locally and on Vercel. Which mode you get is decided
+entirely by environment variables — there is no separate settings file.
+
+| | Local | Vercel |
+|---|---|---|
+| Config source | `.env` file (gitignored) | Vercel env vars |
+| Mode trigger | `DJANGO_ENV=local` (or unset) | `VERCEL=1` is injected automatically |
+| Database | SQLite (`DATABASE_URL` blank) | Supabase Postgres via `DATABASE_URL` |
+| `DEBUG` | `True` | `False` (enforced — boot fails otherwise) |
+| HTTPS redirect / secure cookies / HSTS | off | on |
+| File logging | `libtrack.log` | stdout only (ephemeral filesystem) |
+| Static files | served by Django dev server | served by Vercel CDN |
+| "Run daily check now" dashboard button | enabled | hidden (use Vercel Cron) |
+
+`.env` never reaches Vercel — it is gitignored, so it is not in the repo that
+Vercel builds. And `load_dotenv()` does **not** override real environment
+variables, so on Vercel the dashboard values always win.
+
+### First-time setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env      # then fill in your API keys
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+Open http://localhost:8000 — it redirects to `/libtracker/login/`.
+
+### Switching the local database
+
+Local defaults to SQLite. To point local dev at the live Supabase database
+instead, uncomment `DATABASE_URL` in `.env` and restart the server. Everything
+you do then writes to production data, so prefer SQLite for day-to-day work.
+
+### Running the daily check locally
+
+```bash
+python manage.py run_daily_check                     # your projects
+python manage.py run_daily_check --global-run        # every owner
+```
+
+To exercise the cron endpoint itself:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+     http://localhost:8000/libtracker/internal/cron/daily-check/
+```
+
+### Email in local development
+
+`TEST_MODE=True` writes rendered emails to `email_previews/` instead of sending
+them through Mailtrap. Keep it on locally unless you are deliberately testing
+delivery.
+
+### GitHub OAuth locally
+
+A GitHub OAuth App accepts only one callback URL, so register a second app for
+development with the callback
+`http://localhost:8000/accounts/github/login/callback/`, and put its client ID
+and secret in `.env`. Leaving `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` blank
+simply hides the GitHub sign-in button.
+
 ## Database Configuration
 
 For production, set `DATABASE_URL` to the Supabase **Transaction pooler** URI

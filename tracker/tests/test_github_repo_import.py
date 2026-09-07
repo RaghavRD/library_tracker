@@ -34,7 +34,9 @@ def test_import_repository_reads_supported_root_manifests():
     package_json = json.dumps({"dependencies": {"react": "^18.2.0"}})
     requirements_txt = "Django==5.2.1\n"
 
-    def fake_get(url, headers=None, timeout=None):
+    def fake_get(url, headers=None, timeout=None, params=None):
+        if url.endswith("/contributors"):
+            return _github_response(payload=[{"login": "octocat", "type": "User"}])
         if url.endswith("/repos/acme/app"):
             return _github_response(payload={"default_branch": "main"})
         if "contents/package.json" in url:
@@ -59,7 +61,9 @@ def test_import_repository_prefers_lockfile_versions():
     package_lock = json.dumps({"packages": {"node_modules/react": {"version": "18.2.0"}}})
     package_json = json.dumps({"dependencies": {"react": "^18.0.0", "vite": "^5.1.4"}})
 
-    def fake_get(url, headers=None, timeout=None):
+    def fake_get(url, headers=None, timeout=None, params=None):
+        if url.endswith("/contributors"):
+            return _github_response(payload=[{"login": "octocat", "type": "User"}])
         if url.endswith("/repos/acme/app"):
             return _github_response(payload={"default_branch": "main"})
         if "contents/package-lock.json" in url:

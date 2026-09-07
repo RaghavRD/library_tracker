@@ -10,7 +10,6 @@ urlpatterns = [
     path("dashboard/run-check/status/", views.run_daily_check_status, name="run_daily_check_status"),
     path("internal/cron/daily-check/", views.run_scheduled_daily_check, name="run_scheduled_daily_check"),
     path("projects/", views.projects_view, name="projects"),
-    path("projects/parse-manifest/", views.parse_manifest, name="parse_manifest"),
     path("projects/import-github/", views.import_github_repo, name="import_github_repo"),
     path("projects/github-repositories/", views.github_repositories, name="github_repositories"),
     path("update-history/", views.updateHistory, name="updateHistory"),

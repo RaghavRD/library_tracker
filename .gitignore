@@ -16,3 +16,6 @@ service_account*.json
 .DS_Store
 staticfiles/
 email_previews/
+
+# Local data dump — contains user password hashes
+libtrack_seed.json

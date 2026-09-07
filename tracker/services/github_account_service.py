@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import requests
-from allauth.socialaccount.models import SocialToken
+from allauth.socialaccount.models import SocialAccount, SocialToken
 
 logger = logging.getLogger("libtrack")
 
@@ -24,6 +24,20 @@ class GitHubAccountService:
             .first()
         )
         return token.token if token else ""
+
+    def get_account_email(self, user) -> str:
+        """Email of the connected GitHub account, falling back to the Django user."""
+        account = (
+            SocialAccount.objects.filter(user=user, provider="github")
+            .order_by("-id")
+            .first()
+        )
+        if account:
+            extra = account.extra_data or {}
+            email = (extra.get("email") or "").strip()
+            if email:
+                return email
+        return (getattr(user, "email", "") or "").strip()
 
     def list_repositories(self, user) -> dict:
         token = self.get_access_token(user)
@@ -80,6 +94,7 @@ class GitHubAccountService:
                 }
 
             for repo in payload:
+                owner = repo.get("owner") or {}
                 repositories.append(
                     {
                         "id": repo.get("id"),
@@ -92,6 +107,10 @@ class GitHubAccountService:
                         "default_branch": repo.get("default_branch", ""),
                         "description": repo.get("description", "") or "",
                         "updated_at": repo.get("updated_at", "") or "",
+                        "language": repo.get("language", "") or "",
+                        "stars": repo.get("stargazers_count", 0) or 0,
+                        "owner_login": owner.get("login", "") or "",
+                        "owner_avatar": owner.get("avatar_url", "") or "",
                     }
                 )
 

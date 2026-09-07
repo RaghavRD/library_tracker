@@ -53,6 +53,7 @@ class GitHubRepoImportService:
             }
 
         default_branch = repo_info.get("default_branch") or "main"
+        contributors = self.list_contributors(owner, repo)
         components = []
         warnings = []
         files = []
@@ -89,6 +90,10 @@ class GitHubRepoImportService:
                 "warnings": warnings,
                 "files": files,
                 "error": "No supported dependency manifests were found in the repository root.",
+                "repository": f"{owner}/{repo}",
+                "default_branch": default_branch,
+                "project_name": repo,
+                "contributors": contributors,
             }
 
         return {
@@ -98,7 +103,46 @@ class GitHubRepoImportService:
             "error": "",
             "repository": f"{owner}/{repo}",
             "default_branch": default_branch,
+            "project_name": repo,
+            "contributors": contributors,
         }
+
+
+    MAX_CONTRIBUTORS = 10
+
+    def list_contributors(self, owner: str, repo: str) -> list[str]:
+        """Top contributor logins, most commits first. Never raises."""
+        try:
+            response = requests.get(
+                f"{self.API_ROOT}/repos/{owner}/{repo}/contributors",
+                headers=self._headers(),
+                params={"per_page": self.MAX_CONTRIBUTORS, "anon": "0"},
+                timeout=self.timeout,
+            )
+        except requests.RequestException:
+            return []
+
+        if response.status_code >= 400:
+            return []
+
+        try:
+            payload = response.json()
+        except ValueError:
+            return []
+
+        if not isinstance(payload, list):
+            return []
+
+        logins = []
+        for entry in payload:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type") == "Bot":
+                continue
+            login = (entry.get("login") or "").strip()
+            if login and login not in logins:
+                logins.append(login)
+        return logins[: self.MAX_CONTRIBUTORS]
 
     @staticmethod
     def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

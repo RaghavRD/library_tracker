@@ -1,13 +1,7 @@
 import json
 
 import pytest
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-
 from tracker.services.manifest_parser_service import ManifestParserService
-
-
-User = get_user_model()
 
 
 def test_parse_package_json_dependencies():
@@ -251,30 +245,3 @@ def test_parse_manifest_reports_invalid_package_json():
 
     assert result["components"] == []
     assert "Invalid package.json" in result["error"]
-
-
-@pytest.mark.django_db
-def test_parse_manifest_endpoint_requires_login(client):
-    response = client.post(
-        reverse("parse_manifest"),
-        {"manifest_type": "requirements_txt", "manifest_content": "Django==5.2.1"},
-    )
-
-    assert response.status_code == 302
-
-
-@pytest.mark.django_db
-def test_parse_manifest_endpoint_returns_components(client):
-    user = User.objects.create_user(username="manifest-user", password="pass12345")
-    client.force_login(user)
-
-    response = client.post(
-        reverse("parse_manifest"),
-        {"manifest_type": "requirements_txt", "manifest_content": "Django==5.2.1"},
-    )
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["ok"] is True
-    assert payload["components"][0]["name"] == "Django"
-    assert payload["components"][0]["version"] == "5.2.1"

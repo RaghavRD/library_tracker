@@ -223,71 +223,48 @@
               placeholder="Comma separated" required></textarea>
           </div>
           <div class="col-12">
-            <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="add-stack">
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <span class="form-label fw-semibold mb-0">Import Dependencies</span>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <span class="badge bg-secondary-subtle text-secondary">Node / Python / Go / Java / Rust / .NET / PHP</span>
-                  {% if github_login_enabled %}
-                  <a class="btn btn-outline-secondary btn-sm"
-                    href="{% provider_login_url 'github' process='connect' %}">
-                    <i class="bi bi-github me-1"></i>Connect GitHub
-                  </a>
-                  {% endif %}
+            <div class="manifest-import repo-import" data-target-builder="add-stack">
+
+              <div class="repo-import-head">
+                <div class="repo-import-title">
+                  <span class="repo-import-icon"><i class="bi bi-github"></i></span>
+                  <span>
+                    <span class="repo-import-label">Import from GitHub</span>
+                    <small class="repo-import-sub">Pick a repository to fill in project details and dependencies</small>
+                  </span>
                 </div>
+                {% if github_login_enabled %}
+                <a class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                  href="{% provider_login_url 'github' process='connect' %}">
+                  <i class="bi bi-github me-1"></i>Connect
+                </a>
+                {% endif %}
               </div>
-              <div class="row g-2 github-repo-picker" data-repo-picker>
-                <div class="col-12">
-                  <label class="form-label small text-muted mb-1" for="add_github_repo_search">Search repositories</label>
-                  <input type="search" class="form-control form-control-sm github-repo-search" id="add_github_repo_search"
-                    placeholder="Type to filter your connected GitHub repositories" autocomplete="off" disabled />
+
+              <div class="github-repo-picker" data-repo-picker>
+                <div class="repo-search">
+                  <i class="bi bi-search repo-search-icon"></i>
+                  <input type="search" class="form-control github-repo-search" id="add_github_repo_search"
+                    placeholder="Search your repositories" autocomplete="off" aria-label="Search repositories" disabled />
                 </div>
-                <div class="col-12">
-                  <select class="form-select form-select-sm github-repo-select" size="6" disabled aria-label="Select repository">
-                    <option value="">Connect GitHub to load repositories</option>
-                  </select>
+
+                <div class="repo-list" role="listbox" aria-label="Your GitHub repositories" tabindex="0">
+                  <div class="repo-list-empty">
+                    <i class="bi bi-github"></i>
+                    <span>Connect GitHub to load your repositories.</span>
+                  </div>
                 </div>
+
                 <input type="hidden" class="github-repo-id" name="repo_id" value="" />
-                <div class="col-12 d-grid d-md-flex justify-content-md-between align-items-md-center gap-2">
-                  <small class="github-repo-helper text-muted">Select a repository from your connected GitHub account.</small>
-                  <button type="button" class="btn btn-outline-primary btn-sm github-import-btn" disabled>
-                    <i class="bi bi-github me-1"></i>Import Repo
+
+                <div class="repo-import-foot">
+                  <small class="github-repo-helper">Select a repository to continue.</small>
+                  <button type="button" class="btn btn-primary btn-sm github-import-btn" disabled>
+                    <i class="bi bi-box-arrow-in-down me-1"></i>Import
                   </button>
                 </div>
-                <div class="col-12">
-                  <small class="github-import-status text-muted"></small>
-                </div>
-                <div class="col-md-4">
-                  <select class="form-select form-select-sm manifest-type">
-                    <option value="package_json">package.json</option>
-                    <option value="package_lock_json">package-lock.json</option>
-                    <option value="yarn_lock">yarn.lock</option>
-                    <option value="pnpm_lock">pnpm-lock.yaml</option>
-                    <option value="requirements_txt">requirements.txt</option>
-                    <option value="pyproject_toml">pyproject.toml</option>
-                    <option value="poetry_lock">poetry.lock</option>
-                    <option value="pipfile_lock">Pipfile.lock</option>
-                    <option value="go_mod">go.mod</option>
-                    <option value="pom_xml">pom.xml</option>
-                    <option value="build_gradle">build.gradle</option>
-                    <option value="cargo_toml">Cargo.toml</option>
-                    <option value="csproj">.csproj</option>
-                    <option value="composer_json">composer.json</option>
-                  </select>
-                </div>
-                <div class="col-md-8">
-                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in,.lock,.yaml,.yml,.toml,.mod,.xml,.gradle,.kts,.csproj" />
-                </div>
-                <div class="col-12">
-                  <textarea class="form-control form-control-sm manifest-content" rows="4"
-                    placeholder="Paste manifest content here"></textarea>
-                </div>
-                <div class="col-12 d-flex flex-wrap align-items-center gap-2">
-                  <button type="button" class="btn btn-outline-primary btn-sm manifest-import-btn">
-                    <i class="bi bi-upload me-1"></i>Import Stack
-                  </button>
-                  <small class="manifest-import-status text-muted"></small>
-                </div>
+
+                <div class="github-import-status" role="status" aria-live="polite"></div>
               </div>
             </div>
           </div>
@@ -385,71 +362,48 @@
               required></textarea>
           </div>
           <div class="col-12">
-            <div class="manifest-import border rounded-3 p-3 bg-body-tertiary" data-target-builder="edit-stack">
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <span class="form-label fw-semibold mb-0">Import Dependencies</span>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <span class="badge bg-secondary-subtle text-secondary">Node / Python / Go / Java / Rust / .NET / PHP</span>
-                  {% if github_login_enabled %}
-                  <a class="btn btn-outline-secondary btn-sm"
-                    href="{% provider_login_url 'github' process='connect' %}">
-                    <i class="bi bi-github me-1"></i>Connect GitHub
-                  </a>
-                  {% endif %}
+            <div class="manifest-import repo-import" data-target-builder="edit-stack">
+
+              <div class="repo-import-head">
+                <div class="repo-import-title">
+                  <span class="repo-import-icon"><i class="bi bi-github"></i></span>
+                  <span>
+                    <span class="repo-import-label">Import from GitHub</span>
+                    <small class="repo-import-sub">Pick a repository to fill in project details and dependencies</small>
+                  </span>
                 </div>
+                {% if github_login_enabled %}
+                <a class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                  href="{% provider_login_url 'github' process='connect' %}">
+                  <i class="bi bi-github me-1"></i>Connect
+                </a>
+                {% endif %}
               </div>
-              <div class="row g-2 github-repo-picker" data-repo-picker>
-                <div class="col-12">
-                  <label class="form-label small text-muted mb-1" for="edit_github_repo_search">Search repositories</label>
-                  <input type="search" class="form-control form-control-sm github-repo-search" id="edit_github_repo_search"
-                    placeholder="Type to filter your connected GitHub repositories" autocomplete="off" disabled />
+
+              <div class="github-repo-picker" data-repo-picker>
+                <div class="repo-search">
+                  <i class="bi bi-search repo-search-icon"></i>
+                  <input type="search" class="form-control github-repo-search" id="edit_github_repo_search"
+                    placeholder="Search your repositories" autocomplete="off" aria-label="Search repositories" disabled />
                 </div>
-                <div class="col-12">
-                  <select class="form-select form-select-sm github-repo-select" size="6" disabled aria-label="Select repository">
-                    <option value="">Connect GitHub to load repositories</option>
-                  </select>
+
+                <div class="repo-list" role="listbox" aria-label="Your GitHub repositories" tabindex="0">
+                  <div class="repo-list-empty">
+                    <i class="bi bi-github"></i>
+                    <span>Connect GitHub to load your repositories.</span>
+                  </div>
                 </div>
+
                 <input type="hidden" class="github-repo-id" name="repo_id" value="" />
-                <div class="col-12 d-grid d-md-flex justify-content-md-between align-items-md-center gap-2">
-                  <small class="github-repo-helper text-muted">Select a repository from your connected GitHub account.</small>
-                  <button type="button" class="btn btn-outline-primary btn-sm github-import-btn" disabled>
-                    <i class="bi bi-github me-1"></i>Import Repo
+
+                <div class="repo-import-foot">
+                  <small class="github-repo-helper">Select a repository to continue.</small>
+                  <button type="button" class="btn btn-primary btn-sm github-import-btn" disabled>
+                    <i class="bi bi-box-arrow-in-down me-1"></i>Import
                   </button>
                 </div>
-                <div class="col-12">
-                  <small class="github-import-status text-muted"></small>
-                </div>
-                <div class="col-md-4">
-                  <select class="form-select form-select-sm manifest-type">
-                    <option value="package_json">package.json</option>
-                    <option value="package_lock_json">package-lock.json</option>
-                    <option value="yarn_lock">yarn.lock</option>
-                    <option value="pnpm_lock">pnpm-lock.yaml</option>
-                    <option value="requirements_txt">requirements.txt</option>
-                    <option value="pyproject_toml">pyproject.toml</option>
-                    <option value="poetry_lock">poetry.lock</option>
-                    <option value="pipfile_lock">Pipfile.lock</option>
-                    <option value="go_mod">go.mod</option>
-                    <option value="pom_xml">pom.xml</option>
-                    <option value="build_gradle">build.gradle</option>
-                    <option value="cargo_toml">Cargo.toml</option>
-                    <option value="csproj">.csproj</option>
-                    <option value="composer_json">composer.json</option>
-                  </select>
-                </div>
-                <div class="col-md-8">
-                  <input type="file" class="form-control form-control-sm manifest-file" accept=".json,.txt,.in,.lock,.yaml,.yml,.toml,.mod,.xml,.gradle,.kts,.csproj" />
-                </div>
-                <div class="col-12">
-                  <textarea class="form-control form-control-sm manifest-content" rows="4"
-                    placeholder="Paste manifest content here"></textarea>
-                </div>
-                <div class="col-12 d-flex flex-wrap align-items-center gap-2">
-                  <button type="button" class="btn btn-outline-primary btn-sm manifest-import-btn">
-                    <i class="bi bi-upload me-1"></i>Import Stack
-                  </button>
-                  <small class="manifest-import-status text-muted"></small>
-                </div>
+
+                <div class="github-import-status" role="status" aria-live="polite"></div>
               </div>
             </div>
           </div>
@@ -549,26 +503,8 @@
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const defaultStackTemplate = [{}];
-    const parseManifestUrl = "{% url 'parse_manifest' %}";
     const importGithubUrl = "{% url 'import_github_repo' %}";
     const githubRepositoriesUrl = "{% url 'github_repositories' %}";
-    const manifestTypeByFileName = {
-      "package.json": "package_json",
-      "package-lock.json": "package_lock_json",
-      "yarn.lock": "yarn_lock",
-      "pnpm-lock.yaml": "pnpm_lock",
-      "pnpm-lock.yml": "pnpm_lock",
-      "requirements.txt": "requirements_txt",
-      "pyproject.toml": "pyproject_toml",
-      "poetry.lock": "poetry_lock",
-      "pipfile.lock": "pipfile_lock",
-      "go.mod": "go_mod",
-      "pom.xml": "pom_xml",
-      "build.gradle": "build_gradle",
-      "build.gradle.kts": "build_gradle",
-      "cargo.toml": "cargo_toml",
-      "composer.json": "composer_json",
-    };
     const githubRepoPickerState = new WeakMap();
 
     const getCookie = (name) => {
@@ -582,45 +518,55 @@
       return "";
     };
 
-    const readSelectedFile = (fileInput) => {
-      const file = fileInput && fileInput.files && fileInput.files[0];
-      if (!file) return Promise.resolve("");
-      return file.text();
+    const escapeHtml = (value) => {
+      const div = document.createElement("div");
+      div.textContent = value == null ? "" : String(value);
+      return div.innerHTML;
     };
 
-    const detectManifestType = (fileName) => {
-      const normalized = (fileName || "").trim().toLowerCase();
-      if (normalized.endsWith(".csproj")) return "csproj";
-      return manifestTypeByFileName[normalized] || "";
+    const relativeTime = (isoDate) => {
+      const then = Date.parse(isoDate || "");
+      if (Number.isNaN(then)) return "";
+      const seconds = Math.round((Date.now() - then) / 1000);
+      const units = [
+        ["year", 31536000], ["month", 2592000], ["week", 604800],
+        ["day", 86400], ["hour", 3600], ["minute", 60],
+      ];
+      for (const [unit, span] of units) {
+        const value = Math.floor(seconds / span);
+        if (value >= 1) return `${value} ${unit}${value === 1 ? "" : "s"} ago`;
+      }
+      return "just now";
+    };
+
+    // Mirrors GitHub's own language colours for the most common stacks.
+    const languageColors = {
+      JavaScript: "#f1e05a", TypeScript: "#3178c6", Python: "#3572A5",
+      Java: "#b07219", Go: "#00ADD8", Rust: "#dea584", Ruby: "#701516",
+      PHP: "#4F5D95", "C#": "#178600", "C++": "#f34b7d", C: "#555555",
+      Shell: "#89e051", HTML: "#e34c26", CSS: "#563d7c", Vue: "#41b883",
+      Swift: "#F05138", Kotlin: "#A97BFF", Dart: "#00B4AB", Scala: "#c22d40",
     };
 
     const resetManifestImporter = (container) => {
       container.querySelectorAll(".manifest-import").forEach((panel) => {
-        const content = panel.querySelector(".manifest-content");
-        const file = panel.querySelector(".manifest-file");
-        const status = panel.querySelector(".manifest-import-status");
         const repoSearch = panel.querySelector(".github-repo-search");
-        const repoSelect = panel.querySelector(".github-repo-select");
         const repoId = panel.querySelector(".github-repo-id");
         const githubStatus = panel.querySelector(".github-import-status");
-        if (content) content.value = "";
-        if (file) file.value = "";
+        const importButton = panel.querySelector(".github-import-btn");
         if (repoSearch) repoSearch.value = "";
-        if (repoSelect) repoSelect.selectedIndex = -1;
         if (repoId) repoId.value = "";
-        if (status) {
-          status.textContent = "";
-          status.className = "manifest-import-status text-muted";
-        }
+        if (importButton) importButton.disabled = true;
         if (githubStatus) {
           githubStatus.textContent = "";
-          githubStatus.className = "github-import-status text-muted";
+          githubStatus.className = "github-import-status";
         }
         const state = githubRepoPickerState.get(panel);
         if (state) {
           state.selectedRepoId = "";
           state.filterText = "";
         }
+        renderGitHubRepoOptions(panel);
       });
     };
 
@@ -637,76 +583,108 @@
       return githubRepoPickerState.get(panel);
     };
 
-    const setGitHubRepoPickerStatus = (panel, message, isError = false) => {
+    const setGitHubRepoPickerStatus = (panel, message, tone = "muted") => {
       const status = panel.querySelector(".github-import-status");
       if (!status) return;
       status.textContent = message;
-      status.className = isError
-        ? "github-import-status text-danger"
-        : "github-import-status text-muted";
+      status.className = message ? `github-import-status is-${tone}` : "github-import-status";
     };
 
-    const formatGitHubRepoLabel = (repo) => {
-      const visibility = repo.private ? "Private" : "Public";
-      const flags = [visibility];
-      if (repo.fork) flags.push("Fork");
-      if (repo.archived) flags.push("Archived");
-      return `${repo.full_name || repo.name || "Repository"} • ${flags.join(" • ")}`;
+    const renderRepoListEmpty = (list, icon, message) => {
+      list.innerHTML =
+        `<div class="repo-list-empty"><i class="bi ${icon}"></i><span>${escapeHtml(message)}</span></div>`;
+    };
+
+    const buildRepoRow = (repo, isSelected) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = `repo-item${isSelected ? " is-selected" : ""}`;
+      row.dataset.repoId = String(repo.id);
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", isSelected ? "true" : "false");
+
+      const avatar = repo.owner_avatar
+        ? `<img class="repo-avatar" src="${escapeHtml(repo.owner_avatar)}" alt="" loading="lazy" />`
+        : `<span class="repo-avatar repo-avatar-fallback"><i class="bi bi-person"></i></span>`;
+
+      const meta = [];
+      if (repo.language) {
+        const dot = languageColors[repo.language] || "var(--lt-muted)";
+        meta.push(
+          `<span class="repo-meta-item"><span class="repo-lang-dot" style="background:${dot}"></span>${escapeHtml(repo.language)}</span>`
+        );
+      }
+      if (repo.stars) {
+        meta.push(`<span class="repo-meta-item"><i class="bi bi-star"></i>${repo.stars}</span>`);
+      }
+      const updated = relativeTime(repo.updated_at);
+      if (updated) {
+        meta.push(`<span class="repo-meta-item">Updated ${escapeHtml(updated)}</span>`);
+      }
+
+      const tags = [
+        `<span class="repo-tag ${repo.private ? "is-private" : "is-public"}">${repo.private ? "Private" : "Public"}</span>`,
+      ];
+      if (repo.fork) tags.push('<span class="repo-tag">Fork</span>');
+      if (repo.archived) tags.push('<span class="repo-tag is-archived">Archived</span>');
+
+      row.innerHTML = `
+        ${avatar}
+        <span class="repo-body">
+          <span class="repo-title-row">
+            <span class="repo-name">${escapeHtml(repo.full_name || repo.name || "Repository")}</span>
+            ${tags.join("")}
+          </span>
+          ${repo.description ? `<span class="repo-desc">${escapeHtml(repo.description)}</span>` : ""}
+          ${meta.length ? `<span class="repo-meta">${meta.join("")}</span>` : ""}
+        </span>
+        <i class="bi bi-check-circle-fill repo-check"></i>`;
+      return row;
     };
 
     const renderGitHubRepoOptions = (panel) => {
       const state = getGitHubRepoPickerState(panel);
-      const select = panel.querySelector(".github-repo-select");
-      if (!select) return;
+      const list = panel.querySelector(".repo-list");
+      if (!list) return;
 
       const filterText = (state.filterText || "").trim().toLowerCase();
       const selectedRepoId = state.selectedRepoId || "";
       const repositories = state.repositories || [];
-      const filteredRepositories = repositories.filter((repo) => {
+      const filtered = repositories.filter((repo) => {
         if (!filterText) return true;
-        const haystack = [
-          repo.full_name,
-          repo.name,
-          repo.description,
-          repo.private ? "private" : "public",
-        ].join(" ").toLowerCase();
-        return haystack.includes(filterText);
+        return [repo.full_name, repo.name, repo.description, repo.language,
+          repo.private ? "private" : "public"].join(" ").toLowerCase().includes(filterText);
       });
-
-      select.innerHTML = "";
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = repositories.length ? "Choose a repository" : "No repositories available";
-      select.appendChild(placeholder);
-
-      filteredRepositories.forEach((repo) => {
-        const option = document.createElement("option");
-        option.value = String(repo.id);
-        option.textContent = formatGitHubRepoLabel(repo);
-        select.appendChild(option);
-      });
-
-      const matchesSelection = filteredRepositories.some((repo) => String(repo.id) === selectedRepoId);
-      select.value = matchesSelection ? selectedRepoId : "";
-
-      const repoId = panel.querySelector(".github-repo-id");
-      if (repoId) {
-        repoId.value = matchesSelection ? selectedRepoId : "";
-      }
-
-      const importButton = panel.querySelector(".github-import-btn");
-      if (importButton) {
-        importButton.disabled = !matchesSelection;
-      }
 
       const helper = panel.querySelector(".github-repo-helper");
+      const importButton = panel.querySelector(".github-import-btn");
+      const repoIdInput = panel.querySelector(".github-repo-id");
+
+      if (!repositories.length) {
+        renderRepoListEmpty(list, "bi-github", "Connect GitHub to load your repositories.");
+      } else if (!filtered.length) {
+        renderRepoListEmpty(list, "bi-search", "No repositories match your search.");
+      } else {
+        list.innerHTML = "";
+        filtered.forEach((repo) => {
+          list.appendChild(buildRepoRow(repo, String(repo.id) === selectedRepoId));
+        });
+      }
+
+      const matches = filtered.some((repo) => String(repo.id) === selectedRepoId);
+      if (repoIdInput) repoIdInput.value = matches ? selectedRepoId : "";
+      if (importButton) importButton.disabled = !matches;
+
       if (helper) {
         if (!repositories.length) {
-          helper.textContent = "Connect GitHub to load repositories.";
+          helper.textContent = "Connect GitHub to load your repositories.";
+        } else if (matches) {
+          const selected = repositories.find((repo) => String(repo.id) === selectedRepoId);
+          helper.textContent = `${selected.full_name || selected.name} selected.`;
         } else if (filterText) {
-          helper.textContent = `${filteredRepositories.length} repository option${filteredRepositories.length === 1 ? "" : "s"} match your search.`;
+          helper.textContent = `${filtered.length} of ${repositories.length} repositories match.`;
         } else {
-          helper.textContent = "Select a repository from your connected GitHub account.";
+          helper.textContent = `${repositories.length} repositories available.`;
         }
       }
     };
@@ -714,7 +692,7 @@
     const loadGitHubRepositories = async (panel) => {
       const state = getGitHubRepoPickerState(panel);
       const searchInput = panel.querySelector(".github-repo-search");
-      const select = panel.querySelector(".github-repo-select");
+      const list = panel.querySelector(".repo-list");
       const importButton = panel.querySelector(".github-import-btn");
 
       if (state.loading || state.loaded) {
@@ -724,19 +702,16 @@
 
       state.loading = true;
       if (searchInput) searchInput.disabled = true;
-      if (select) {
-        select.disabled = true;
-        select.innerHTML = "<option value=\"\">Loading repositories...</option>";
-      }
       if (importButton) importButton.disabled = true;
-      setGitHubRepoPickerStatus(panel, "Loading repositories...");
+      if (list) {
+        list.innerHTML =
+          '<div class="repo-list-empty"><span class="spinner-border spinner-border-sm"></span><span>Loading repositories…</span></div>';
+      }
 
       try {
         const response = await fetch(githubRepositoriesUrl, {
           method: "GET",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-          },
+          headers: { "X-Requested-With": "XMLHttpRequest" },
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) {
@@ -748,22 +723,15 @@
         state.loading = false;
 
         if (searchInput) searchInput.disabled = false;
-        if (select) select.disabled = false;
         setGitHubRepoPickerStatus(panel, "");
         renderGitHubRepoOptions(panel);
       } catch (error) {
         state.loading = false;
         if (searchInput) searchInput.disabled = true;
-        if (select) {
-          select.disabled = true;
-          select.innerHTML = "<option value=\"\">Connect GitHub to load repositories</option>";
-        }
         if (importButton) importButton.disabled = true;
-        setGitHubRepoPickerStatus(panel, error.message || "Could not load repositories.", true);
+        if (list) renderRepoListEmpty(list, "bi-exclamation-triangle", error.message || "Could not load repositories.");
         const helper = panel.querySelector(".github-repo-helper");
-        if (helper) {
-          helper.textContent = "Connect your GitHub account to load private and public repositories.";
-        }
+        if (helper) helper.textContent = "Connect your GitHub account to load repositories.";
       }
     };
 
@@ -772,35 +740,31 @@
       panel.dataset.repoPickerReady = "true";
 
       const searchInput = panel.querySelector(".github-repo-search");
-      const select = panel.querySelector(".github-repo-select");
-      const repoId = panel.querySelector(".github-repo-id");
+      const list = panel.querySelector(".repo-list");
       const importButton = panel.querySelector(".github-import-btn");
 
       if (searchInput) {
         searchInput.addEventListener("input", () => {
+          getGitHubRepoPickerState(panel).filterText = searchInput.value || "";
+          renderGitHubRepoOptions(panel);
+        });
+        // The picker lives inside a <form>; Enter must filter, not submit.
+        searchInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") event.preventDefault();
+        });
+      }
+
+      if (list) {
+        list.addEventListener("click", (event) => {
+          const row = event.target.closest(".repo-item");
+          if (!row) return;
           const state = getGitHubRepoPickerState(panel);
-          state.filterText = searchInput.value || "";
+          state.selectedRepoId = row.dataset.repoId || "";
           renderGitHubRepoOptions(panel);
         });
       }
 
-      if (select) {
-        select.addEventListener("change", () => {
-          const state = getGitHubRepoPickerState(panel);
-          state.selectedRepoId = select.value || "";
-          if (repoId) repoId.value = state.selectedRepoId;
-          if (importButton) importButton.disabled = !state.selectedRepoId;
-          const helper = panel.querySelector(".github-repo-helper");
-          const selectedOption = select.selectedOptions && select.selectedOptions[0];
-          if (helper && selectedOption && select.value) {
-            helper.textContent = selectedOption.textContent || "Repository selected.";
-          }
-        });
-      }
-
-      if (importButton) {
-        importButton.disabled = true;
-      }
+      if (importButton) importButton.disabled = true;
     };
 
     const setupStackOverflowPanels = () => {
@@ -900,107 +864,61 @@
 
     setupStackOverflowPanels();
 
-    const applyImportedStack = (builderId, payload, status, prefix) => {
+    // Import overwrites the form's details, per product decision, so that a
+    // re-import in Edit Project always reflects the current repository.
+    const applyRepoPrefill = (panel, payload) => {
+      const modal = panel.closest(".modal");
+      if (!modal) return [];
+
+      const filled = [];
+      const assign = (selector, value, label) => {
+        const field = modal.querySelector(selector);
+        if (!field || !value) return;
+        field.value = value;
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.classList.add("field-autofilled");
+        window.setTimeout(() => field.classList.remove("field-autofilled"), 1200);
+        filled.push(label);
+      };
+
+      assign('input[name="project_name"]', payload.project_name, "name");
+      assign('input[name="developer_names"]', payload.developer_names, "developers");
+      assign('textarea[name="developer_emails"]', payload.developer_emails, "email");
+      return filled;
+    };
+
+    const applyImportedStack = (builderId, payload) => {
       if (window.LibTrackStack) {
         window.LibTrackStack.setRows(builderId, payload.components || []);
-      }
-
-      const warningCount = (payload.warnings || []).length;
-      const fileText = payload.files && payload.files.length ? ` from ${payload.files.join(", ")}` : "";
-      if (status) {
-        status.textContent = `${prefix} ${(payload.components || []).length} dependencies${fileText}${warningCount ? `, ${warningCount} skipped` : ""}.`;
-        status.className = status.className.replace("text-muted", "").replace("text-danger", "") + " text-success";
       }
     };
 
     document.querySelectorAll(".manifest-import").forEach((panel) => {
       setupGitHubRepoPicker(panel);
-      const button = panel.querySelector(".manifest-import-btn");
       const githubButton = panel.querySelector(".github-import-btn");
-      const uploadInput = panel.querySelector(".manifest-file");
-      const typeSelect = panel.querySelector(".manifest-type");
+      if (!githubButton) return;
 
-      if (uploadInput && typeSelect) {
-        uploadInput.addEventListener("change", function () {
-          const file = uploadInput.files && uploadInput.files[0];
-          const detectedType = detectManifestType(file ? file.name : "");
-          if (detectedType) {
-            typeSelect.value = detectedType;
-          }
-        });
-      }
-
-      if (githubButton) {
-        githubButton.addEventListener("click", async function () {
-          const repoIdInput = panel.querySelector(".github-repo-id");
-          const status = panel.querySelector(".github-import-status");
-          const builderId = panel.dataset.targetBuilder;
-          const repoId = repoIdInput ? repoIdInput.value : "";
-
-          if (status) {
-            status.textContent = "Importing repository...";
-            status.className = "github-import-status text-muted";
-          }
-          if (!repoId) {
-            if (status) {
-              status.textContent = "Select a repository from your connected GitHub account.";
-              status.className = "github-import-status text-danger";
-            }
-            return;
-          }
-          githubButton.disabled = true;
-
-          try {
-            const formData = new FormData();
-            formData.append("repo_id", repoId);
-
-            const response = await fetch(importGithubUrl, {
-              method: "POST",
-              headers: {
-                "X-CSRFToken": getCookie("csrftoken"),
-                "X-Requested-With": "XMLHttpRequest",
-              },
-              body: formData,
-            });
-            const payload = await response.json();
-            if (!response.ok || !payload.ok) {
-              throw new Error(payload.error || "Could not import repository.");
-            }
-
-            applyImportedStack(builderId, payload, status, "Imported");
-          } catch (error) {
-            if (status) {
-              status.textContent = error.message || "Import failed.";
-              status.className = "github-import-status text-danger";
-            }
-          } finally {
-            githubButton.disabled = false;
-          }
-        });
-      }
-
-      if (!button) return;
-      button.addEventListener("click", async function () {
-        const typeInput = panel.querySelector(".manifest-type");
-        const contentInput = panel.querySelector(".manifest-content");
-        const fileInput = panel.querySelector(".manifest-file");
-        const status = panel.querySelector(".manifest-import-status");
+      githubButton.addEventListener("click", async function () {
+        const repoIdInput = panel.querySelector(".github-repo-id");
         const builderId = panel.dataset.targetBuilder;
+        const repoId = repoIdInput ? repoIdInput.value : "";
 
-        if (status) {
-          status.textContent = "Parsing...";
-          status.className = "manifest-import-status text-muted";
+        if (!repoId) {
+          setGitHubRepoPickerStatus(panel, "Select a repository first.", "error");
+          return;
         }
-        button.disabled = true;
+
+        const originalLabel = githubButton.innerHTML;
+        githubButton.disabled = true;
+        githubButton.innerHTML =
+          '<span class="spinner-border spinner-border-sm me-1"></span>Importing…';
+        setGitHubRepoPickerStatus(panel, "Reading repository…");
 
         try {
-          const fileContent = await readSelectedFile(fileInput);
-          const manifestContent = fileContent || (contentInput ? contentInput.value : "");
           const formData = new FormData();
-          formData.append("manifest_type", typeInput ? typeInput.value : "package_json");
-          formData.append("manifest_content", manifestContent);
+          formData.append("repo_id", repoId);
 
-          const response = await fetch(parseManifestUrl, {
+          const response = await fetch(importGithubUrl, {
             method: "POST",
             headers: {
               "X-CSRFToken": getCookie("csrftoken"),
@@ -1009,18 +927,31 @@
             body: formData,
           });
           const payload = await response.json();
+
+          // Repo details are returned even when no manifest was found, so the
+          // form is still prefilled before any error is surfaced.
+          const filled = applyRepoPrefill(panel, payload);
+
           if (!response.ok || !payload.ok) {
-            throw new Error(payload.error || "Could not parse manifest.");
+            const detail = filled.length ? " Project details were still filled in." : "";
+            throw new Error((payload.error || "Could not import repository.") + detail);
           }
 
-          applyImportedStack(builderId, payload, status, "Imported");
+          applyImportedStack(builderId, payload);
+
+          const count = (payload.components || []).length;
+          const skipped = (payload.warnings || []).length;
+          const files = payload.files && payload.files.length ? ` from ${payload.files.join(", ")}` : "";
+          setGitHubRepoPickerStatus(
+            panel,
+            `Imported ${count} ${count === 1 ? "dependency" : "dependencies"}${files}${skipped ? `, ${skipped} skipped` : ""}.`,
+            "success"
+          );
         } catch (error) {
-          if (status) {
-            status.textContent = error.message || "Import failed.";
-            status.className = "manifest-import-status text-danger";
-          }
+          setGitHubRepoPickerStatus(panel, error.message || "Import failed.", "error");
         } finally {
-          button.disabled = false;
+          githubButton.disabled = false;
+          githubButton.innerHTML = originalLabel;
         }
       });
     });

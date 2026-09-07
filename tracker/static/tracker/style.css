@@ -1194,3 +1194,266 @@ select.form-select option {
   .section-title { font-size: 18px; }
   .card-body   { padding: 16px; }
 }
+
+/* ============================================================
+   GitHub repository picker (Add / Edit Project modals)
+   ============================================================ */
+
+.repo-import {
+  border: 1px solid var(--lt-border);
+  border-radius: 12px;
+  background: var(--lt-surface-2);
+  overflow: hidden;
+}
+
+.repo-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--lt-border);
+  background: var(--lt-surface);
+}
+
+.repo-import-title {
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  min-width: 0;
+}
+
+.repo-import-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  background: var(--lt-surface-3);
+  color: var(--lt-heading);
+  font-size: 1rem;
+}
+
+.repo-import-label {
+  display: block;
+  font-weight: 600;
+  color: var(--lt-heading);
+  line-height: 1.2;
+}
+
+.repo-import-sub {
+  display: block;
+  color: var(--lt-muted);
+  font-size: .78rem;
+  line-height: 1.3;
+}
+
+/* ---- search ---- */
+.repo-search {
+  position: relative;
+  padding: .75rem 1rem .5rem;
+}
+
+.repo-search-icon {
+  position: absolute;
+  left: 1.75rem;
+  top: 50%;
+  transform: translateY(-25%);
+  color: var(--lt-muted);
+  font-size: .85rem;
+  pointer-events: none;
+}
+
+.repo-search .github-repo-search {
+  padding-left: 2.25rem;
+  font-size: .875rem;
+}
+
+/* ---- list ---- */
+.repo-list {
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 0 .5rem .5rem;
+  scrollbar-width: thin;
+}
+
+.repo-list:focus-visible {
+  outline: 2px solid var(--lt-blue);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.repo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  width: 100%;
+  padding: .625rem .75rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+  color: var(--lt-text);
+  transition: background-color .12s ease, border-color .12s ease;
+}
+
+.repo-item + .repo-item { margin-top: 2px; }
+.repo-item:hover { background: var(--lt-nav-hover-bg); }
+
+.repo-item.is-selected {
+  background: rgba(88, 166, 255, .12);
+  border-color: var(--lt-blue);
+}
+
+.repo-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 6px;
+  object-fit: cover;
+  margin-top: 2px;
+}
+
+.repo-avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--lt-surface-3);
+  color: var(--lt-muted);
+}
+
+.repo-body {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: .175rem;
+}
+
+.repo-title-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.repo-name {
+  font-weight: 600;
+  font-size: .875rem;
+  color: var(--lt-heading);
+  overflow-wrap: anywhere;
+}
+
+.repo-desc {
+  font-size: .8rem;
+  color: var(--lt-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.repo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  font-size: .75rem;
+  color: var(--lt-muted);
+}
+
+.repo-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+}
+
+.repo-lang-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.repo-tag {
+  font-size: .68rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: .2rem .45rem;
+  border-radius: 999px;
+  border: 1px solid var(--lt-border);
+  color: var(--lt-muted);
+  white-space: nowrap;
+}
+
+.repo-tag.is-private { border-color: var(--lt-orange); color: var(--lt-orange); }
+.repo-tag.is-public  { border-color: var(--lt-border);  color: var(--lt-muted); }
+.repo-tag.is-archived{ border-color: var(--lt-red);     color: var(--lt-red); }
+
+.repo-check {
+  margin-top: 4px;
+  color: var(--lt-blue);
+  opacity: 0;
+  transition: opacity .12s ease;
+  flex: 0 0 auto;
+}
+
+.repo-item.is-selected .repo-check { opacity: 1; }
+
+.repo-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: 2rem 1rem;
+  color: var(--lt-muted);
+  font-size: .85rem;
+  text-align: center;
+}
+
+.repo-list-empty i { font-size: 1.1rem; }
+
+/* ---- footer ---- */
+.repo-import-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .625rem 1rem;
+  border-top: 1px solid var(--lt-border);
+  background: var(--lt-surface);
+}
+
+.github-repo-helper {
+  color: var(--lt-muted);
+  font-size: .8rem;
+  min-width: 0;
+}
+
+.github-import-status:not(:empty) {
+  padding: .5rem 1rem .75rem;
+  font-size: .8rem;
+  background: var(--lt-surface);
+}
+
+.github-import-status.is-muted   { color: var(--lt-muted); }
+.github-import-status.is-success { color: var(--lt-green-h); }
+.github-import-status.is-error   { color: var(--lt-red); }
+
+/* Brief highlight so it is obvious which fields the import filled in. */
+@keyframes lt-autofill-flash {
+  from { background-color: rgba(88, 166, 255, .18); }
+  to   { background-color: transparent; }
+}
+
+.field-autofilled {
+  animation: lt-autofill-flash 1.2s ease-out;
+  border-color: var(--lt-blue) !important;
+}
+
+@media (max-width: 575.98px) {
+  .repo-import-foot { flex-direction: column; align-items: stretch; }
+  .repo-import-foot .github-import-btn { width: 100%; }
+  .repo-list { max-height: 220px; }
+}

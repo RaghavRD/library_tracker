@@ -31,7 +31,6 @@ from tracker.forms import LoginForm, RegistrationForm
 from tracker.services.github_account_service import GitHubAccountService
 from tracker.services.dashboard_metrics_service import DashboardMetricsService
 from tracker.services.github_repo_import_service import GitHubRepoImportService
-from tracker.services.manifest_parser_service import ManifestParserService
 from tracker.services.project_service import ProjectService
 
 logger = logging.getLogger("libtrack")
@@ -405,40 +404,6 @@ def projects_view(request):
 
 @login_required
 @require_POST
-def parse_manifest(request):
-    manifest_type = request.POST.get("manifest_type", "")
-    content = request.POST.get("manifest_content", "")
-
-    uploaded = request.FILES.get("manifest_file")
-    if uploaded:
-        try:
-            content = uploaded.read().decode("utf-8")
-        except UnicodeDecodeError:
-            return JsonResponse(
-                {
-                    "ok": False,
-                    "components": [],
-                    "warnings": [],
-                    "error": "Uploaded manifest must be UTF-8 text.",
-                },
-                status=400,
-            )
-
-    result = ManifestParserService.parse(manifest_type, content)
-    ok = not result.get("error")
-    return JsonResponse(
-        {
-            "ok": ok,
-            "components": result.get("components", []),
-            "warnings": result.get("warnings", []),
-            "error": result.get("error", ""),
-        },
-        status=200 if ok else 400,
-    )
-
-
-@login_required
-@require_POST
 def import_github_repo(request):
     repo_id = request.POST.get("repo_id", "")
     account_service = GitHubAccountService()
@@ -461,6 +426,15 @@ def import_github_repo(request):
     token = account_service.get_access_token(request.user)
     result = GitHubRepoImportService(token=token).import_repository(repository.get("html_url", ""))
     ok = not result.get("error")
+
+    # Prefill values for the Add/Edit Project form. Contributor emails are not
+    # exposed by the GitHub API, so the connected account's own address is used.
+    project_name = result.get("project_name") or repository.get("name", "")
+    contributors = result.get("contributors") or []
+    developer_names = ", ".join(contributors)
+    if not developer_names:
+        developer_names = repository.get("owner_login", "")
+
     return JsonResponse(
         {
             "ok": ok,
@@ -469,6 +443,9 @@ def import_github_repo(request):
             "files": result.get("files", []),
             "repository": result.get("repository", ""),
             "default_branch": result.get("default_branch", ""),
+            "project_name": project_name,
+            "developer_names": developer_names,
+            "developer_emails": account_service.get_account_email(request.user),
             "error": result.get("error", ""),
         },
         status=200 if ok else 400,
