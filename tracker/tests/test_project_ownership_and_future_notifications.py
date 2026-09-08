@@ -65,16 +65,13 @@ def test_manual_daily_check_button_creates_owner_scoped_run(client):
         developer_emails="other@example.com",
     )
 
-    class FakeThread:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-        def start(self):
-            return None
+    def mark_run_success(*args, **kwargs):
+        run = DailyCheckRun.objects.get(pk=kwargs["manual_run_id"])
+        run.status = "success"
+        run.save(update_fields=["status", "updated_at"])
 
     client.force_login(user)
-    with patch("tracker.views.threading.Thread", FakeThread):
+    with patch("tracker.views.call_command", side_effect=mark_run_success) as command:
         response = client.post(reverse("run_daily_check_now"), {"scope": "owner"})
 
     run = DailyCheckRun.objects.get()
@@ -82,7 +79,9 @@ def test_manual_daily_check_button_creates_owner_scoped_run(client):
     assert run.triggered_by == user
     assert run.scope_owner == user
     assert run.scope == "owner"
-    assert run.status == "queued"
+    # The run is executed inline, so it is already finished by the redirect.
+    assert run.status == "success"
+    assert command.call_args.kwargs["owner_id"] == user.id
 
 
 @pytest.mark.django_db
@@ -102,16 +101,9 @@ def test_manual_daily_check_blocks_active_run(client):
     assert DailyCheckRun.objects.count() == 1
 
 
-@pytest.mark.django_db
-def test_manual_daily_check_is_disabled_on_vercel(client):
-    user = User.objects.create_user(username="vercel-owner", password="pass12345")
-    client.force_login(user)
-
-    with override_settings(IS_VERCEL=True):
-        response = client.post(reverse("run_daily_check_now"), {"scope": "owner"})
-
-    assert response.status_code == 302
-    assert DailyCheckRun.objects.count() == 0
+# Manual checks used to be refused on Vercel because they ran in a background
+# thread that serverless killed. They now run inline; see
+# test_manual_check_mode.test_manual_check_runs_on_vercel.
 
 
 @pytest.mark.django_db

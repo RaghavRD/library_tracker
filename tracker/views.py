@@ -1,6 +1,5 @@
 import logging
 import os
-import threading
 import hmac
 from datetime import timedelta
 from collections import defaultdict
@@ -14,7 +13,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.management import call_command
-from django.db import close_old_connections
+from django.template.defaultfilters import pluralize
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -26,6 +25,7 @@ from tracker.models import (
     StackComponent,
     UpdateCache,
     UpdateEvent,
+    UserPreference,
 )
 from tracker.forms import LoginForm, RegistrationForm
 from tracker.services.github_account_service import GitHubAccountService
@@ -129,24 +129,23 @@ def dashboard(request):
     else:
         recent_runs = recent_runs_qs.filter(scope_owner=request.user).order_by("-created_at")[:5]
 
-    active_manual_run = DailyCheckRun.objects.filter(
-        scope_owner=request.user,
-        status__in=active_statuses,
-    ).order_by("-created_at").first()
-    latest_manual_run = DailyCheckRun.objects.filter(scope_owner=request.user).order_by("-created_at").first()
     cooldown_since = timezone.now() - timedelta(minutes=15)
     cooldown_run = DailyCheckRun.objects.filter(
         scope_owner=request.user,
         created_at__gte=cooldown_since,
     ).exclude(status__in=active_statuses).order_by("-created_at").first()
+
+    # The outcome of a run is delivered once, as a message, by run_daily_check_now.
+    # Nothing about the last run is rendered from the database here: doing that
+    # re-showed the same banner on every later visit to the dashboard.
+    preference = UserPreference.for_user(request.user)
     context.update(
         {
             "recent_daily_check_runs": recent_runs,
-            "active_manual_run": active_manual_run,
-            "latest_manual_run": latest_manual_run,
             "manual_run_cooldown_active": bool(cooldown_run),
             "manual_run_cooldown_minutes": 15,
-            "manual_daily_check_enabled": not getattr(settings, "IS_VERCEL", False),
+            "needs_check_mode_choice": not preference.has_chosen_check_mode,
+            "check_mode": preference.check_mode,
             "email_test_mode": os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"},
         }
     )
@@ -160,10 +159,6 @@ def run_daily_check_now(request):
     Trigger an owner-scoped manual daily check from the dashboard.
     Admin users may explicitly request a global run.
     """
-    if getattr(settings, "IS_VERCEL", False):
-        messages.info(request, "Manual checks are unavailable in production. The scheduled daily check runs automatically.")
-        return redirect("dashboard")
-
     DailyCheckRun.reap_stale()
     active_statuses = DailyCheckRun.ACTIVE_STATUSES
     requested_scope = request.POST.get("scope", "owner")
@@ -190,24 +185,73 @@ def run_daily_check_now(request):
         messages.warning(request, "Manual checks are limited to one run every 15 minutes.")
         return redirect("dashboard")
 
+    preference = UserPreference.for_user(request.user)
+    submitted_mode = request.POST.get("check_mode", "").strip()
+    if submitted_mode in dict(UserPreference.CHECK_MODE_CHOICES):
+        # First run, or a mode chosen from the prompt: remember it.
+        preference.check_mode = submitted_mode
+        preference.save(update_fields=["check_mode", "updated_at"])
+    elif not preference.has_chosen_check_mode:
+        # The prompt is client side, so a post can still arrive without a
+        # choice. Run in the cheaper mode rather than failing, and leave the
+        # preference unset so the user is asked again next time.
+        pass
+
     run = DailyCheckRun.objects.create(
         triggered_by=request.user,
         scope="global" if is_global else "owner",
         scope_owner=scope_owner,
         status="queued",
     )
-    thread = threading.Thread(
-        target=_run_daily_check_background,
-        args=(run.id, request.user.id if not is_global else None, is_global),
-        daemon=True,
-    )
-    thread.start()
 
+    # Run inline rather than in a thread. Serverless hosts freeze the instance
+    # once the response is returned, which killed the old background thread
+    # mid-run; the scheduled cron endpoint has always run inline for that
+    # reason. A full check now finishes well inside the function time limit.
+    command_kwargs = {
+        "manual_run_id": run.id,
+        "force": preference.force_check,
+        "budget_seconds": getattr(settings, "LIBTRACK_RUN_BUDGET_SECONDS", 0),
+    }
     if is_global:
-        messages.success(request, "Global check started. Status will update in Recent Runs.")
+        command_kwargs["global_run"] = True
     else:
-        messages.success(request, "Check started for your projects. Status will update in Recent Runs.")
+        command_kwargs["owner_id"] = request.user.id
+
+    try:
+        call_command("run_daily_check", **command_kwargs)
+    except Exception as exc:
+        logger.exception("Manual daily check crashed")
+        run.status = "failed"
+        run.finished_at = timezone.now()
+        run.error_message = str(exc)
+        run.save(update_fields=["status", "finished_at", "error_message", "updated_at"])
+
+    run.refresh_from_db()
+    _message_for_run(request, run)
     return redirect("dashboard")
+
+
+def _message_for_run(request, run: DailyCheckRun):
+    """Report a finished run once, as a flash message."""
+    scope_label = "Global check" if run.scope == "global" else "Check"
+    if run.status == "success":
+        messages.success(
+            request,
+            f"{scope_label} completed in {run.duration_label}. "
+            f"{run.projects_scanned} project{pluralize(run.projects_scanned)} scanned, "
+            f"{run.libraries_checked} librar{'y' if run.libraries_checked == 1 else 'ies'} checked, "
+            f"{run.emails_sent} email{pluralize(run.emails_sent)} sent.",
+        )
+    elif run.status == "partial":
+        messages.warning(
+            request,
+            f"{scope_label} ran out of time after {run.duration_label} and saved partial results. "
+            "The scheduled run will pick up the rest.",
+        )
+    else:
+        detail = f": {run.error_message}" if run.error_message else "."
+        messages.error(request, f"{scope_label} failed{detail}")
 
 
 @login_required
@@ -242,19 +286,6 @@ def run_daily_check_status(request):
             "error_message": run.error_message,
         }
     )
-
-
-def _run_daily_check_background(run_id: int, owner_id: int | None, is_global: bool):
-    close_old_connections()
-    try:
-        command_kwargs = {"manual_run_id": run_id}
-        if is_global:
-            command_kwargs["global_run"] = True
-        else:
-            command_kwargs["owner_id"] = owner_id
-        call_command("run_daily_check", **command_kwargs)
-    finally:
-        close_old_connections()
 
 
 @require_GET
@@ -679,7 +710,18 @@ def settings_view(request):
     Allows users to toggle notify_paused and set min_confidence_threshold.
     """
     projects = _user_projects_queryset(request).order_by('project_name')
-    
+    preference = UserPreference.for_user(request.user)
+
+    if request.method == 'POST' and request.POST.get('form') == 'check_mode':
+        submitted_mode = request.POST.get('check_mode', '').strip()
+        if submitted_mode not in dict(UserPreference.CHECK_MODE_CHOICES):
+            messages.error(request, 'Pick either a thorough or a quick check.')
+            return redirect('settings')
+        preference.check_mode = submitted_mode
+        preference.save(update_fields=['check_mode', 'updated_at'])
+        messages.success(request, f'Check depth set to {preference.get_check_mode_display().lower()}.')
+        return redirect('settings')
+
     if request.method == 'POST':
         try:
             for project in projects:
@@ -714,4 +756,5 @@ def settings_view(request):
     
     return render(request, 'tracker/settings.html', {
         'projects': projects,
+        'check_mode': preference.check_mode,
     })

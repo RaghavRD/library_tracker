@@ -290,6 +290,59 @@ class DashboardSnapshot(TimeStampedModel):
         return f"{self.owner} dashboard snapshot for {self.scan_date}"
 
 
+class UserPreference(TimeStampedModel):
+    """Per-user settings that are not tied to any single project."""
+
+    THOROUGH = "thorough"
+    QUICK = "quick"
+    CHECK_MODE_CHOICES = [
+        (THOROUGH, "Thorough check"),
+        (QUICK, "Quick check"),
+    ]
+    # Used when a run happens without a stored choice - a form posted with
+    # JavaScript disabled, say. The cheaper mode is the safer default.
+    DEFAULT_CHECK_MODE = QUICK
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preferences",
+    )
+    # Blank means the user has never been asked, which is what triggers the
+    # first-run prompt. Do not give this a non-blank default: that would silently
+    # answer the question on the user's behalf.
+    check_mode = models.CharField(
+        max_length=10,
+        choices=CHECK_MODE_CHOICES,
+        blank=True,
+        default="",
+        help_text="How thorough a manual update check should be.",
+    )
+
+    class Meta:
+        verbose_name = "User Preference"
+        verbose_name_plural = "User Preferences"
+
+    def __str__(self):
+        return f"Preferences for {self.user}"
+
+    @classmethod
+    def for_user(cls, user) -> "UserPreference":
+        """Return this user's preferences, creating an empty row on first use."""
+        preference, _ = cls.objects.get_or_create(user=user)
+        return preference
+
+    @property
+    def has_chosen_check_mode(self) -> bool:
+        """False until the user picks a mode, which is when we prompt them."""
+        return self.check_mode in {self.THOROUGH, self.QUICK}
+
+    @property
+    def force_check(self) -> bool:
+        """Whether a manual run should ignore the freshness window."""
+        return self.check_mode == self.THOROUGH
+
+
 class DailyCheckRun(TimeStampedModel):
     """Audit trail for scheduled and manual dependency check runs."""
 
