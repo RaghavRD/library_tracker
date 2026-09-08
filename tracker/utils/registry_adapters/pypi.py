@@ -43,7 +43,7 @@ class PyPIRegistry(PackageRegistry):
         self._log_debug(f"Fetching from {url}")
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             response.raise_for_status()
             data = response.json()
             
@@ -112,7 +112,7 @@ class PyPIRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/{package_name}/json"
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             if response.status_code == 404:
                 return []
             
@@ -157,7 +157,7 @@ class PyPIRegistry(PackageRegistry):
         """Get source repository URL from PyPI metadata."""
         url = f"{self.BASE_URL}/{package_name}/json"
         try:
-            resp = requests.get(url, timeout=self.timeout)
+            resp = self.get(url)
             if resp.status_code != 200: return None
             
             info = resp.json().get("info", {})
@@ -195,7 +195,7 @@ class PyPIRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/{package_name}/json"
         
         try:
-            response = requests.head(url, timeout=self.timeout)
+            response = self.head(url)
             return response.status_code == 200
         except:
             return False

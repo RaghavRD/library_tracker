@@ -69,6 +69,11 @@ class Command(BaseCommand):
       - MAILTRAP_FROM_EMAIL (env): Sender email address
     """
 
+    # Defaults so run_daily_check() is callable without going through handle().
+    force = False
+    deadline = None
+    budget_seconds = 0.0
+
     def add_arguments(self, parser):
         """Add command-line arguments."""
         parser.add_argument(
@@ -89,6 +94,11 @@ class Command(BaseCommand):
             help="DailyCheckRun id to update while this command executes.",
         )
         parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Check every library, ignoring the freshness window.",
+        )
+        parser.add_argument(
             "--budget-seconds",
             dest="budget_seconds",
             type=float,
@@ -104,6 +114,7 @@ class Command(BaseCommand):
         """Run one complete daily check for the requested scope."""
         owner = self._resolve_scope_owner(options)
         self.daily_check_run = self._resolve_daily_check_run(options.get("manual_run_id"))
+        self.force = bool(options.get("force"))
         self._start_budget(options.get("budget_seconds"))
         self.run_daily_check(owner=owner)
 
@@ -236,7 +247,12 @@ class Command(BaseCommand):
             use_official_apis=use_official_apis,
             debug=False
         )
-        return service.fetch_all_libraries(stdout_writer=self.stdout.write, owner=self.scope_owner)
+        return service.fetch_all_libraries(
+            stdout_writer=self.stdout.write,
+            owner=self.scope_owner,
+            force=self.force,
+            deadline=self.deadline,
+        )
 
     # ===== STEP 3: Future Version Detection =====
 
@@ -247,26 +263,23 @@ class Command(BaseCommand):
         from tracker.models import Library
         
         service = FutureUpdateService()
-        
+
         # Get all active libraries
         libraries = Library.objects.filter(linked_components__isnull=False)
         if self.scope_owner is not None:
             libraries = libraries.filter(linked_components__project__owner=self.scope_owner)
         libraries = libraries.distinct()
-        
-        for library in libraries:
-            payload = service.check_future_versions(library, stdout_writer=self.stdout.write)
-            
-            # Buffer future updates for notification step
-            if payload and payload.get("category") == "future":
-                service.fresh_future_updates[library.name] = payload
-        
+
+        summary = service.check_all_libraries(
+            libraries,
+            stdout_writer=self.stdout.write,
+            deadline=self.deadline,
+            force=self.force,
+        )
+
         # Share buffer with notification service (will use in step 4)
         self.fresh_future_updates = service.fresh_future_updates
-        return {
-            "libraries_checked": libraries.count(),
-            "future_updates_found": len(service.fresh_future_updates),
-        }
+        return summary
 
     # ===== STEP 4: Security Vulnerability Scan =====
 

@@ -61,7 +61,7 @@ class MavenRegistry(PackageRegistry):
         self._log_debug(f"Fetching from {self.BASE_URL} with query: {params['q']}")
         
         try:
-            response = requests.get(self.BASE_URL, params=params, headers=headers, timeout=self.timeout)
+            response = self.get(self.BASE_URL, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
             
@@ -141,7 +141,7 @@ class MavenRegistry(PackageRegistry):
         headers = {"User-Agent": "LibTrack-AI-Test/1.0"}
         
         try:
-            response = requests.get(self.BASE_URL, params=params, headers=headers, timeout=self.timeout)
+            response = self.get(self.BASE_URL, params=params, headers=headers)
             if response.status_code != 200: return []
             
             docs = response.json().get("response", {}).get("docs", [])
@@ -200,7 +200,7 @@ class MavenRegistry(PackageRegistry):
         }
         
         try:
-            response = requests.get(self.BASE_URL, params=params, timeout=self.timeout)
+            response = self.get(self.BASE_URL, params=params)
             response.raise_for_status()
             data = response.json()
             

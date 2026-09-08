@@ -14,8 +14,11 @@ Workflow:
 
 import logging
 import time
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
 from packaging import version as pkg_version
 from packaging.version import InvalidVersion
 
@@ -57,38 +60,43 @@ class VersionFetchService:
             self.groq = GroqAnalyzer()
             self.serper = SerperFetcher()
 
-    def fetch_all_libraries(self, stdout_writer=None, owner=None):
+    def fetch_all_libraries(self, stdout_writer=None, owner=None, force=False, deadline=None):
         """
         Fetch updates for all unique libraries.
 
         Args:
             stdout_writer: Optional callable to write status updates
+            owner: Restrict to libraries used by this owner's projects
+            force: Check every library, ignoring the freshness window
+            deadline: Optional time.monotonic() value to stop working at
 
         Returns:
             dict: Summary with counts of updated, skipped, and errored libraries
         """
         self._log(stdout_writer, "Starting version fetch for all libraries...")
 
-        # Get all libraries that are actively used (linked to at least one component)
-        libraries = Library.objects.filter(linked_components__isnull=False)
-        if owner is not None:
-            libraries = libraries.filter(linked_components__project__owner=owner)
-        libraries = libraries.distinct()
-        count = libraries.count()
-        self._log(stdout_writer, f"Fetching {count} unique libraries...")
+        libraries, total, skipped_fresh = self._libraries_to_check(owner=owner, force=force)
+        if skipped_fresh:
+            self._log(
+                stdout_writer,
+                f"Skipping {skipped_fresh} of {total} libraries checked within the freshness window.",
+            )
+        self._log(stdout_writer, f"Fetching {len(libraries)} unique libraries...")
 
-        for library in libraries:
-            self._fetch_library(library, stdout_writer)
-            # Rate limiting between requests (configurable)
-            rate_limit = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
-            time.sleep(rate_limit)
+        if self.use_official_apis and self.helper:
+            unchecked = self._fetch_concurrently(libraries, stdout_writer, deadline)
+        else:
+            unchecked = self._fetch_sequentially(libraries, stdout_writer, deadline)
 
         summary = {
-            "checked_count": count,
+            "checked_count": len(libraries) - unchecked,
             "updated_count": self.updated_count,
             "skipped_count": self.skipped_count,
             "error_count": self.error_count,
+            "skipped_fresh_count": skipped_fresh,
         }
+        if unchecked:
+            summary["unchecked_count"] = unchecked
         self._log(
             stdout_writer,
             f"✅ Fetch complete: {self.updated_count} updated, "
@@ -96,57 +104,135 @@ class VersionFetchService:
         )
         return summary
 
-    def _fetch_library(self, library: Library, stdout_writer=None):
+    def _libraries_to_check(self, owner=None, force=False):
         """
-        Fetch version info for a single library.
+        Return (libraries, total, skipped_fresh) for this run.
 
-        Args:
-            library: Library instance to update
-            stdout_writer: Optional callable for logging
+        Libraries checked recently are skipped: most do not ship daily, so
+        re-querying the whole catalog every night is almost entirely wasted work.
         """
+        queryset = Library.objects.filter(linked_components__isnull=False)
+        if owner is not None:
+            queryset = queryset.filter(linked_components__project__owner=owner)
+        queryset = queryset.distinct()
+
+        total = queryset.count()
+        freshness_hours = getattr(settings, "LIBTRACK_FRESHNESS_HOURS", 0)
+        if not force and freshness_hours > 0:
+            cutoff = timezone.now() - timedelta(hours=freshness_hours)
+            queryset = queryset.filter(
+                Q(last_checked_at__isnull=True) | Q(last_checked_at__lt=cutoff)
+            )
+
+        libraries = list(queryset)
+        return libraries, total, total - len(libraries)
+
+    def _fetch_concurrently(self, libraries, stdout_writer=None, deadline=None) -> int:
+        """
+        Fetch versions for the official-API path.
+
+        Detection runs in a thread pool because it is almost entirely network
+        wait; the results are then persisted serially on this thread, so no
+        worker ever touches the ORM. Returns the number of libraries left
+        unchecked because the deadline passed.
+        """
+        # Registry inference writes to the database, so resolve it up front.
+        for library in libraries:
+            if not library.registry_type:
+                library.registry_type = self._infer_registry_type(library)
+                library.save(update_fields=["registry_type"])
+
+        max_workers = getattr(settings, "LIBTRACK_FETCH_MAX_WORKERS", 8)
+        workers = max(1, min(max_workers, len(libraries))) if libraries else 1
+
+        def detect(library):
+            return self.helper.detect(
+                name=library.name,
+                component_type=library.component_type,
+                current_version=library.latest_version,
+                registry_hint=library.registry_type,
+            )
+
+        unchecked = 0
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(detect, library): library for library in libraries}
+            for future, library in futures.items():
+                if deadline is not None and time.monotonic() >= deadline:
+                    future.cancel()
+                    unchecked += 1
+                    continue
+                self._persist_detection(future, library, stdout_writer)
+
+        if unchecked:
+            self._log(stdout_writer, f"⏱️  Stopped at deadline with {unchecked} librar(ies) unchecked.")
+        return unchecked
+
+    def _persist_detection(self, future, library: Library, stdout_writer=None):
+        """Apply one detection result. Runs on the main thread only."""
         self._log(
             stdout_writer,
             f"Checking {library.name} (current: v{library.latest_version or 'unknown'})...",
         )
-
-        # Infer registry type if not set
-        if not library.registry_type:
-            library.registry_type = self._infer_registry_type(library)
-            library.save(update_fields=["registry_type"])
-
         try:
-            # Try official API first
-            if self.use_official_apis and self.helper:
-                result = self.helper.update_library(
-                    library, stdout_writer=stdout_writer
-                )
-                if result:
-                    log_detection = getattr(settings, "LIBTRACK_LOG_DETECTION_METHOD", True)
-                    if log_detection:
-                        logger.info(
-                            f"Version detected for {library.name}: v{library.latest_version}, "
-                            f"detection_method=registry_api, registry_type={library.registry_type}"
-                        )
-                    self.updated_count += 1
-                else:
-                    self._log(stdout_writer, "ℹ️  No updates found")
-                    self.skipped_count += 1
-                fallback_rate = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
-                time.sleep(fallback_rate)
-                return
-
+            version_info = future.result()
         except Exception as e:
+            self._log(stdout_writer, f"❌ Official API error for {library.name}: {e}")
+            logger.error(f"Official API error for {library.name}: {e}", exc_info=True)
+            self.helper.record_failure(library, e)
+            self.error_count += 1
+            return
+
+        if not version_info:
+            self._log(stdout_writer, "ℹ️  No updates found")
+            self._touch_checked_at(library)
+            self.skipped_count += 1
+            return
+
+        self.helper.apply(library, version_info, stdout_writer=stdout_writer)
+        if getattr(settings, "LIBTRACK_LOG_DETECTION_METHOD", True):
+            logger.info(
+                f"Version detected for {library.name}: v{library.latest_version}, "
+                f"detection_method=registry_api, registry_type={library.registry_type}"
+            )
+        self.updated_count += 1
+
+    @staticmethod
+    def _touch_checked_at(library: Library):
+        """
+        Record that we looked, even when nothing changed.
+
+        Without this a library that is already up to date would never gain a
+        last_checked_at and so would be re-fetched on every single run.
+        """
+        library.last_checked_at = timezone.now()
+        library.save(update_fields=["last_checked_at", "updated_at"])
+
+    def _fetch_sequentially(self, libraries, stdout_writer=None, deadline=None) -> int:
+        """
+        Legacy Serper+Groq path: one library at a time.
+
+        Left sequential deliberately. It is a fallback that calls an LLM per
+        library, so it is bounded by that provider's rate limit rather than by
+        our own concurrency.
+        """
+        rate_limit = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
+        for index, library in enumerate(libraries):
+            if deadline is not None and time.monotonic() >= deadline:
+                remaining = len(libraries) - index
+                self._log(stdout_writer, f"⏱️  Stopped at deadline with {remaining} librar(ies) unchecked.")
+                return remaining
+
             self._log(
                 stdout_writer,
-                f"❌ Official API error: {e}. Falling back to Serper+Groq...",
+                f"Checking {library.name} (current: v{library.latest_version or 'unknown'})...",
             )
-            logger.error(f"Official API error for {library.name}: {e}", exc_info=True)
-            # Fall through to Serper+Groq fallback
+            if not library.registry_type:
+                library.registry_type = self._infer_registry_type(library)
+                library.save(update_fields=["registry_type"])
 
-        # Fallback: Serper + Groq
-        self._fetch_with_serper_groq(library, stdout_writer)
-        fallback_rate_limit = getattr(settings, "LIBTRACK_API_RATE_LIMIT_SECONDS", 1.5)
-        time.sleep(fallback_rate_limit)
+            self._fetch_with_serper_groq(library, stdout_writer)
+            time.sleep(rate_limit)
+        return 0
 
     def _fetch_with_serper_groq(self, library: Library, stdout_writer=None):
         """
@@ -285,7 +371,7 @@ class VersionFetchService:
 
         # Update Library record
         library.latest_version = detected_version
-        library.last_checked_at = datetime.now()
+        library.last_checked_at = timezone.now()
         library.save()
 
         # Save to LibraryRelease history with detection method

@@ -71,29 +71,36 @@ class FutureVersionDetector:
             return []
             
         registry = self.registries[registry_key]
-        
-        # 2. Get Registry Pre-releases (Tier 1)
+
+        # get_prereleases and get_repository_url read the same registry endpoint
+        # on most adapters, so cache responses for the duration of this package.
+        registry.begin_response_cache()
         try:
-            reg_updates = registry.get_prereleases(library_name)
-            for u in reg_updates:
-                u.detection_method = "registry_prerelease"
-            candidates.extend(reg_updates)
-        except Exception as e:
-            logger.error(f"Error fetching registry pre-releases: {e}")
-            
-        # 3. Get GitHub Updates (Tier 2)
-        try:
-            repo_url = registry.get_repository_url(library_name)
-            if repo_url:
-                gh_updates = self.github.get_future_versions(repo_url)
-                for u in gh_updates:
-                    # Enrich detection type if not set
-                    if not hasattr(u, 'detection_method'): 
-                        u.detection_method = "github_ecosystem"
-                candidates.extend(gh_updates)
-        except Exception as e:
-            logger.error(f"Error fetching GitHub future versions: {e}")
-            
+            # 2. Get Registry Pre-releases (Tier 1)
+            try:
+                reg_updates = registry.get_prereleases(library_name)
+                for u in reg_updates:
+                    u.detection_method = "registry_prerelease"
+                candidates.extend(reg_updates)
+            except Exception as e:
+                logger.error(f"Error fetching registry pre-releases: {e}")
+
+            # 3. Get GitHub Updates (Tier 2)
+            try:
+                repo_url = registry.get_repository_url(library_name)
+                if repo_url:
+                    gh_updates = self.github.get_future_versions(repo_url)
+                    for u in gh_updates:
+                        # Enrich detection type if not set
+                        if not hasattr(u, 'detection_method'):
+                            u.detection_method = "github_ecosystem"
+                    candidates.extend(gh_updates)
+            except Exception as e:
+                logger.error(f"Error fetching GitHub future versions: {e}")
+        finally:
+            registry.end_response_cache()
+
+
         # 4. Filter and Deduplicate
         unique_versions = self._deduplicate(candidates)
         

@@ -44,7 +44,7 @@ class CargoRegistry(PackageRegistry):
         self._log_debug(f"Fetching from {url}")
         
         try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response = self.get(url, headers=headers)
             response.raise_for_status()
             data = response.json()
             
@@ -119,7 +119,7 @@ class CargoRegistry(PackageRegistry):
         headers = {"User-Agent": self.USER_AGENT}
         
         try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response = self.get(url, headers=headers)
             if response.status_code != 200: return []
             
             data = response.json()
@@ -148,7 +148,7 @@ class CargoRegistry(PackageRegistry):
         headers = {"User-Agent": self.USER_AGENT}
         
         try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
+            response = self.get(url, headers=headers)
             if response.status_code != 200: return None
             
             data = response.json()
@@ -167,7 +167,7 @@ class CargoRegistry(PackageRegistry):
         headers = {"User-Agent": self.USER_AGENT}
         
         try:
-            response = requests.head(url, headers=headers, timeout=self.timeout)
+            response = self.head(url, headers=headers)
             return response.status_code == 200
         except:
             return False

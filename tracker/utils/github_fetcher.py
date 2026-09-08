@@ -11,7 +11,12 @@ from datetime import datetime
 import base64
 from django.conf import settings
 from tracker.utils.future_version_validator import FutureVersionValidator
-from tracker.utils.registry_adapters.base import PreReleaseInfo, VersionInfo
+from tracker.utils.registry_adapters.base import (
+    PreReleaseInfo,
+    VersionInfo,
+    get_rate_limiter,
+    get_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +25,10 @@ class GitHubFetcher:
     Fetches version information from GitHub API.
     Handles authentication and rate limiting.
     """
-    
+
     BASE_URL = "https://api.github.com"
-    
+    TIMEOUT = 10
+
     def __init__(self, token: Optional[str] = None):
         # Try to get token from settings/env if not provided
         self.token = token or os.getenv("GITHUB_TOKEN")
@@ -32,6 +38,19 @@ class GitHubFetcher:
         }
         if self.token:
             self.headers["Authorization"] = f"token {self.token}"
+
+    def get(self, url: str, **kwargs):
+        """
+        Rate-limited, connection-pooled GET against the GitHub API.
+
+        Shares the pooled session with the registry adapters so repeated calls
+        to api.github.com reuse one connection instead of renegotiating TLS,
+        and so the per-host throttle applies when detection runs concurrently.
+        """
+        kwargs.setdefault("timeout", self.TIMEOUT)
+        kwargs.setdefault("headers", self.headers)
+        get_rate_limiter().wait("api.github.com")
+        return get_session().get(url, **kwargs)
 
     def get_future_versions(self, repo_url: str) -> List[PreReleaseInfo]:
         """
@@ -62,31 +81,71 @@ class GitHubFetcher:
         
         return detections
 
+    ROADMAP_FILENAMES = {"roadmap.md", "plans.md"}
+
     def detect_roadmap_file(self, owner: str, repo: str) -> Optional[PreReleaseInfo]:
-        """Look for ROADMAP.md and parse it."""
-        candidates = ["ROADMAP.md", "roadmap.md", "PLANS.md", "Roadmap.md"]
-        
-        for filename in candidates:
-            url = f"{self.BASE_URL}/repos/{owner}/{repo}/contents/{filename}"
-            try:
-                resp = requests.get(url, headers=self.headers, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    content = base64.b64decode(data.get("content", "")).decode("utf-8")
-                    
-                    # Simple heuristic parsing
-                    return PreReleaseInfo(
-                        version="Roadmap", # Placeholder
-                        release_date=None,
-                        prerelease_type="roadmap",
-                        summary=f"Found roadmap file: {filename}. Content preview: {content[:100]}...",
-                        source_url=data.get("html_url", ""),
-                        trust_level=80,
-                        is_published=False
-                    )
-            except Exception:
-                continue
-        return None
+        """
+        Look for a roadmap file in the repository root and parse it.
+
+        Lists the root directory once and matches case-insensitively rather
+        than guessing one capitalisation per request. Most repositories have no
+        roadmap at all, and that answer now costs a single call instead of four
+        404s - which mattered because this runs for every tracked library.
+        """
+        listing_url = f"{self.BASE_URL}/repos/{owner}/{repo}/contents"
+        try:
+            resp = self.get(listing_url)
+            if resp.status_code != 200:
+                return None
+
+            entries = resp.json()
+            if not isinstance(entries, list):
+                return None
+
+            match = next(
+                (
+                    entry for entry in entries
+                    if isinstance(entry, dict)
+                    and entry.get("type") == "file"
+                    and (entry.get("name") or "").lower() in self.ROADMAP_FILENAMES
+                ),
+                None,
+            )
+            if not match:
+                return None
+
+            filename = match.get("name", "")
+            content = self._fetch_file_content(match)
+
+            return PreReleaseInfo(
+                version="Roadmap",  # Placeholder
+                release_date=None,
+                prerelease_type="roadmap",
+                summary=f"Found roadmap file: {filename}. Content preview: {content[:100]}...",
+                source_url=match.get("html_url", ""),
+                trust_level=80,
+                is_published=False
+            )
+        except Exception as e:
+            logger.debug(f"Roadmap lookup failed for {owner}/{repo}: {e}")
+            return None
+
+    def _fetch_file_content(self, entry: dict) -> str:
+        """Decode a contents-API entry, fetching the blob if it was not inlined."""
+        # A directory listing omits `content`; only a single-file response inlines it.
+        encoded = entry.get("content")
+        if not encoded:
+            url = entry.get("url")
+            if not url:
+                return ""
+            resp = self.get(url)
+            if resp.status_code != 200:
+                return ""
+            encoded = resp.json().get("content", "")
+        try:
+            return base64.b64decode(encoded or "").decode("utf-8", errors="replace")
+        except Exception:
+            return ""
 
     def get_latest_stable_version(self, repo_url: str) -> Optional[VersionInfo]:
         """
@@ -99,7 +158,7 @@ class GitHubFetcher:
         url = f"{self.BASE_URL}/repos/{owner}/{repo}/releases/latest"
         
         try:
-            resp = requests.get(url, headers=self.headers, timeout=10)
+            resp = self.get(url)
             if resp.status_code == 404:
                 # No "latest" release (might purely use tags or pre-releases)
                 return None
@@ -130,7 +189,7 @@ class GitHubFetcher:
         results = []
         
         try:
-            resp = requests.get(url, headers=self.headers, timeout=10)
+            resp = self.get(url)
             if resp.status_code != 200:
                 logger.warning(f"GitHub API error {resp.status_code} for {owner}/{repo}")
                 return []
@@ -168,7 +227,7 @@ class GitHubFetcher:
         results = []
         
         try:
-            resp = requests.get(url, headers=self.headers, params=params, timeout=10)
+            resp = self.get(url, params=params)
             if resp.status_code != 200: return []
             
             milestones = resp.json()

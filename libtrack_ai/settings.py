@@ -310,11 +310,53 @@ try:
 except (ValueError, TypeError):
     LIBTRACK_DEDUP_WINDOW_HOURS = 24
 
+# Blanket delay between libraries on the legacy sequential (Serper+Groq) fetch path.
 LIBTRACK_API_RATE_LIMIT_SECONDS = os.getenv("LIBTRACK_API_RATE_LIMIT_SECONDS", "1.5")
 try:
     LIBTRACK_API_RATE_LIMIT_SECONDS = float(LIBTRACK_API_RATE_LIMIT_SECONDS)
 except (ValueError, TypeError):
     LIBTRACK_API_RATE_LIMIT_SECONDS = 1.5
+
+# Minimum interval between registry requests to the *same* host. Registry fetches
+# run concurrently, so throttling is per host: npm and PyPI need not wait on each
+# other, while crates.io asks for roughly one request per second.
+LIBTRACK_HOST_RATE_LIMIT_SECONDS = os.getenv("LIBTRACK_HOST_RATE_LIMIT_SECONDS", "0.25")
+try:
+    LIBTRACK_HOST_RATE_LIMIT_SECONDS = float(LIBTRACK_HOST_RATE_LIMIT_SECONDS)
+except (ValueError, TypeError):
+    LIBTRACK_HOST_RATE_LIMIT_SECONDS = 0.25
+
+# Concurrency for the registry fetch step. Network only: database writes are
+# applied serially on the main thread afterwards.
+LIBTRACK_FETCH_MAX_WORKERS = os.getenv("LIBTRACK_FETCH_MAX_WORKERS", "8")
+try:
+    LIBTRACK_FETCH_MAX_WORKERS = max(1, int(LIBTRACK_FETCH_MAX_WORKERS))
+except (ValueError, TypeError):
+    LIBTRACK_FETCH_MAX_WORKERS = 8
+
+# Skip libraries checked more recently than this. Most libraries do not ship
+# daily, so in steady state this keeps the fetch step to a fraction of the catalog.
+LIBTRACK_FRESHNESS_HOURS = os.getenv("LIBTRACK_FRESHNESS_HOURS", "20")
+try:
+    LIBTRACK_FRESHNESS_HOURS = float(LIBTRACK_FRESHNESS_HOURS)
+except (ValueError, TypeError):
+    LIBTRACK_FRESHNESS_HOURS = 20.0
+
+# Same idea for the future/pre-release step, but a wider window: pre-releases
+# appear far less often than stable releases, and each check costs several
+# GitHub API calls per library.
+LIBTRACK_FUTURE_FRESHNESS_HOURS = os.getenv("LIBTRACK_FUTURE_FRESHNESS_HOURS", "72")
+try:
+    LIBTRACK_FUTURE_FRESHNESS_HOURS = float(LIBTRACK_FUTURE_FRESHNESS_HOURS)
+except (ValueError, TypeError):
+    LIBTRACK_FUTURE_FRESHNESS_HOURS = 72.0
+
+# Packages per OSV querybatch request (OSV allows up to 1000).
+LIBTRACK_OSV_BATCH_SIZE = os.getenv("LIBTRACK_OSV_BATCH_SIZE", "500")
+try:
+    LIBTRACK_OSV_BATCH_SIZE = max(1, min(1000, int(LIBTRACK_OSV_BATCH_SIZE)))
+except (ValueError, TypeError):
+    LIBTRACK_OSV_BATCH_SIZE = 500
 
 # Wall-clock budget for a single run_daily_check run; 0 disables it.
 # Vercel Functions are killed at 300s (Hobby cannot raise this), and a killed

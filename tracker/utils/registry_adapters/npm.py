@@ -47,7 +47,7 @@ class NpmRegistry(PackageRegistry):
         self._log_debug(f"Fetching from {url}")
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             response.raise_for_status()
             data = response.json()
             
@@ -127,7 +127,7 @@ class NpmRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/{encoded_name}"
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             if response.status_code == 404:
                 return []
             
@@ -193,7 +193,7 @@ class NpmRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/{encoded_name}"
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             if response.status_code != 200: return None
             
             data = response.json()
@@ -221,7 +221,7 @@ class NpmRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/{encoded_name}"
         
         try:
-            response = requests.head(url, timeout=self.timeout)
+            response = self.head(url)
             return response.status_code == 200
         except:
             return False

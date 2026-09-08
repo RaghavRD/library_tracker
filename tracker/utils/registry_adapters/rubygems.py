@@ -42,7 +42,7 @@ class RubyGemsRegistry(PackageRegistry):
         self._log_debug(f"Fetching from {url}")
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             response.raise_for_status()
             versions = response.json()
             
@@ -108,7 +108,7 @@ class RubyGemsRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/gems/{gem_name}.json"
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -119,7 +119,7 @@ class RubyGemsRegistry(PackageRegistry):
         """Get pre-releases from RubyGems."""
         url = f"{self.BASE_URL}/versions/{package_name}.json"
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             if response.status_code == 404: return []
             
             versions = response.json()
@@ -167,7 +167,7 @@ class RubyGemsRegistry(PackageRegistry):
         url = f"{self.BASE_URL}/versions/{package_name}.json"
         
         try:
-            response = requests.head(url, timeout=self.timeout)
+            response = self.head(url)
             return response.status_code == 200
         except:
             return False

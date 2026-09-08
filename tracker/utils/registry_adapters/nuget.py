@@ -46,7 +46,7 @@ class NuGetRegistry(PackageRegistry):
         self._log_debug(f"Fetching versions from {versions_url}")
         
         try:
-            response = requests.get(versions_url, timeout=self.timeout)
+            response = self.get(versions_url)
             response.raise_for_status()
             data = response.json()
             
@@ -112,7 +112,7 @@ class NuGetRegistry(PackageRegistry):
         url = f"{self.SEARCH_URL}?q=packageid:{package_name}&prerelease={prerelease_str}"
         
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self.get(url)
             response.raise_for_status()
             data = response.json()
             
@@ -170,7 +170,7 @@ class NuGetRegistry(PackageRegistry):
         url = f"{self.FLAT_CONTAINER_URL}/{package_id_lower}/index.json"
         
         try:
-            response = requests.head(url, timeout=self.timeout)
+            response = self.head(url)
             return response.status_code == 200
         except:
             return False

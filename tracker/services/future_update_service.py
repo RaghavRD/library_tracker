@@ -13,7 +13,9 @@ Workflow:
 """
 
 import logging
-from datetime import datetime
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone
 from django.db import models
@@ -108,6 +110,143 @@ class FutureUpdateService:
         except Exception as e:
             logger.warning(f"Deduplication error for {library_name}: {e}")
 
+    def check_all_libraries(self, libraries, stdout_writer=None, deadline=None, force=False) -> dict:
+        """
+        Check every library for future versions.
+
+        Same split as the registry fetch step: detection is network-bound and
+        runs in a thread pool, while the FutureUpdateCache writes happen
+        serially on this thread so no worker touches the ORM.
+
+        Returns a summary dict; detected payloads land in fresh_future_updates.
+        """
+        libraries, total, skipped_fresh = self._libraries_to_check(libraries, force=force)
+        if skipped_fresh:
+            self._log(
+                stdout_writer,
+                f"Skipping {skipped_fresh} of {total} libraries checked within the future-check window.",
+            )
+        if not libraries:
+            return {
+                "libraries_checked": 0,
+                "future_updates_found": 0,
+                "skipped_fresh_count": skipped_fresh,
+            }
+
+        max_workers = getattr(settings, "LIBTRACK_FETCH_MAX_WORKERS", 8)
+        workers = max(1, min(max_workers, len(libraries)))
+
+        def detect(library):
+            return self.detector.detect_future_versions(
+                library.name,
+                library.latest_version or "0.0.0",
+                registry_type=library.registry_type,
+            )
+
+        checked = 0
+        unchecked = 0
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(detect, library): library for library in libraries}
+            for future, library in futures.items():
+                if deadline is not None and time.monotonic() >= deadline:
+                    future.cancel()
+                    unchecked += 1
+                    continue
+                checked += 1
+                payload = self._persist_candidates(future, library, stdout_writer)
+                if payload and payload.get("category") == "future":
+                    self.fresh_future_updates[library.name] = payload
+
+        if unchecked:
+            self._log(stdout_writer, f"⏱️  Stopped at deadline with {unchecked} librar(ies) unchecked.")
+
+        summary = {
+            "libraries_checked": checked,
+            "future_updates_found": len(self.fresh_future_updates),
+            "skipped_fresh_count": skipped_fresh,
+        }
+        if unchecked:
+            summary["unchecked_count"] = unchecked
+        return summary
+
+    def _libraries_to_check(self, libraries, force=False):
+        """
+        Return (libraries, total, skipped_fresh) for this run.
+
+        Pre-releases appear less often than stable releases, so this window is
+        wider than the registry fetch step's; re-querying every library nightly
+        was several GitHub calls per library for almost never a new answer.
+        """
+        if hasattr(libraries, "count") and hasattr(libraries, "filter"):
+            total = libraries.count()
+            freshness_hours = getattr(settings, "LIBTRACK_FUTURE_FRESHNESS_HOURS", 0)
+            if not force and freshness_hours > 0:
+                cutoff = timezone.now() - timedelta(hours=freshness_hours)
+                libraries = libraries.filter(
+                    models.Q(last_future_check_at__isnull=True)
+                    | models.Q(last_future_check_at__lt=cutoff)
+                )
+            selected = list(libraries)
+        else:
+            # Plain iterable (tests, ad-hoc callers): no filtering to apply.
+            selected = list(libraries)
+            total = len(selected)
+
+        return selected, total, total - len(selected)
+
+    @staticmethod
+    def _touch_future_checked_at(library):
+        """
+        Record that we looked, whether or not a future version was found.
+
+        Without this a library with no pre-releases would never gain a
+        timestamp and so would be re-checked on every single run.
+        """
+        library.last_future_check_at = timezone.now()
+        library.save(update_fields=["last_future_check_at", "updated_at"])
+
+    def _persist_candidates(self, future, library, stdout_writer=None):
+        """Apply one future-version detection result. Main thread only."""
+        self._log(stdout_writer, f"🔮 Checking future versions for {library.name}...")
+        try:
+            candidates = future.result()
+        except Exception as e:
+            self._log(stdout_writer, f"   ❌ Error checking future versions: {e}")
+            logger.error(f"Future version check error for {library.name}: {e}")
+            self.error_count += 1
+            # Deliberately not stamped: a failed check should be retried
+            # tomorrow rather than suppressed for the whole freshness window.
+            return None
+
+        payload = self._save_best_candidate(library.name, candidates, stdout_writer)
+        self._touch_future_checked_at(library)
+        return payload
+
+    def _save_best_candidate(self, library_name, candidates, stdout_writer=None):
+        """Persist the highest-confidence candidate, if any."""
+        if not candidates:
+            self._log(stdout_writer, "   ℹ️  No future versions detected")
+            return None
+
+        best = candidates[0]
+        self._log(
+            stdout_writer,
+            f"   ✅ Future version: {best.version} "
+            f"({best.prerelease_type}, {best.trust_level}% confidence)",
+        )
+
+        return self._handle_future_update(
+            library_name=library_name,
+            version=best.version,
+            confidence=best.trust_level,
+            expected_date=str(best.release_date) if best.release_date else "",
+            summary=best.summary,
+            source=best.source_url,
+            prerelease_type=best.prerelease_type,
+            detection_method=best.detection_method,
+            stdout_writer=stdout_writer,
+        )
+
     def check_future_versions(self, library, stdout_writer=None):
         """
         Check for future versions of a library.
@@ -132,32 +271,8 @@ class FutureUpdateService:
                 registry_type=library.registry_type,
             )
 
-            if not candidates:
-                self._log(stdout_writer, "   ℹ️  No future versions detected")
-                return None
-
-            # Use the highest confidence candidate
-            best = candidates[0]
-            self._log(
-                stdout_writer,
-                f"   ✅ Future version: {best.version} "
-                f"({best.prerelease_type}, {best.trust_level}% confidence)",
-            )
-
             # Save to FutureUpdateCache and get notification payload
-            payload = self._handle_future_update(
-                library_name=library.name,
-                version=best.version,
-                confidence=best.trust_level,
-                expected_date=str(best.release_date) if best.release_date else "",
-                summary=best.summary,
-                source=best.source_url,
-                prerelease_type=best.prerelease_type,
-                detection_method=best.detection_method,
-                stdout_writer=stdout_writer,
-            )
-
-            return payload
+            return self._save_best_candidate(library.name, candidates, stdout_writer)
 
         except Exception as e:
             self._log(

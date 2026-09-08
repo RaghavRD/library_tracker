@@ -68,6 +68,13 @@ class Library(TimeStampedModel):
     # Latest known stable version
     latest_version = models.CharField(max_length=100, blank=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_future_check_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When future/pre-release versions were last checked. Tracked "
+                  "separately from last_checked_at because pre-releases appear "
+                  "less often than stable ones and are checked less frequently.",
+    )
     
     homepage_url = models.URLField(blank=True)
     
