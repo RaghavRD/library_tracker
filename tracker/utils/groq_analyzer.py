@@ -120,6 +120,22 @@ def _extract_json(s: str) -> dict:
                 pass
     return {}
 
+# Groq's recommended replacement for the retired llama-3.1-8b-instant.
+DEFAULT_MODEL = "openai/gpt-oss-20b"
+
+# Models Groq has shut down for free/developer tier. Requests to these
+# fail with "model does not exist or you do not have access to it".
+DEPRECATED_MODELS = {
+    "llama-3.1-8b-instant",          # shut down 2026-08-16
+    "llama-3.3-70b-versatile",       # shut down 2026-08-16
+    "qwen/qwen3-32b",                # shut down 2026-07-17
+    "meta-llama/llama-4-scout-17b-16e-instruct",  # shut down 2026-07-17
+    "gemma2-9b-it",                  # shut down 2025-10-08
+    "llama-3.1-70b-versatile",
+    "llama-3.2-70b-versatile",
+    "mixtral-8x7b-32768",
+}
+
 # --- Core Analyzer Class ---
 class GroqAnalyzer:
     def __init__(self):
@@ -128,19 +144,17 @@ class GroqAnalyzer:
             raise RuntimeError("GROQ_API_KEY missing in .env")
 
         self.client = Groq(api_key=api_key)
-        # ✅ Updated model list — choose safest available
         self.model = os.getenv("GROQ_MODEL")
         self._validate_model()
 
     def _validate_model(self):
-        """Fallback if model is deprecated or unavailable."""
-        deprecated = {
-            "llama-3.1-70b-versatile",
-            "llama-3.2-70b-versatile",
-        }
-        if self.model in deprecated:
-            print(f"⚠️ Model '{self.model}' deprecated. Falling back to 'llama-3.2-11b-text'")
-            self.model = "llama-3.2-11b-text"
+        """Fall back to a live model if GROQ_MODEL is unset or retired."""
+        if not self.model:
+            print(f"⚠️ GROQ_MODEL not set. Falling back to '{DEFAULT_MODEL}'")
+            self.model = DEFAULT_MODEL
+        elif self.model in DEPRECATED_MODELS:
+            print(f"⚠️ Model '{self.model}' is retired. Falling back to '{DEFAULT_MODEL}'")
+            self.model = DEFAULT_MODEL
 
     def analyze(self, library: str, serper_results: dict) -> dict:
         """
@@ -180,6 +194,9 @@ class GroqAnalyzer:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
+                # gpt-oss models reason before answering and bill those tokens.
+                # Version extraction is a lookup, not a puzzle - keep it cheap.
+                reasoning_effort="low",
                 response_format={"type": "json_object"},
             )
             content = comp.choices[0].message.content
