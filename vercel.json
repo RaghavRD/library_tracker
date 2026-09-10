@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/libtracker/internal/cron/daily-check/",
-      "schedule": "30 3 * * *"
+      "schedule": "30 5 * * *"
     }
   ]
 }
