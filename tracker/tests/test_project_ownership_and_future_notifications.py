@@ -208,7 +208,7 @@ def test_owner_scoped_daily_check_command_passes_owner_to_services():
         status="queued",
     )
 
-    with patch.dict("os.environ", {"MAILTRAP_API_KEY": "key", "MAILTRAP_FROM_EMAIL": "noreply@example.com"}), \
+    with override_settings(BREVO_API_KEY="key", BREVO_FROM_EMAIL="noreply@example.com"), \
         patch("tracker.services.library_sync_service.LibrarySyncService.sync_all_libraries", return_value={"synced_count": 0, "created_count": 0}) as sync_mock, \
         patch("tracker.services.version_fetch_service.VersionFetchService.fetch_all_libraries", return_value={"checked_count": 1, "updated_count": 0, "skipped_count": 1, "error_count": 0}) as fetch_mock, \
         patch("tracker.services.future_update_service.FutureUpdateService.check_future_versions", return_value=None), \
@@ -307,7 +307,7 @@ def test_future_notification_success_is_tracked_per_project():
         "tracker.services.notification_service.send_update_email",
         return_value={"success": True, "status_text": "sent", "http_status": 200},
     ) as send_mock:
-        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service = NotificationService(api_key="key", sender_email="noreply@example.com")
         service.notify_all_projects()
 
         project_delivery = ProjectFutureNotification.objects.get(
@@ -327,7 +327,7 @@ def test_future_notification_success_is_tracked_per_project():
         ).exists()
         assert send_mock.call_count == 1
 
-        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service = NotificationService(api_key="key", sender_email="noreply@example.com")
         service.notify_all_projects()
         assert send_mock.call_count == 1
 
@@ -361,12 +361,12 @@ def test_update_events_preserve_multiple_versions_while_cache_tracks_latest():
         "tracker.services.notification_service.send_update_email",
         return_value={"success": True, "status_text": "sent", "http_status": 200},
     ):
-        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service = NotificationService(api_key="key", sender_email="noreply@example.com")
         service.notify_all_projects()
 
         library.latest_version = "3.0.0"
         library.save(update_fields=["latest_version"])
-        service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+        service = NotificationService(api_key="key", sender_email="noreply@example.com")
         service.notify_all_projects()
 
     cache = UpdateCache.objects.get(project=project, library="requests")

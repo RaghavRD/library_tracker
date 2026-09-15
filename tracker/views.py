@@ -146,7 +146,7 @@ def dashboard(request):
             "manual_run_cooldown_minutes": 15,
             "needs_check_mode_choice": not preference.has_chosen_check_mode,
             "check_mode": preference.check_mode,
-            "email_test_mode": os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"},
+            "email_test_mode": getattr(settings, "LIBTRACK_EMAIL_TEST_MODE", True),
         }
     )
     return render(request, "tracker/dashboard.html", context)

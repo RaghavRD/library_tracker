@@ -291,6 +291,24 @@ LIBTRACK_FETCH_DEBUG_MODE = os.getenv("LIBTRACK_FETCH_DEBUG_MODE", "False") == "
 
 # Email / Notification Settings
 LIBTRACK_ENABLE_EMAIL_NOTIFICATIONS = os.getenv("LIBTRACK_ENABLE_EMAIL_NOTIFICATIONS", "True") == "True"
+
+# Brevo credentials. Values are stripped of stray quotes/whitespace because the
+# dashboard stores env vars literally, and a pasted "key" breaks the API call
+# in a way that only shows up as a 401 from the provider.
+def _clean_env(name: str) -> str:
+    return os.getenv(name, "").strip().strip('"').strip("'")
+
+BREVO_API_KEY = _clean_env("BREVO_API_KEY")
+BREVO_FROM_EMAIL = _clean_env("BREVO_FROM_EMAIL")
+BREVO_FROM_NAME = _clean_env("BREVO_FROM_NAME") or "LibTrack AI"
+
+# TEST_MODE renders emails without sending them. It must default to off in
+# production: a missing env var used to silently stop every notification while
+# still reporting success.
+LIBTRACK_EMAIL_TEST_MODE = (
+    os.getenv("TEST_MODE", "False" if IS_PRODUCTION else "True").strip().strip('"').strip("'").lower()
+    in {"1", "true", "yes", "y"}
+)
 LIBTRACK_EMAIL_BATCH_SIZE = os.getenv("LIBTRACK_EMAIL_BATCH_SIZE", "5")
 try:
     LIBTRACK_EMAIL_BATCH_SIZE = int(LIBTRACK_EMAIL_BATCH_SIZE)

@@ -11,6 +11,7 @@ This module tests:
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
+from django.test import override_settings
 
 from tracker.models import UpdateCache, FutureUpdateCache, Project
 from tracker.utils.send_mail import send_update_email
@@ -128,13 +129,12 @@ class TestReleasedVersionNotifications:
             notification_type='major, minor, future'
         )
         
-        with patch.dict('os.environ', {
-            'TEST_MODE': 'True',
-            'MAILTRAP_MAIN_KEY': 'test_key',
-            'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
-        }):
+        with override_settings(
+            LIBTRACK_EMAIL_TEST_MODE=True,
+            BREVO_FROM_EMAIL="noreply@libtrack.com",
+        ):
             result = send_update_email(
-                mailtrap_api_key='test_key',
+                api_key='test_key',
                 project_name='Release Test Project',
                 recipients='dev@example.com',
                 library='numpy',
@@ -154,13 +154,12 @@ class TestReleasedVersionNotifications:
         project = mock_project(notification_type='major, minor, future')
         
         # Test future update subject
-        with patch.dict('os.environ', {
-            'TEST_MODE': 'True',
-            'MAILTRAP_MAIN_KEY': 'test_key',
-            'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
-        }):
+        with override_settings(
+            LIBTRACK_EMAIL_TEST_MODE=True,
+            BREVO_FROM_EMAIL="noreply@libtrack.com",
+        ):
             future_result = send_update_email(
-                mailtrap_api_key='test_key',
+                api_key='test_key',
                 project_name='Test',
                 recipients='dev@test.com',
                 library='pandas',
@@ -172,7 +171,7 @@ class TestReleasedVersionNotifications:
             )
             
             released_result = send_update_email(
-                mailtrap_api_key='test_key',
+                api_key='test_key',
                 project_name='Test',
                 recipients='dev@test.com',
                 library='pandas',

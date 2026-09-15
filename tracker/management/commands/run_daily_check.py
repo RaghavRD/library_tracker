@@ -65,8 +65,8 @@ class Command(BaseCommand):
     
     Configuration:
       - USE_OFFICIAL_APIS (env): If "true", use official registries; else Serper+Groq
-      - MAILTRAP_API_KEY (env): Mailtrap API key for sending emails
-      - MAILTRAP_FROM_EMAIL (env): Sender email address
+      - BREVO_API_KEY (env): Brevo API key for sending emails
+      - BREVO_FROM_EMAIL (env): Verified Brevo sender address
     """
 
     # Defaults so run_daily_check() is callable without going through handle().
@@ -295,24 +295,24 @@ class Command(BaseCommand):
         """Step 5: Send notifications to projects about relevant updates."""
         self.stdout.write(self.style.MIGRATE_HEADING("5. Notifying Projects..."))
         
-        # Check for required Mailtrap credentials
-        mailtrap_key = os.getenv("MAILTRAP_API_KEY")
-        sender_email = os.getenv("MAILTRAP_FROM_EMAIL")
+        # Check for required Brevo credentials
+        api_key = getattr(settings, "BREVO_API_KEY", "")
+        sender_email = getattr(settings, "BREVO_FROM_EMAIL", "")
 
-        if not mailtrap_key or not sender_email:
+        if not api_key or not sender_email:
             self.stdout.write(
-                self.style.ERROR("❌ Missing Mailtrap credentials (MAILTRAP_API_KEY, MAILTRAP_FROM_EMAIL)")
+                self.style.ERROR("❌ Missing Brevo credentials (BREVO_API_KEY, BREVO_FROM_EMAIL)")
             )
             return {
                 "projects_checked": 0,
                 "sent_count": 0,
                 "skipped_count": 0,
                 "error_count": 1,
-                "error": "missing_mailtrap_credentials",
+                "error": "missing_brevo_credentials",
             }
 
         service = NotificationService(
-            mailtrap_key=mailtrap_key,
+            api_key=api_key,
             sender_email=sender_email
         )
         

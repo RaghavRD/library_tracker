@@ -128,8 +128,8 @@ def mock_groq_analysis():
 
 
 @pytest.fixture
-def mock_mailtrap_success():
-    """Mock successful Mailtrap email sending."""
+def mock_brevo_success():
+    """Mock successful Brevo email sending."""
     with patch('tracker.utils.send_mail.requests.post') as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 200

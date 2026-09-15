@@ -24,7 +24,7 @@ Most teams find out about dependency updates too late — during a security audi
 | **Multi-Registry Detection** | Fetches latest stable versions from PyPI, npm, RubyGems, Cargo, and GitHub Releases |
 | **AI Fallback** | If an official API fails, Serper (Google search) + Groq LLM extracts the correct version from the web |
 | **Future Version Prediction** | Groq analyses release cadence and public signals to predict upcoming releases with confidence scores |
-| **Smart Notifications** | Email alerts via Mailtrap — configurable per project (major only, minor, future, or all) |
+| **Smart Notifications** | Email alerts via Brevo — configurable per project (major only, minor, future, or all) |
 | **Notification Pause** | Temporarily silence notifications for a project without removing it |
 | **Confidence Threshold** | Only receive future-update notifications above a user-defined confidence level (0–100%) |
 | **Health Score** | Dashboard metric showing what percentage of your tracked libraries are up-to-date |
@@ -44,7 +44,7 @@ Most teams find out about dependency updates too late — during a security audi
 - [Serper API](https://serper.dev/) — Google Search API used as a version-detection fallback and for future release signals
 
 **Notifications**
-- [Mailtrap](https://mailtrap.io/) — transactional email (bulk API)
+- [Brevo](https://www.brevo.com/) — transactional email (HTTP API)
 
 **Frontend**
 - [Bootstrap 5.3](https://getbootstrap.com/) — grid and utility classes
@@ -72,7 +72,7 @@ python manage.py run_daily_check
 3. FutureUpdateService    — predict upcoming releases via Groq analysis
         │                   stores confidence score per prediction
         ▼
-4. NotificationService    — send emails to project teams via Mailtrap
+4. NotificationService    — send emails to project teams via Brevo
                             respects per-project type filter + confidence threshold
 ```
 ---
@@ -137,7 +137,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 ### Email in local development
 
 `TEST_MODE=True` writes rendered emails to `email_previews/` instead of sending
-them through Mailtrap. Keep it on locally unless you are deliberately testing
+them through Brevo. Keep it on locally unless you are deliberately testing
 delivery.
 
 ### GitHub OAuth locally
@@ -186,7 +186,7 @@ CSRF_TRUSTED_ORIGINS=https://<your-vercel-or-custom-domain>
 CRON_SECRET=<generate-a-separate-random-value>
 ```
 
-Add the Groq, Serper, Mailtrap, and GitHub OAuth variables from your local
+Add the Groq, Serper, Brevo, and GitHub OAuth variables from your local
 `.env` before enabling the production daily check. Never commit any secret.
 
 ## Deploying on Vercel

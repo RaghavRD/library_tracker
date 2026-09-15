@@ -11,7 +11,7 @@ This module tests:
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from tracker.models import FutureUpdateCache, Project
 from tracker.management.commands.run_daily_check import Command
@@ -109,13 +109,12 @@ class TestFutureUpdateNotifications:
         )
         
         # Mock environment variables
-        with patch.dict('os.environ', {
-            'TEST_MODE': 'True',
-            'MAILTRAP_MAIN_KEY': 'test_key',
-            'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
-        }):
+        with override_settings(
+            LIBTRACK_EMAIL_TEST_MODE=True,
+            BREVO_FROM_EMAIL="noreply@libtrack.com",
+        ):
             result = send_update_email(
-                mailtrap_api_key='test_key',
+                api_key='test_key',
                 project_name='Test Project',
                 recipients='dev@test.com',
                 library='pandas',
@@ -144,13 +143,12 @@ class TestFutureUpdateNotifications:
         """Test that future updates have distinct subject lines."""
         project = mock_project(notification_type='major, minor, future')
         
-        with patch.dict('os.environ', {
-            'TEST_MODE': 'True',
-            'MAILTRAP_MAIN_KEY': 'test_key',
-            'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
-        }):
+        with override_settings(
+            LIBTRACK_EMAIL_TEST_MODE=True,
+            BREVO_FROM_EMAIL="noreply@libtrack.com",
+        ):
             result = send_update_email(
-                mailtrap_api_key='test_key',
+                api_key='test_key',
                 project_name='Test Project',
                 recipients='dev@test.com',
                 library='numpy',
@@ -168,11 +166,10 @@ class TestFutureUpdateNotifications:
         """Test that confidence percentage appears in future update emails."""
         project = mock_project(notification_type='major, minor, future')
         
-        with patch.dict('os.environ', {
-            'TEST_MODE': 'True',
-            'MAILTRAP_MAIN_KEY': 'test_key',
-            'MAILTRAP_FROM_EMAIL': 'noreply@libtrack.com'
-        }):
+        with override_settings(
+            LIBTRACK_EMAIL_TEST_MODE=True,
+            BREVO_FROM_EMAIL="noreply@libtrack.com",
+        ):
             # Capture the HTML content
             with patch('tracker.utils.send_mail.requests.post') as mock_post:
                 mock_response = MagicMock()
@@ -180,7 +177,7 @@ class TestFutureUpdateNotifications:
                 mock_post.return_value = mock_response
                 
                 result = send_update_email(
-                    mailtrap_api_key='test_key',
+                    api_key='test_key',
                     project_name='Test Project',
                     recipients='dev@test.com',
                     library='django',

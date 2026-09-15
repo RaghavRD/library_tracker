@@ -13,7 +13,15 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-MAILTRAP_BASE = "https://bulk.api.mailtrap.io/api/send"
+BREVO_BASE = "https://api.brevo.com/v3/smtp/email"
+
+
+def _message_id(response) -> str | None:
+    """Brevo returns the accepted message id in the body, not a header."""
+    try:
+        return response.json().get("messageId")
+    except Exception:
+        return None
 
 
 def _empty_severity_counts() -> dict[str, int]:
@@ -121,7 +129,7 @@ def _email_subject(
 
 
 def send_update_email(
-    mailtrap_api_key: str | None,
+    api_key: str | None,
     project_name: str,
     recipients: Iterable[str] | str,
     library: str,
@@ -136,14 +144,14 @@ def send_update_email(
     future_opt_in: bool = False,
     digest: dict | None = None,
 ) -> dict:
-    """Send one project update and security digest through Mailtrap."""
-    api_key = mailtrap_api_key or os.getenv("MAILTRAP_API_KEY")
-    from_addr = from_email or os.getenv("MAILTRAP_FROM_EMAIL")
+    """Send one project update and security digest through Brevo."""
+    api_key = api_key or getattr(settings, "BREVO_API_KEY", "")
+    from_addr = from_email or getattr(settings, "BREVO_FROM_EMAIL", "")
 
     if not api_key or not from_addr:
         return {
             "success": False,
-            "status_text": "Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
+            "status_text": "Missing BREVO_API_KEY or BREVO_FROM_EMAIL",
             "http_status": None,
             "response_text": None,
             "error": "missing_credentials",
@@ -189,16 +197,20 @@ def send_update_email(
     text_content = render_to_string("tracker/emails/project_update.txt", context)
 
     payload_category = "Security Alerts" if category == "security" else "Project Updates"
+    sender_name = getattr(settings, "BREVO_FROM_NAME", "LibTrack AI")
     payload = {
-        "from": {"email": from_addr, "name": "LibTrack AI"},
+        "sender": {"email": from_addr, "name": sender_name},
         "to": [{"email": recipient} for recipient in recipients],
+        # Brevo rewrites the From domain when the sender is a free address such
+        # as gmail.com, so replies need an explicit destination to land on.
+        "replyTo": {"email": from_addr, "name": sender_name},
         "subject": subject,
-        "html": html_content,
-        "text": text_content,
-        "category": payload_category,
+        "htmlContent": html_content,
+        "textContent": text_content,
+        "tags": [payload_category],
     }
 
-    test_mode = os.getenv("TEST_MODE", "True").lower() in {"1", "true", "yes", "y"}
+    test_mode = getattr(settings, "LIBTRACK_EMAIL_TEST_MODE", True)
     if test_mode:
         logger.info("TEST_MODE: email would be sent with subject=%s", subject)
         print(f"\n--- EMAIL HTML START: {project_name} | {subject} ---")
@@ -217,19 +229,20 @@ def send_update_email(
         }
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "api-key": api_key,
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
     try:
-        response = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
+        response = requests.post(BREVO_BASE, headers=headers, json=payload, timeout=timeout)
         success = 200 <= response.status_code < 300
-        status_text = f"Mailtrap: {response.status_code}"
+        status_text = f"Brevo: {response.status_code}"
         response_text = response.text
-        request_id = response.headers.get("X-Request-Id") or response.headers.get("x-request-id")
+        request_id = _message_id(response)
 
         if getattr(settings, "LIBTRACK_LOG_HTTP_STATUS", True):
             logger.info(
-                "Mailtrap email send: status=%s request_id=%s recipients=%s project=%s",
+                "Brevo email send: status=%s message_id=%s recipients=%s project=%s",
                 response.status_code,
                 request_id,
                 len(recipients),
@@ -237,7 +250,7 @@ def send_update_email(
             )
         if not success:
             logger.warning(
-                "Mailtrap email failed: status=%s request_id=%s response=%s",
+                "Brevo email failed: status=%s message_id=%s response=%s",
                 response.status_code,
                 request_id,
                 response_text[:200],
@@ -251,10 +264,10 @@ def send_update_email(
             "request_id": request_id,
         }
     except Exception as exc:
-        logger.error("Mailtrap exception: %s", exc, exc_info=True)
+        logger.error("Brevo exception: %s", exc, exc_info=True)
         return {
             "success": False,
-            "status_text": "Mailtrap exception",
+            "status_text": "Brevo exception",
             "http_status": None,
             "response_text": None,
             "error": str(exc),

@@ -75,7 +75,7 @@ def test_project_digest_contains_current_future_and_security_state():
         last_seen_at=timezone.now(),
     )
 
-    service = NotificationService(mailtrap_key="key", sender_email="noreply@example.com")
+    service = NotificationService(api_key="key", sender_email="noreply@example.com")
     findings = list(project.security_vulnerabilities.filter(status="active"))
     digest = service._build_project_digest(
         project,
@@ -114,7 +114,7 @@ def test_high_security_finding_is_sent_once_by_scheduled_notification_cycle():
         "tracker.services.notification_service.send_update_email",
         return_value={"success": True, "status_text": "sent", "http_status": 200},
     ) as send_mock:
-        NotificationService(mailtrap_key="key", sender_email="noreply@example.com").notify_all_projects()
+        NotificationService(api_key="key", sender_email="noreply@example.com").notify_all_projects()
         finding.refresh_from_db()
 
         assert send_mock.call_count == 1
@@ -123,7 +123,7 @@ def test_high_security_finding_is_sent_once_by_scheduled_notification_cycle():
         assert finding.last_notified_signature
         assert finding.last_notified_at is not None
 
-        NotificationService(mailtrap_key="key", sender_email="noreply@example.com").notify_all_projects()
+        NotificationService(api_key="key", sender_email="noreply@example.com").notify_all_projects()
         assert send_mock.call_count == 1
 
 
@@ -144,15 +144,15 @@ def test_low_security_finding_does_not_trigger_security_only_email():
     )
 
     with patch("tracker.services.notification_service.send_update_email") as send_mock:
-        NotificationService(mailtrap_key="key", sender_email="noreply@example.com").notify_all_projects()
+        NotificationService(api_key="key", sender_email="noreply@example.com").notify_all_projects()
 
     send_mock.assert_not_called()
 
 
-def test_email_template_renders_health_future_and_escaped_content(monkeypatch):
-    monkeypatch.setenv("TEST_MODE", "True")
+def test_email_template_renders_health_future_and_escaped_content(settings):
+    settings.LIBTRACK_EMAIL_TEST_MODE = True
     result = send_update_email(
-        mailtrap_api_key="key",
+        api_key="key",
         project_name="<script>alert(1)</script>",
         recipients="dev@example.com",
         library="django",

@@ -9,7 +9,7 @@ Workflow:
   1. For each project, compare component versions against latest Library versions
   2. Filter based on user notification preferences (major/minor/future)
   3. Build email payload with update details
-  4. Send via Mailtrap/Sender
+  4. Send via Brevo
 """
 
 import hashlib
@@ -45,15 +45,15 @@ class NotificationService:
     Handles detection of relevant updates and sending notifications to projects.
     """
 
-    def __init__(self, mailtrap_key: str, sender_email: str):
+    def __init__(self, api_key: str, sender_email: str):
         """
         Initialize notification service.
 
         Args:
-            mailtrap_key: Mailtrap API key for sending emails
+            api_key: Brevo API key for sending emails
             sender_email: Sender email address
         """
-        self.mailtrap_key = mailtrap_key
+        self.api_key = api_key
         self.sender_email = sender_email
         self.sent_count = 0
         self.skipped_count = 0
@@ -777,7 +777,7 @@ class NotificationService:
             while attempt < max_retries:
                 attempt += 1
                 result = send_update_email(
-                    mailtrap_api_key=self.mailtrap_key,
+                    api_key=self.api_key,
                     project_name=project.project_name,
                     recipients=emails,
                     library=subject_library,
@@ -897,6 +897,16 @@ class NotificationService:
                     logger.error(f"Email send failed for {project.project_name}: {status_text}")
                     self.error_count += 1
 
+                    # A 4xx other than rate limiting is a permanent rejection
+                    # (bad key, unverified sender, malformed payload). Retrying
+                    # only burns the run's time budget with the same failure.
+                    if http_status and 400 <= http_status < 500 and http_status != 429:
+                        self._log(
+                            stdout_writer,
+                            f"↳ Not retrying: {http_status} is a permanent error",
+                        )
+                        break
+
                     # Backoff before next attempt (do not sleep after last attempt)
                     if attempt < max_retries:
                         backoff = min(2 ** attempt, 30)
@@ -904,7 +914,7 @@ class NotificationService:
 
             if not final_result:
                 # all attempts failed
-                self._log(stdout_writer, f"❌ All {max_retries} attempts failed for {project.project_name}")
+                self._log(stdout_writer, f"❌ All {attempt} attempt(s) failed for {project.project_name}")
 
         except Exception as e:
             self._log(

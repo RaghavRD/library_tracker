@@ -1,17 +1,14 @@
-import os
 import requests
 from typing import Iterable
-from dotenv import load_dotenv
 
-load_dotenv()
+from django.conf import settings
 
-# Mailtrap Transactional/Bulk API endpoint
-MAILTRAP_BASE = "https://bulk.api.mailtrap.io/api/send"
-TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+# Brevo transactional email endpoint
+BREVO_BASE = "https://api.brevo.com/v3/smtp/email"
 
 
 def send_confidence_update_email(
-    mailtrap_api_key: str | None,
+    api_key: str | None,
     project_name: str,
     recipients: Iterable[str] | str,
     library: str,
@@ -29,7 +26,7 @@ def send_confidence_update_email(
     Send an email notification when future update confidence increases significantly.
     
     Args:
-        mailtrap_api_key: Mailtrap API key (if None, uses MAILTRAP_API_KEY from .env)
+        api_key: Brevo API key (if None, uses BREVO_API_KEY from settings)
         project_name: Name of the project
         recipients: Iterable of emails or comma-separated string of emails
         library: Library name (e.g., 'Python')
@@ -40,20 +37,20 @@ def send_confidence_update_email(
         expected_date: Expected release date
         summary: Summary of planned features
         source: URL to announcement/roadmap
-        from_email: Sender email (if None, uses MAILTRAP_FROM_EMAIL from .env)
+        from_email: Sender email (if None, uses BREVO_FROM_EMAIL from settings)
         timeout: HTTP request timeout in seconds
     
     Returns:
         (success: bool, status_text: str)
     """
     
-    api_key = mailtrap_api_key or os.getenv("MAILTRAP_API_KEY")
-    from_addr = from_email or os.getenv("MAILTRAP_FROM_EMAIL")
+    api_key = api_key or getattr(settings, "BREVO_API_KEY", "")
+    from_addr = from_email or getattr(settings, "BREVO_FROM_EMAIL", "")
     
     if not api_key or not from_addr:
         return (
             False,
-            "❌ Missing MAILTRAP_API_KEY or MAILTRAP_FROM_EMAIL in .env",
+            "❌ Missing BREVO_API_KEY or BREVO_FROM_EMAIL",
         )
     
     # Normalize recipients
@@ -133,34 +130,37 @@ def send_confidence_update_email(
     """
     
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "api-key": api_key,
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
     
+    sender_name = getattr(settings, "BREVO_FROM_NAME", "LibTrack AI")
     payload = {
-        "from": {"email": "hello@demomailtrap.co", "name": "LibTrack AI"},
+        "sender": {"email": from_addr, "name": sender_name},
         "to": [{"email": r} for r in recipients],
+        "replyTo": {"email": from_addr, "name": sender_name},
         "subject": subject,
-        "html": html_content,
-        "category": "Confidence Updates",
+        "htmlContent": html_content,
+        "tags": ["Confidence Updates"],
     }
     
-    if TEST_MODE:
+    if getattr(settings, "LIBTRACK_EMAIL_TEST_MODE", True):
         print("TEST_MODE: Confidence Update Email subject:", subject)
         print("TEST_MODE: Old confidence:", old_confidence, "New:", new_confidence, "Change:", change_reason[:50])
         return True, "🧪 Confidence update email would be sent in TEST_MODE"
     
     try:
-        resp = requests.post(MAILTRAP_BASE, headers=headers, json=payload, timeout=timeout)
+        resp = requests.post(BREVO_BASE, headers=headers, json=payload, timeout=timeout)
         ok = 200 <= resp.status_code < 300
-        status_text = f"Mailtrap: {resp.status_code} - {resp.text[:200]}"
+        status_text = f"Brevo: {resp.status_code} - {resp.text[:200]}"
         if ok:
             print(f"✅ Confidence update email sent: {status_text}")
         else:
             print(f"❌ Confidence update email failed: {status_text}")
         return ok, status_text
     except Exception as e:
-        return False, f"Mailtrap exception: {e}"
+        return False, f"Brevo exception: {e}"
 
 
 # Existing send_update_email function follows...
