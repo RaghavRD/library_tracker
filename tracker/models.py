@@ -1,6 +1,7 @@
-from datetime import timedelta
+from datetime import timedelta, timezone as dt_timezone
 
 from django.db import models
+from django.db.models import Q
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
@@ -363,6 +364,15 @@ class DailyCheckRun(TimeStampedModel):
     # A serverless host kills the function without running our cleanup, so an
     # active run older than this is assumed abandoned rather than in progress.
     STALE_AFTER_MINUTES = 15
+    # A user may start one manual run in this window.
+    MANUAL_COOLDOWN_MINUTES = 10
+    # The run log shows this many days of runs; the daily cron deletes older ones.
+    RETENTION_DAYS = 7
+    # Keep in step with the "crons" schedule in vercel.json (05:30 UTC is 11:00 IST).
+    SCHEDULED_HOUR_UTC = 5
+    SCHEDULED_MINUTE_UTC = 30
+    # Some Vercel plans fire a cron anywhere within its scheduled hour.
+    SCHEDULED_GRACE_MINUTES = 45
 
     triggered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -434,6 +444,91 @@ class DailyCheckRun(TimeStampedModel):
             error_message=f"Run abandoned: still active {minutes} minutes after it was created.",
             # .update() bypasses auto_now, so keep updated_at honest by hand.
             updated_at=now,
+        )
+
+    @classmethod
+    def visible_to(cls, user):
+        """
+        Runs within the retention window that ``user`` may see in their run log.
+
+        That is their own manual runs plus every all-users run (the daily cron,
+        or an admin's global run), since those checked the user's projects too.
+        """
+        return cls.objects.filter(
+            Q(scope="owner", scope_owner=user) | Q(scope="global"),
+            created_at__gte=timezone.now() - timedelta(days=cls.RETENTION_DAYS),
+        )
+
+    @classmethod
+    def prune_old(cls, days: int | None = None) -> int:
+        """Delete finished runs older than the retention window. Returns the number deleted."""
+        days = cls.RETENTION_DAYS if days is None else days
+        # Notification records keep their rows; their link to the run is set to null.
+        _, deleted = cls.objects.filter(
+            created_at__lt=timezone.now() - timedelta(days=days),
+        ).exclude(status__in=cls.ACTIVE_STATUSES).delete()
+        return deleted.get(cls._meta.label, 0)
+
+    @classmethod
+    def _scheduled_on(cls, moment):
+        """The cron's firing time on ``moment``'s UTC date."""
+        return moment.astimezone(dt_timezone.utc).replace(
+            hour=cls.SCHEDULED_HOUR_UTC,
+            minute=cls.SCHEDULED_MINUTE_UTC,
+            second=0,
+            microsecond=0,
+        )
+
+    @classmethod
+    def next_scheduled_at(cls, now=None):
+        """When the daily cron fires next."""
+        now = now or timezone.now()
+        due = cls._scheduled_on(now)
+        return due if due > now else due + timedelta(days=1)
+
+    @classmethod
+    def scheduled_run_missed(cls, now=None) -> bool:
+        """
+        Whether today's scheduled run is overdue and never started.
+
+        A cron that does not fire writes no row, so the run log cannot show the
+        gap on its own.
+        """
+        now = now or timezone.now()
+        due = cls._scheduled_on(now)
+        if now < due + timedelta(minutes=cls.SCHEDULED_GRACE_MINUTES):
+            return False
+        return not cls.objects.filter(
+            scope="global",
+            triggered_by__isnull=True,
+            created_at__gte=due.replace(minute=0),
+        ).exists()
+
+    @property
+    def is_scheduled(self) -> bool:
+        return self.scope == "global" and self.triggered_by_id is None
+
+    def figures_for(self, user) -> dict | None:
+        """
+        Counts limited to ``user``'s projects.
+
+        An all-users run records them per owner when it finishes. Returns None
+        for a run that has none recorded (still active, or finished before
+        per-owner counts existed).
+        """
+        if self.scope == "owner":
+            return {
+                "projects": self.projects_scanned,
+                "libraries": self.libraries_checked,
+                "emails_sent": self.emails_sent,
+                "emails_failed": self.emails_failed,
+            }
+        owners = (self.summary or {}).get("owners")
+        if owners is None:
+            return None
+        return owners.get(
+            str(user.pk),
+            {"projects": 0, "libraries": 0, "emails_sent": 0, "emails_failed": 0},
         )
 
     @property

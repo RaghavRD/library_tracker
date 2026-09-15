@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}LibTrack AI - Run Logs{% endblock %}
+
+{% block content %}
+<div class="container-xl">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 page-header">
+    <div>
+      <h1 class="section-title">Run Logs</h1>
+      <p class="page-subtitle">Your manual checks and the daily scheduled check from the last {{ retention_days }} days.</p>
+    </div>
+    <a href="{% url 'settings' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to Settings
+    </a>
+  </div>
+
+  {% if scheduled_run_missed %}
+  <div class="alert alert-warning shadow-sm">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Today's scheduled check was due at {{ next_scheduled_at|date:"H:i T" }} but has not run.
+  </div>
+  {% endif %}
+
+  <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+    <div class="col">
+      <div class="card stat-card shadow-sm h-100">
+        <div class="card-body p-4">
+          <h6 class="text-uppercase small fw-bold text-muted mb-2">Last run</h6>
+          {% if last_run %}
+          <div class="fw-semibold">{{ last_run.created_at|date:"M d, H:i T" }}</div>
+          <div class="d-flex flex-wrap align-items-start gap-2 mt-2">
+            {% include "tracker/includes/run_status_badge.html" with run=last_run %}
+            <div>{% include "tracker/includes/run_trigger.html" with run=last_run %}</div>
+          </div>
+          {% else %}
+          <div class="text-muted">No runs yet</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card stat-card shadow-sm h-100">
+        <div class="card-body p-4">
+          <h6 class="text-uppercase small fw-bold text-muted mb-2">Next scheduled run</h6>
+          <div class="fw-semibold">{{ next_scheduled_at|date:"M d, H:i T" }}</div>
+          <p class="small text-muted mb-0 mt-2">Runs once a day for all projects</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card stat-card shadow-sm h-100">
+        <div class="card-body p-4">
+          <h6 class="text-uppercase small fw-bold text-muted mb-2">Succeeded</h6>
+          <div class="kpi-value">{{ run_counts.succeeded }}<span class="fs-6 text-muted fw-normal"> of {{ run_counts.total }}</span></div>
+          <p class="small text-muted mb-0 mt-2">Finished runs, last {{ retention_days }} days</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card stat-card shadow-sm h-100">
+        <div class="card-body p-4">
+          <h6 class="text-uppercase small fw-bold text-muted mb-2">Failed</h6>
+          <div class="kpi-value {% if run_counts.failed %}text-danger{% endif %}">{{ run_counts.failed }}</div>
+          <p class="small text-muted mb-0 mt-2">{{ run_counts.partial }} partial (stopped at the time limit)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card dashboard-insight-card mb-4">
+    <div class="card-header border-0 bg-transparent d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <h5 class="fw-bold mb-0">Runs</h5>
+      </div>
+      <form method="get" class="d-flex flex-wrap align-items-center gap-2 m-0">
+        <select name="trigger" class="form-select form-select-sm w-auto" style="min-width: 11rem;" aria-label="Filter by trigger">
+          <option value="">All triggers</option>
+          <option value="scheduled" {% if selected_trigger == "scheduled" %}selected{% endif %}>Scheduled</option>
+          <option value="manual" {% if selected_trigger == "manual" %}selected{% endif %}>Manual</option>
+        </select>
+        <select name="status" class="form-select form-select-sm w-auto" style="min-width: 11rem;" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        {% if selected_trigger or selected_status %}
+        <a href="{% url 'run_logs' %}" class="btn btn-link btn-sm">Clear</a>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="card-body pt-0">
+      {% if runs %}
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="text-center">
+            <tr>
+              <th>Run</th>
+              <th>Started</th>
+              <th>Trigger</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Projects</th>
+              <th>Libraries</th>
+              <th>Emails</th>
+              <th><span class="visually-hidden">Details</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in runs %}
+            <tr class="text-center">
+              <td class="fw-semibold">#{{ run.id }}</td>
+              <td class="text-nowrap">{{ run.started_at|default:run.created_at|date:"M d, H:i T" }}</td>
+              <td>{% include "tracker/includes/run_trigger.html" %}</td>
+              <td>{% include "tracker/includes/run_status_badge.html" %}</td>
+              <td>{{ run.duration_label }}</td>
+              {% if run.figures %}
+              <td>{{ run.figures.projects }}</td>
+              <td>{{ run.figures.libraries }}</td>
+              <td class="text-nowrap">
+                <span class="text-success">{{ run.figures.emails_sent }}</span>
+                <span class="text-muted">/</span>
+                <span class="text-danger">{{ run.figures.emails_failed }}</span>
+              </td>
+              {% else %}
+              <td class="text-muted">-</td>
+              <td class="text-muted">-</td>
+              <td class="text-muted">-</td>
+              {% endif %}
+              <td class="text-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm js-run-details-toggle"
+                  aria-expanded="false" aria-controls="run-details-{{ run.id }}">Details</button>
+              </td>
+            </tr>
+            <tr id="run-details-{{ run.id }}" hidden>
+              <td colspan="9" class="bg-body-tertiary">
+                <dl class="row small mb-0 py-2">
+                  <dt class="col-sm-3">Check depth</dt>
+                  <dd class="col-sm-9">{{ run.summary.check_mode|title|default:"-" }}</dd>
+
+                  <dt class="col-sm-3">Started / finished</dt>
+                  <dd class="col-sm-9">
+                    {{ run.started_at|date:"M d, H:i:s T"|default:"-" }} &rarr; {{ run.finished_at|date:"M d, H:i:s T"|default:"-" }}
+                  </dd>
+
+                  <dt class="col-sm-3">Step timings</dt>
+                  <dd class="col-sm-9">
+                    {% for step, seconds in run.summary.timings.items %}
+                    <span class="me-3 text-nowrap">{{ step|title }}: {{ seconds }}s</span>
+                    {% empty %}-{% endfor %}
+                  </dd>
+
+                  {% if run.summary.stopped_before %}
+                  <dt class="col-sm-3">Stopped before</dt>
+                  <dd class="col-sm-9">{{ run.summary.stopped_before|title }} step (time limit reached)</dd>
+                  {% endif %}
+
+                  {% if run.scope == "owner" %}
+                  <dt class="col-sm-3">Future updates found</dt>
+                  <dd class="col-sm-9">{{ run.future_updates_found }}</dd>
+
+                  <dt class="col-sm-3">Security findings</dt>
+                  <dd class="col-sm-9">{{ run.security_findings_found }}</dd>
+
+                  <dt class="col-sm-3">No email needed</dt>
+                  <dd class="col-sm-9">{{ run.emails_skipped }} project{{ run.emails_skipped|pluralize }}</dd>
+                  {% else %}
+                  <dt class="col-sm-3">Scope</dt>
+                  <dd class="col-sm-9">
+                    All users. {% if run.figures %}Projects, libraries and emails above count only your projects.{% else %}Per-user counts were not recorded for this run.{% endif %}
+                  </dd>
+                  {% endif %}
+
+                  <dt class="col-sm-3">Error</dt>
+                  <dd class="col-sm-9 {% if run.error_message %}text-danger{% endif %}">{{ run.error_message|linebreaksbr|default:"-" }}</dd>
+                </dl>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if runs_page.paginator.num_pages > 1 %}
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <small class="text-muted">
+          Showing {{ runs_page.start_index }}-{{ runs_page.end_index }} of {{ runs_page.paginator.count }} run{{ runs_page.paginator.count|pluralize }}
+        </small>
+        <nav aria-label="Run log pagination">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if not runs_page.has_previous %}disabled{% endif %}">
+              {% if runs_page.has_previous %}
+              <a class="page-link" href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ runs_page.previous_page_number }}">Previous</a>
+              {% else %}
+              <span class="page-link">Previous</span>
+              {% endif %}
+            </li>
+            <li class="page-item disabled">
+              <span class="page-link">Page {{ runs_page.number }} of {{ runs_page.paginator.num_pages }}</span>
+            </li>
+            <li class="page-item {% if not runs_page.has_next %}disabled{% endif %}">
+              {% if runs_page.has_next %}
+              <a class="page-link" href="?{% if filter_query %}{{ filter_query }}&amp;{% endif %}page={{ runs_page.next_page_number }}">Next</a>
+              {% else %}
+              <span class="page-link">Next</span>
+              {% endif %}
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+      {% else %}
+      <p class="text-muted small mb-0">
+        {% if selected_trigger or selected_status %}No runs match these filters.{% else %}No check runs in the last {{ retention_days }} days.{% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll(".js-run-details-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = document.getElementById(button.getAttribute("aria-controls"));
+      row.hidden = !row.hidden;
+      button.setAttribute("aria-expanded", String(!row.hidden));
+      button.textContent = row.hidden ? "Details" : "Hide";
+    });
+  });
+</script>
+{% endblock %}

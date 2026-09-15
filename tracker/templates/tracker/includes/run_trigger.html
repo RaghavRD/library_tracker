@@ -1,0 +1,8 @@
+{% if run.is_scheduled %}
+<span class="badge bg-primary-subtle text-primary-emphasis"><i class="bi bi-clock me-1"></i>Scheduled</span>
+{% else %}
+<span class="badge bg-secondary-subtle text-secondary-emphasis"><i class="bi bi-person me-1"></i>Manual</span>
+{% if run.scope == "global" %}
+<div class="text-muted small">all users{% if run.triggered_by_id != user.id %}, by an admin{% endif %}</div>
+{% endif %}
+{% endif %}

@@ -32,9 +32,6 @@
         </button>
       </form>
       {% endif %}
-      <a href="{% url 'settings' %}" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-gear-fill me-1"></i> Manage Projects
-      </a>
     </div>
   </div>
 
@@ -112,9 +109,11 @@
     <div class="card-header border-0 bg-transparent d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div>
         <h5 class="fw-bold mb-0">Recent Runs</h5>
-        <p class="page-subtitle">Manual check status, delivery totals, and audit trail</p>
+        <p class="page-subtitle">Your manual checks and the daily scheduled check, counted for your projects</p>
       </div>
-      <span class="badge bg-secondary-subtle text-secondary">Latest 5</span>
+      <a href="{% url 'run_logs' %}" class="btn btn-outline-secondary btn-sm">
+        View all runs <i class="bi bi-arrow-right ms-1"></i>
+      </a>
     </div>
     <div class="card-body pt-0">
       {% if recent_daily_check_runs %}
@@ -136,24 +135,26 @@
             {% for run in recent_daily_check_runs %}
             <tr class="text-center">
               <td class="fw-semibold">#{{ run.id }}</td>
+              <td>{% include "tracker/includes/run_status_badge.html" %}</td>
               <td>
-                <span class="badge {% if run.status == 'success' %}bg-success{% elif run.status == 'failed' %}bg-danger{% elif run.status == 'running' or run.status == 'queued' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                  {{ run.status|title }}
-                </span>
-              </td>
-              <td>
-                {% if run.started_at %}{{ run.started_at|date:"M d, H:i" }}{% else %}{{ run.created_at|date:"M d, H:i" }}{% endif %}
-                <div class="text-muted small">by {{ run.triggered_by|default:"system" }}</div>
+                {{ run.started_at|default:run.created_at|date:"M d, H:i" }}
+                <div class="mt-1">{% include "tracker/includes/run_trigger.html" %}</div>
               </td>
               <td>{{ run.duration_label }}</td>
-              <td>{{ run.projects_scanned }}</td>
-              <td>{{ run.libraries_checked }}</td>
+              {% if run.figures %}
+              <td>{{ run.figures.projects }}</td>
+              <td>{{ run.figures.libraries }}</td>
               <td>
-                <span class="text-success">{{ run.emails_sent }}</span>
+                <span class="text-success">{{ run.figures.emails_sent }}</span>
                 <span class="text-muted">/</span>
-                <span class="text-danger">{{ run.emails_failed }}</span>
-                <div class="text-muted small">{{ run.emails_skipped }} no email needed</div>
+                <span class="text-danger">{{ run.figures.emails_failed }}</span>
+                {% if run.scope == "owner" %}<div class="text-muted small">{{ run.emails_skipped }} no email needed</div>{% endif %}
               </td>
+              {% else %}
+              <td class="text-muted">-</td>
+              <td class="text-muted">-</td>
+              <td class="text-muted">-</td>
+              {% endif %}
               <td class="text-start text-danger small">{{ run.error_message|truncatechars:80|default:"-" }}</td>
             </tr>
             {% endfor %}
@@ -161,7 +162,7 @@
         </table>
       </div>
       {% else %}
-      <p class="text-muted small mb-0">No manual check runs yet.</p>
+      <p class="text-muted small mb-0">No check runs in the last 7 days.</p>
       {% endif %}
     </div>
   </div>

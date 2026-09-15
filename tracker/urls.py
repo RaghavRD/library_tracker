@@ -17,4 +17,5 @@ urlpatterns = [
     path("security-alerts/", views.security_alerts, name="security_alerts"),
     path("profile/", views.profile_view, name="profile"),
     path("settings/", views.settings_view, name="settings"),
+    path("settings/run-logs/", views.run_logs_view, name="run_logs"),
 ]

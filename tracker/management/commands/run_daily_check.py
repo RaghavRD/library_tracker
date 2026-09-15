@@ -24,11 +24,13 @@ Services:
 import os
 import logging
 import time
+from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Count
 from django.utils import timezone
 
 from tracker.services import (
@@ -39,7 +41,7 @@ from tracker.services import (
     NotificationService,
     DashboardMetricsService,
 )
-from tracker.models import DailyCheckRun, Project
+from tracker.models import DailyCheckRun, Library, NotificationRecord, Project, UserPreference
 
 # Get logger
 logger = logging.getLogger('libtrack')
@@ -361,6 +363,51 @@ class Command(BaseCommand):
         run.error_message = ""
         run.save(update_fields=["status", "started_at", "scope_owner", "error_message", "updated_at"])
 
+    @staticmethod
+    def _figures_by_owner(run):
+        """
+        Break an all-users run down per project owner.
+
+        The run's own counters are totals across every user. Each user's run log
+        shows these instead, so nobody sees counts for someone else's projects.
+        Returns None if they could not be worked out; the run still finishes.
+        """
+        figures = defaultdict(
+            lambda: {"projects": 0, "libraries": 0, "emails_sent": 0, "emails_failed": 0}
+        )
+        try:
+            projects = (
+                Project.objects.filter(owner__isnull=False)
+                .values("owner")
+                .annotate(total=Count("id"))
+                .order_by()
+            )
+            for row in projects:
+                figures[row["owner"]]["projects"] = row["total"]
+
+            libraries = (
+                Library.objects.filter(linked_components__project__owner__isnull=False)
+                .values("linked_components__project__owner")
+                .annotate(total=Count("id", distinct=True))
+                .order_by()
+            )
+            for row in libraries:
+                figures[row["linked_components__project__owner"]]["libraries"] = row["total"]
+
+            emails = (
+                NotificationRecord.objects.filter(daily_check_run=run, project__owner__isnull=False)
+                .values("project__owner", "success")
+                .annotate(total=Count("id"))
+                .order_by()
+            )
+            for row in emails:
+                key = "emails_sent" if row["success"] else "emails_failed"
+                figures[row["project__owner"]][key] += row["total"]
+        except Exception:
+            logger.exception("Could not record per-owner figures for daily check run %s", run.pk)
+            return None
+        return {str(owner_id): counts for owner_id, counts in figures.items()}
+
     def _mark_run_finished(self, *, status, duration, error="", stopped_before=None):
         run = getattr(self, "daily_check_run", None)
         if not run:
@@ -368,8 +415,13 @@ class Command(BaseCommand):
         summary = dict(getattr(self, "run_summary", {}) or {})
         # Per-step timings are what tell you which step is eating the budget.
         summary["timings"] = getattr(self, "step_timings", {})
+        summary["check_mode"] = UserPreference.THOROUGH if self.force else UserPreference.QUICK
         if stopped_before:
             summary["stopped_before"] = stopped_before
+        if self.scope_owner is None:
+            owners = self._figures_by_owner(run)
+            if owners is not None:
+                summary["owners"] = owners
         fetch = summary.get("fetch") or {}
         future = summary.get("future") or {}
         security = summary.get("security") or {}

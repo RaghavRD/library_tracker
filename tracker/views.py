@@ -13,9 +13,10 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.management import call_command
+from django.db.models import Count, Q
 from django.template.defaultfilters import pluralize
 from django.utils import timezone
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 
 from tracker.models import (
     DailyCheckRun,
@@ -123,13 +124,9 @@ def dashboard(request):
     context = DashboardMetricsService.build_for_owner(request.user)
     DailyCheckRun.reap_stale()
     active_statuses = DailyCheckRun.ACTIVE_STATUSES
-    recent_runs_qs = DailyCheckRun.objects.select_related("triggered_by", "scope_owner")
-    if request.user.is_staff or request.user.is_superuser:
-        recent_runs = recent_runs_qs.order_by("-created_at")[:5]
-    else:
-        recent_runs = recent_runs_qs.filter(scope_owner=request.user).order_by("-created_at")[:5]
+    recent_runs = DailyCheckRun.visible_to(request.user).order_by("-created_at")[:5]
 
-    cooldown_since = timezone.now() - timedelta(minutes=15)
+    cooldown_since = timezone.now() - timedelta(minutes=DailyCheckRun.MANUAL_COOLDOWN_MINUTES)
     cooldown_run = DailyCheckRun.objects.filter(
         scope_owner=request.user,
         created_at__gte=cooldown_since,
@@ -141,15 +138,23 @@ def dashboard(request):
     preference = UserPreference.for_user(request.user)
     context.update(
         {
-            "recent_daily_check_runs": recent_runs,
+            "recent_daily_check_runs": _attach_run_figures(recent_runs, request.user),
             "manual_run_cooldown_active": bool(cooldown_run),
-            "manual_run_cooldown_minutes": 15,
+            "manual_run_cooldown_minutes": DailyCheckRun.MANUAL_COOLDOWN_MINUTES,
             "needs_check_mode_choice": not preference.has_chosen_check_mode,
             "check_mode": preference.check_mode,
             "email_test_mode": getattr(settings, "LIBTRACK_EMAIL_TEST_MODE", True),
         }
     )
     return render(request, "tracker/dashboard.html", context)
+
+
+def _attach_run_figures(runs, user):
+    """Give each run the counts ``user`` may see; a template cannot call figures_for(user)."""
+    runs = list(runs)
+    for run in runs:
+        run.figures = run.figures_for(user)
+    return runs
 
 
 @login_required
@@ -175,14 +180,15 @@ def run_daily_check_now(request):
         messages.warning(request, "A check is already running. Wait for it to finish before starting another one.")
         return redirect("dashboard")
 
-    cooldown_since = timezone.now() - timedelta(minutes=15)
+    cooldown_minutes = DailyCheckRun.MANUAL_COOLDOWN_MINUTES
+    cooldown_since = timezone.now() - timedelta(minutes=cooldown_minutes)
     cooldown_qs = DailyCheckRun.objects.filter(created_at__gte=cooldown_since).exclude(status__in=active_statuses)
     if is_global:
         cooldown_qs = cooldown_qs.filter(scope="global", triggered_by=request.user)
     else:
         cooldown_qs = cooldown_qs.filter(scope_owner=request.user)
     if cooldown_qs.exists():
-        messages.warning(request, "Manual checks are limited to one run every 15 minutes.")
+        messages.warning(request, f"Manual checks are limited to one run every {cooldown_minutes} minutes.")
         return redirect("dashboard")
 
     preference = UserPreference.for_user(request.user)
@@ -304,6 +310,9 @@ def run_scheduled_daily_check(request):
     reaped = DailyCheckRun.reap_stale()
     if reaped:
         logger.warning("Reaped %s abandoned daily check run(s) before scheduled run", reaped)
+    pruned = DailyCheckRun.prune_old()
+    if pruned:
+        logger.info("Deleted %s daily check run(s) past the retention window", pruned)
 
     active_run = DailyCheckRun.objects.filter(
         scope="global",
@@ -757,4 +766,52 @@ def settings_view(request):
     return render(request, 'tracker/settings.html', {
         'projects': projects,
         'check_mode': preference.check_mode,
+        'last_run': DailyCheckRun.visible_to(request.user).order_by('-created_at').first(),
+        'next_scheduled_at': DailyCheckRun.next_scheduled_at(),
+    })
+
+
+@login_required
+@require_GET
+def run_logs_view(request):
+    """Run history for the signed-in user: their manual runs and the all-users runs."""
+    DailyCheckRun.reap_stale()
+    visible = DailyCheckRun.visible_to(request.user)
+
+    runs = visible.select_related("triggered_by")
+    trigger = request.GET.get("trigger", "")
+    if trigger == "scheduled":
+        runs = runs.filter(scope="global", triggered_by__isnull=True)
+    elif trigger == "manual":
+        runs = runs.filter(triggered_by__isnull=False)
+    else:
+        trigger = ""
+    status = request.GET.get("status", "")
+    if status in dict(DailyCheckRun.STATUS_CHOICES):
+        runs = runs.filter(status=status)
+    else:
+        status = ""
+
+    runs_page = Paginator(runs.order_by("-created_at"), 20).get_page(request.GET.get("page"))
+    run_counts = visible.exclude(status__in=DailyCheckRun.ACTIVE_STATUSES).aggregate(
+        total=Count("id"),
+        succeeded=Count("id", filter=Q(status="success")),
+        partial=Count("id", filter=Q(status="partial")),
+        failed=Count("id", filter=Q(status="failed")),
+    )
+
+    return render(request, "tracker/run_logs.html", {
+        "runs_page": runs_page,
+        "runs": _attach_run_figures(runs_page.object_list, request.user),
+        "selected_trigger": trigger,
+        "selected_status": status,
+        "status_choices": DailyCheckRun.STATUS_CHOICES,
+        "filter_query": urlencode({key: value for key, value in (("trigger", trigger), ("status", status)) if value}),
+        "last_run": visible.order_by("-created_at").first(),
+        "next_scheduled_at": DailyCheckRun.next_scheduled_at(),
+        # The cron only exists on Vercel, so a missed run means nothing locally.
+        "scheduled_run_missed": getattr(settings, "IS_VERCEL", False) and DailyCheckRun.scheduled_run_missed(),
+        "run_counts": run_counts,
+        "retention_days": DailyCheckRun.RETENTION_DAYS,
+        "cooldown_minutes": DailyCheckRun.MANUAL_COOLDOWN_MINUTES,
     })

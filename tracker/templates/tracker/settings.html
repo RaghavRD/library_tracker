@@ -71,6 +71,28 @@
             </div>
         </div>
 
+        <div class="card stat-card shadow-sm settings-card mb-4">
+            <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h6 class="text-uppercase small fw-bold text-muted mb-1">Run Logs</h6>
+                    <h5 class="mb-1">Recent check runs</h5>
+                    <p class="text-muted small mb-2">Your manual checks and the daily scheduled check from the last 7 days.</p>
+                    <div class="d-flex flex-wrap align-items-center gap-2 small">
+                        {% if last_run %}
+                        <span class="text-muted">Last run {{ last_run.created_at|date:"M d, H:i T" }}</span>
+                        {% include "tracker/includes/run_status_badge.html" with run=last_run %}
+                        {% else %}
+                        <span class="text-muted">No runs in the last 7 days.</span>
+                        {% endif %}
+                        <span class="text-muted">&middot; Next scheduled {{ next_scheduled_at|date:"M d, H:i T" }}</span>
+                    </div>
+                </div>
+                <a href="{% url 'run_logs' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-journal-text me-1"></i>View run logs
+                </a>
+            </div>
+        </div>
+
         {% if projects %}
         <form method="post">
             {% csrf_token %}
