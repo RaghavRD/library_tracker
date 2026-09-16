@@ -591,6 +591,11 @@ hr { border-color: var(--lt-border); opacity: 1; }
   color: #fff;
   margin: 8px 0;
 }
+/* The same figure on a plain card. .kpi-value is white because it only ever
+   sat on the gradient cards; on a surface card that vanishes in light theme. */
+.kpi-value-plain {
+  color: var(--lt-heading);
+}
 .kpi-icon {
   width: 38px;
   height: 38px;
