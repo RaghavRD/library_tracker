@@ -18,7 +18,7 @@
         <input type="hidden" name="check_mode" value="{{ check_mode }}">
         <button type="submit" class="btn btn-primary btn-sm js-run-check-btn" {% if manual_run_cooldown_active %}disabled{% endif %}>
           <i class="bi bi-play-circle me-1"></i>
-          <span class="js-run-check-label">{% if email_test_mode %}Run Check in Test Mode{% else %}Run Check & Send Notifications{% endif %}</span>
+          <span class="js-run-check-label">{% if email_test_mode %}Run Check{% else %}Run Check & Send Notifications{% endif %}</span>
         </button>
       </form>
       {% if user.is_staff or user.is_superuser %}

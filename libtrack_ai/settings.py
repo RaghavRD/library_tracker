@@ -385,6 +385,10 @@ try:
 except (ValueError, TypeError):
     LIBTRACK_RUN_BUDGET_SECONDS = 240.0 if IS_VERCEL else 0.0
 
+# Ask Groq to condense release notes that are still long after cleaning.
+# Turn off to trim the cleaned text instead, with no AI call.
+LIBTRACK_AI_SUMMARIES = os.getenv("LIBTRACK_AI_SUMMARIES", "True") == "True"
+
 # Logging Configuration
 LIBTRACK_LOG_DETECTION_METHOD = os.getenv("LIBTRACK_LOG_DETECTION_METHOD", "True") == "True"
 LIBTRACK_LOG_HTTP_STATUS = os.getenv("LIBTRACK_LOG_HTTP_STATUS", "True") == "True"

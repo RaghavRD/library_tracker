@@ -36,7 +36,7 @@ PACKAGE DETAILS
 Expected: {{ package.future_expected_date }}{% if package.future_confidence != None %}; confidence: {{ package.future_confidence }}%{% endif %}
 {% if package.future_source %}Future source: {{ package.future_source }}
 {% endif %}{% endif %}{% for finding in package.security_findings %}{{ finding.severity }} security finding - {{ finding.osv_id }}
-{{ finding.summary|truncatechars:320 }}
+{{ finding.summary|truncatechars:400 }}
 Affected: {{ finding.affected_version }}{% if finding.fixed_versions %}; fixed in: {{ finding.fixed_versions|join:", " }}{% endif %}
 {% if finding.source_url %}Security details: {{ finding.source_url }}
 {% endif %}{% endfor %}

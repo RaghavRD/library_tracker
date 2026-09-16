@@ -136,6 +136,17 @@ DEPRECATED_MODELS = {
     "mixtral-8x7b-32768",
 }
 
+_SUMMARY_SYSTEM_PROMPT = (
+    "You summarize software release notes and vulnerability reports for a "
+    "developer email digest. Use only facts stated in the input; never guess or "
+    "add anything. Reply with two or three plain sentences covering what matters "
+    "to someone deciding whether to upgrade: breaking changes first, then "
+    "security fixes, then notable features. No markdown, no HTML, no bullet "
+    "characters, no headings, no links. If the input holds no release "
+    "information, reply with nothing at all."
+)
+
+
 # --- Core Analyzer Class ---
 class GroqAnalyzer:
     def __init__(self):
@@ -278,6 +289,35 @@ class GroqAnalyzer:
         # print(json.dumps(data, indent=2))
 
         return data
+
+    def summarize_release_notes(
+        self, text: str, *, library: str = "", version: str = "", max_chars: int = 400
+    ) -> str:
+        """
+        Condense release notes or a vulnerability write-up into plain sentences.
+
+        For text too long to show in an email. Returns "" when the model has
+        nothing useful to say, leaving the caller to trim the text instead.
+        """
+        label = f"{library} {version}".strip() or "this library"
+        comp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": _SUMMARY_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Summarize these release notes for {label} in at most "
+                        f"{max_chars} characters.\n\n{text[:12000]}"
+                    ),
+                },
+            ],
+            temperature=0.2,
+            # Condensing given text is not a puzzle; keep the billed tokens low.
+            reasoning_effort="low",
+            max_completion_tokens=700,
+        )
+        return str(comp.choices[0].message.content or "").strip()
 
 
 # ✅ Manual test

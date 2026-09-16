@@ -36,6 +36,7 @@ from tracker.models import (
 )
 from tracker.services.dashboard_metrics_service import DashboardMetricsService
 from tracker.utils.send_mail import send_update_email
+from tracker.utils.text_summary import clean_summary
 
 logger = logging.getLogger(__name__)
 
@@ -259,8 +260,11 @@ class NotificationService:
                     "security_color": self._severity_color(security_bucket),
                     "security_count": len(package_findings),
                     "detected_on": self._format_date(detected_on),
-                    "release_summary": (
-                        latest_release.summary if latest_release and latest_release.summary else ""
+                    # Cleaned again here: rows saved before summaries were
+                    # cleaned still hold READMEs and raw markdown, and an email
+                    # escapes HTML, so raw text would reach the reader as tags.
+                    "release_summary": clean_summary(
+                        latest_release.summary if latest_release else ""
                     ),
                     "release_date": (
                         str(latest_release.release_date)
@@ -270,7 +274,7 @@ class NotificationService:
                     "release_source": self._safe_url(
                         latest_release.source_url if latest_release else ""
                     ),
-                    "future_summary": future_update.features if future_update else "",
+                    "future_summary": clean_summary(future_update.features if future_update else ""),
                     "future_source": self._safe_url(future_update.source if future_update else ""),
                     "future_confidence": future_update.confidence if future_update else None,
                     "future_expected_date": (
@@ -376,7 +380,9 @@ class NotificationService:
             "osv_id": finding.osv_id,
             "severity": cls._severity_label(bucket),
             "severity_color": cls._severity_color(bucket),
-            "summary": finding.summary or finding.details or "Known vulnerability detected.",
+            # OSV details are markdown; the stored text is left untouched because
+            # the re-notification signature is built from it.
+            "summary": clean_summary(finding.summary or finding.details) or "Known vulnerability detected.",
             "affected_version": finding.version or "-",
             "fixed_versions": finding.fixed_versions or [],
             "source_url": cls._safe_url(finding.source_url),

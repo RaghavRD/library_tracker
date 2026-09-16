@@ -173,7 +173,9 @@ class GitHubFetcher:
                 version=version,
                 release_date=self._parse_date(release.get("published_at")) or datetime.now().date(),
                 homepage_url=release.get("html_url", ""),
-                summary=release.get("body", "")[:500],
+                # Kept long on purpose: the summarizer needs the whole body to
+                # work from, and it shortens what it stores.
+                summary=release.get("body", "")[:4000],
                 source_url=release.get("html_url", ""),
                 trust_level=95, # High trust for GitHub API
                 is_prerelease=False,
@@ -208,7 +210,7 @@ class GitHubFetcher:
                         version=version,
                         release_date=self._parse_date(release.get("published_at")),
                         prerelease_type=FutureVersionValidator.classify_prerelease_type(version),
-                        summary=release.get("body", "")[:500], # Truncate summary
+                        summary=release.get("body", "")[:4000], # Summarized before it is stored
                         source_url=release.get("html_url", ""),
                         trust_level=95,
                         is_published=True # GitHub Release means it's published/tagged

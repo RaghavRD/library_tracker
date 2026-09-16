@@ -14,6 +14,7 @@ from django.utils import timezone
 from tracker.utils.version_detector import VersionDetector
 from tracker.utils.registry_adapters import VersionInfo
 from tracker.models import Library, LibraryRelease
+from tracker.utils.text_summary import looks_unsummarized, summarize
 
 logger = logging.getLogger('libtrack')
 
@@ -103,15 +104,27 @@ class LibraryUpdateHelper:
             version=version_info.version,
             defaults={
                 "release_date": version_info.release_date,
-                "summary": version_info.summary,
+                "summary": "",
                 "source_url": version_info.source_url,
                 "is_security_release": False,
             }
         )
 
+        # Registries hand over whatever they have: a PyPI long description is a
+        # whole README, a GitHub release body is markdown with badges. Store a
+        # cleaned, shortened version. A summary that is already clean is left
+        # alone, since re-summarizing unchanged notes would spend an AI call on
+        # every run.
+        if created or not release.summary or looks_unsummarized(release.summary):
+            release.summary = summarize(
+                version_info.summary,
+                library=library.name,
+                version=version_info.version,
+            )
+            release.save(update_fields=["summary"])
+
         if not created:
             # Update existing release
-            release.summary = version_info.summary
             release.source_url = version_info.source_url
             release.release_date = version_info.release_date
 

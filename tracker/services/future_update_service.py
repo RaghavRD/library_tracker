@@ -22,6 +22,7 @@ from django.db import models
 
 from tracker.models import FutureUpdateCache, FutureUpdateHistory
 from tracker.utils.future_version_detector import FutureVersionDetector
+from tracker.utils.text_summary import clean_summary
 
 logger = logging.getLogger(__name__)
 
@@ -313,6 +314,12 @@ class FutureUpdateService:
         Returns:
             dict: Notification payload, or None when an unchanged existing entry should not re-notify
         """
+        # A pre-release body or roadmap page arrives as markdown, and this text
+        # is shown in emails. Clean it here, before it is stored or compared
+        # against what is stored. Rule-based only, so the same notes always
+        # produce the same text and cannot look like an update every run.
+        summary = clean_summary(summary)
+
         # Parse expected date
         parsed_date = None
         if expected_date:

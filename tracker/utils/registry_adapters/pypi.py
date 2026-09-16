@@ -89,8 +89,11 @@ class PyPIRegistry(PackageRegistry):
                 version=version,
                 release_date=release_date,
                 homepage_url=info.get("home_page") or info.get("project_url", ""),
-                # summary=info.get("summary", ""),
-                summary=info.get("description", ""),
+                # PyPI's "description" is the project's entire README, the same
+                # for every version; "summary" is the one-line blurb worth
+                # showing. Fall back to the README only when there is no blurb,
+                # and leave shortening to the summarizer that stores it.
+                summary=info.get("summary") or info.get("description", ""),
                 source_url=f"https://pypi.org/project/{package_name}/{version}/",
                 trust_level=100,  # Official PyPI API
                 is_prerelease=is_prerelease,

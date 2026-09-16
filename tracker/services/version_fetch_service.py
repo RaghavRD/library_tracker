@@ -26,6 +26,7 @@ from tracker.models import Library, LibraryRelease
 from tracker.utils.library_update_helper import LibraryUpdateHelper
 from tracker.utils.groq_analyzer import GroqAnalyzer
 from tracker.utils.serper_fetcher import SerperFetcher
+from tracker.utils.text_summary import clean_summary
 
 logger = logging.getLogger(__name__)
 
@@ -380,7 +381,7 @@ class VersionFetchService:
             version=detected_version,
             defaults={
                 "release_date": parsed_release_date,
-                "summary": analysis.get("summary", ""),
+                "summary": clean_summary(analysis.get("summary", "")),
                 "source_url": analysis.get("source", ""),
                 "is_security_release": False,
                 "detection_source": "serper_groq",  # Track that this was from Serper+Groq fallback
@@ -389,7 +390,7 @@ class VersionFetchService:
 
         if not created:
             # Update existing release with new data
-            release.summary = analysis.get("summary", "")
+            release.summary = clean_summary(analysis.get("summary", ""))
             release.source_url = analysis.get("source", "")
             release.release_date = parsed_release_date
             release.save()
